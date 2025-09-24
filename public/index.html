@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Expense Tracker & Blog</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4f46e5',
+                        secondary: '#7c3aed',
+                        accent: '#10b981',
+                        dark: '#1f2937',
+                        light: '#f9fafb'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f0f9ff 0%, #fdf2ff 100%);
+            min-height: 100vh;
+        }
+        .card { transition: transform .3s, box-shadow .3s; }
+        .card:hover { transform: translateY(-5px); }
+        .btn-primary {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%);
+            transform: translateY(-2px);
+        }
+        .notification { animation: slideIn .3s ease; }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .expense-table th { background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%); }
+        @media (max-width: 1200px) { .expense-table { display: block; overflow-x: auto; } }
+    </style>
+
+</head>
+<body class="p-4 md:p-6">
+    <!-- AUTH SCREEN -->
+    <div id="authScreen" class="fixed inset-0 bg-gradient-to-br from-primary to-secondary flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+            <h2 class="text-2xl font-bold text-center text-gray-800">Secure Expense Tracker</h2>
+            <div id="loginForm">
+                <h3 class="text-lg font-semibold mb-4">Login to your account</h3>
+                <input type="text" id="loginUsername" placeholder="Username" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary mb-3">
+                <input type="password" id="loginPassword" placeholder="Password" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary mb-4">
+                <button id="loginBtn" class="w-full btn-primary text-white py-3 rounded-lg font-semibold">Login</button>
+                <p class="text-center mt-4 text-sm text-gray-600">
+                    Don't have an account? 
+                    <button id="showRegister" class="text-primary hover:underline">Register here</button>
+                </p>
+            </div>
+            <div id="registerForm" class="hidden">
+                <h3 class="text-lg font-semibold mb-4">Create new account</h3>
+                <input type="text" id="registerUsername" placeholder="Username" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary mb-3">
+                <input type="password" id="registerPassword" placeholder="Password" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary mb-4">
+                <button id="registerBtn" class="w-full btn-primary text-white py-3 rounded-lg font-semibold">Register</button>
+                <p class="text-center mt-4 text-sm text-gray-600">
+                    Already have an account? 
+                    <button id="showLogin" class="text-primary hover:underline">Login here</button>
+                </p>
+            </div>
+            <p id="authError" class="text-red-600 text-sm text-center hidden"></p>
+        </div>
+    </div>
+
+    <!-- MAIN APP -->
+<div id="app" class="max-w-7xl mx-auto hidden">
+    <header class="bg-gradient-to-r from-primary to-secondary rounded-2xl shadow-xl p-6 md:p-8 mb-8 text-white">
+        <div class="text-center mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold mb-3">Secure Expense Tracker & Blog</h1>
+            <p class="text-indigo-100 mb-6">Track payments, manage balances, jot down thoughts – all securely stored</p>
+        </div>
+        <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
+            <button id="addExpenseBtn" class="btn btn-primary flex items-center gap-2 px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all">
+                <i class="fas fa-plus"></i> Add Expense
+            </button>
+            <button id="addBlogPostBtn" class="btn bg-white text-purple-600 hover:bg-gray-100 flex items-center gap-2 px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all">
+                <i class="fas fa-plus"></i> Write Blog Post
+            </button>
+            <button id="exportBtn" class="btn bg-emerald-500 hover:bg-emerald-600 flex items-center gap-2 px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all">
+                <i class="fas fa-download"></i> Export Data
+            </button>
+        </div>
+        <div class="text-center mt-4">
+            <span id="usernameDisplay" class="text-indigo-200 font-medium"></span>
+            <button id="logoutBtn" class="ml-4 bg-white text-primary px-4 py-1 rounded-lg font-semibold hover:bg-gray-100 text-sm">Logout</button>
+        </div>
+    </header>
+
+        <!-- SUMMARY SECTION -->
+        <div id="summarySection" class="mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6" id="summaryCards"></div>
+            <div class="card bg-white rounded-2xl shadow-lg p-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4"><center>Category Breakdown</center></h2>
+                <div id="categoryBreakdown" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"></div>
+            </div>
+        </div>
+
+        <!-- EXPENSES SECTION -->
+        <section class="card bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl shadow-xl p-6 md:p-8 mb-8 text-white">
+            <div class="text-center mb-6">
+                <h2 class="text-2xl md:text-3xl font-bold mb-2">Expense Records</h2>
+                <p class="text-blue-100">Your complete financial history</p>
+            </div>
+            <div id="emptyExpenseState" class="text-center py-8">
+                <i class="fas fa-file-invoice text-5xl opacity-80 mb-4"></i>
+                <p class="text-lg mb-4">No expenses yet – add your first expense!</p>
+                <button id="addFirstExpenseBtn" class="btn bg-white text-blue-600 px-6 py-3 rounded-xl font-semibold">Add First Expense</button>
+            </div>
+            <div id="expenseTableContainer" class="hidden">
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                    <table class="w-full text-sm text-gray-800">
+                        <thead>
+                            <tr class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+                                <th class="p-4 text-left">Date/Time</th>
+                                <th class="p-4 text-left">Category</th>
+                                <th class="p-4 text-left">Session/Term</th>
+                                <th class="p-4 text-left">Recipient</th>
+                                <th class="p-4 text-left">Description</th>
+                                <th class="p-4 text-left">Amount Paid</th>
+                                <th class="p-4 text-left">Balance Due</th>
+                                <th class="p-4 text-left">Status</th>
+                                <th class="p-4 text-left">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="expenseTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- BLOG SECTION -->
+        <section class="card bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl shadow-xl p-6 md:p-8 mb-8 text-white">
+            <div class="text-center mb-6">
+                <h2 class="text-2xl md:text-3xl font-bold mb-2">Personal Financial Blog</h2>
+                <p class="text-purple-100">Your notes & insights</p>
+            </div>
+            <div id="emptyBlogState" class="text-center py-8">
+                <i class="fas fa-blog text-5xl opacity-80 mb-4"></i>
+                <p class="text-lg mb-2">No blog posts yet.</p>
+                <p class="text-purple-100">Start documenting your journey.</p>
+            </div>
+            <div id="blogPostsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 hidden"></div>
+        </section>
+    </div>
+
+    <!-- EXPENSE MODAL -->
+    <div id="expenseModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-40 hidden">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 id="expenseModalTitle" class="text-xl font-bold text-gray-800">Add Expense</h2>
+                <button id="closeExpenseModal" class="text-gray-500 hover:text-gray-700 text-2xl"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="expenseForm" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Date & Time</label>
+                        <input type="datetime-local" id="expenseDateTime" required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                        <select id="expenseCategory" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary">
+                            <option>Home Upkeep</option>
+                            <option>School Upkeep</option>
+                            <option>School Fees</option>
+                            <option>Projects</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Session/Term</label>
+                        <select id="expenseSession" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary">
+                            <option value="">Select</option>
+                            <option>First Term</option>
+                            <option>Second Term</option>
+                            <option>Third Term</option>
+			<option>First Semester</option>
+			<option>Second Semester</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Recipient</label>
+                        <input type="text" id="expenseRecipient" placeholder="Recipient name" required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea id="expenseDescription" rows="3" placeholder="Expense details" required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary"></textarea>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Amount Paid (₦)</label>
+                        <input type="number" step="0.01" id="expenseAmountPaid" placeholder="0.00" required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Balance Due (₦)</label>
+                        <input type="number" step="0.01" id="expenseBalanceDue" placeholder="0.00" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary">
+                    </div>
+                </div>
+                <div class="flex gap-3 pt-4">
+                    <button type="submit" class="flex-1 btn-primary text-white py-3 rounded-lg font-medium">Save Expense</button>
+                    <button type="button" id="cancelExpense" class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- BLOG MODAL -->
+    <div id="blogModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-40 hidden">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 id="blogModalTitle" class="text-xl font-bold text-gray-800">Write Blog Post</h2>
+                <button id="closeBlogModal" class="text-gray-500 hover:text-gray-700 text-2xl"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="blogForm" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Date & Time</label>
+                        <input type="datetime-local" id="blogDateTime" required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                        <select id="blogCategory" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                            <option>Financial Insights</option>
+                            <option>Monthly Review</option>
+                            <option>Expense Notes</option>
+                            <option>Budget Planning</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                    <input type="text" id="blogTitle" placeholder="Post title" required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Content</label>
+                    <textarea id="blogContent" rows="8" placeholder="Your thoughts..." required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-500"></textarea>
+                </div>
+                <div class="flex gap-3 pt-4">
+                    <button type="submit" class="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 rounded-lg font-medium">Publish Post</button>
+                    <button type="button" id="cancelBlog" class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- NOTIFICATION -->
+    <div id="notification" class="fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg hidden">
+        <i class="fas fa-check-circle mr-2"></i><span id="notificationText"></span>
+    </div>
+
+    <script>
+    const API_BASE = 'http://localhost:3000/api';
+    let authToken = localStorage.getItem('authToken');
+    let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
+    let expenses = [];
+    let blogPosts = [];
+
+    // UI Helpers
+    const $ = q => document.querySelector(q);
+    const notify = (msg, err = false) => {
+        const box = $("#notification");
+        box.className = `fixed bottom-4 right-4 ${err ? "bg-red-500" : "bg-green-500"} text-white px-6 py-3 rounded-lg shadow-lg`;
+        $("#notificationText").textContent = msg;
+        box.classList.remove("hidden");
+        setTimeout(() => box.classList.add("hidden"), 3000);
+    };
+
+    const fmtMoney = n => new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(n || 0);
+
+    // API Helper
+    const apiCall = async (endpoint, options = {}) => {
+        const config = {
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            ...options
+        };
+
+        if (options.body) {
+            config.body = JSON.stringify(options.body);
+        }
+
+        try {
+            const response = await fetch(`${API_BASE}${endpoint}`, config);
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.error || 'Request failed');
+            }
+            
+            return data;
+        } catch (error) {
+            console.error('API Error:', error);
+            throw error;
+        }
+    };
+
+    // Authentication
+    async function login(username, password) {
+        const data = await apiCall('/login', {
+            method: 'POST',
+            body: { username, password }
+        });
+        
+        authToken = data.token;
+        currentUser = data.user;
+        localStorage.setItem('authToken', authToken);
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        return data;
+    }
+
+    async function register(username, password) {
+        const data = await apiCall('/register', {
+            method: 'POST',
+            body: { username, password }
+        });
+        
+        authToken = data.token;
+        currentUser = data.user;
+        localStorage.setItem('authToken', authToken);
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        return data;
+    }
+
+    function logout() {
+        authToken = null;
+        currentUser = null;
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('currentUser');
+        $("#authScreen").classList.remove("hidden");
+        $("#app").classList.add("hidden");
+    }
+
+    // Data Management
+    async function loadData() {
+        try {
+            expenses = await apiCall('/expenses');
+            blogPosts = await apiCall('/blog-posts');
+            const dashboard = await apiCall('/dashboard');
+            
+            renderExpenses();
+            renderBlogPosts();
+            renderDashboard(dashboard);
+        } catch (error) {
+            console.error('Error loading data:', error);
+        }
+    }
+
+    function renderExpenses() {
+        const emptyExp = $("#emptyExpenseState");
+        const tblCont = $("#expenseTableContainer");
+        const tbody = $("#expenseTableBody");
+
+        if (expenses.length > 0) {
+            emptyExp.classList.add("hidden");
+            tblCont.classList.remove("hidden");
+            
+            tbody.innerHTML = expenses.map(expense => `
+                <tr class="border-b border-gray-100 hover:bg-gray-50">
+                    <td class="p-4 text-gray-600">${new Date(expense.date_time).toLocaleDateString()}<br>
+                        <span class="text-xs text-gray-400">${new Date(expense.date_time).toLocaleTimeString()}</span>
+                    </td>
+                    <td class="p-4"><span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">${expense.category}</span></td>
+                    <td class="p-4">${expense.session_term || "-"}</td>
+                    <td class="p-4">${expense.recipient}</td>
+                    <td class="p-4 max-w-xs" title="${expense.description}">${expense.description.substring(0, 50)}${expense.description.length > 50 ? '...' : ''}</td>
+                    <td class="p-4 font-medium text-green-600">${fmtMoney(expense.amount_paid)}</td>
+                    <td class="p-4 font-medium text-orange-600">${fmtMoney(expense.balance_due)}</td>
+                    <td class="p-4">${expense.balance_due > 0 ? 
+                        '<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Partial</span>' : 
+                        '<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Paid</span>'}</td>
+                    <td class="p-4 flex gap-2">
+                        <button onclick="editExpense(${expense.id})" class="text-indigo-600 hover:text-indigo-800"><i class="fas fa-edit"></i></button>
+                        <button onclick="deleteExpense(${expense.id})" class="text-red-600 hover:text-red-800"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+        } else {
+            emptyExp.classList.remove("hidden");
+            tblCont.classList.add("hidden");
+        }
+    }
+
+    function renderBlogPosts() {
+        const emptyBlog = $("#emptyBlogState");
+        const blogCont = $("#blogPostsContainer");
+
+        if (blogPosts.length > 0) {
+            emptyBlog.classList.add("hidden");
+            blogCont.classList.remove("hidden");
+            
+            blogCont.innerHTML = blogPosts.map(post => `
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex justify-between items-start mb-3">
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">${post.category}</span>
+                        <div class="flex gap-1">
+                            <button onclick="editBlogPost(${post.id})" class="text-purple-600 hover:text-purple-800"><i class="fas fa-edit"></i></button>
+                            <button onclick="deleteBlogPost(${post.id})" class="text-red-600 hover:text-red-800"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-800 mb-2">${post.title}</h3>
+                    <p class="text-gray-600 text-sm mb-3">${post.content.substring(0, 120)}${post.content.length > 120 ? '...' : ''}</p>
+                    <div class="text-xs text-gray-400">${new Date(post.date_time).toLocaleDateString()}</div>
+                </div>
+            `).join('');
+        } else {
+            emptyBlog.classList.remove("hidden");
+            blogCont.classList.add("hidden");
+        }
+    }
+
+    function renderDashboard(dashboard) {
+        const { statistics, categories } = dashboard;
+        
+        $("#summaryCards").innerHTML = `
+            <div class="card bg-gradient-to-br from-green-500 to-emerald-600 text-white rounded-2xl p-6 shadow-lg">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <p class="text-green-100 text-sm">Total Paid</p>
+                        <p class="text-3xl font-bold">${fmtMoney(statistics.total_paid)}</p>
+                    </div>
+                    <i class="fas fa-money-bill-wave text-4xl text-green-200"></i>
+                </div>
+            </div>
+            <div class="card bg-gradient-to-br from-orange-500 to-red-600 text-white rounded-2xl p-6 shadow-lg">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <p class="text-orange-100 text-sm">Total Balance Due</p>
+                        <p class="text-3xl font-bold">${fmtMoney(statistics.total_balance)}</p>
+                    </div>
+                    <i class="fas fa-calendar-minus text-4xl text-orange-200"></i>
+                </div>
+            </div>
+            <div class="card bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-2xl p-6 shadow-lg">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <p class="text-blue-100 text-sm">Total Expenses</p>
+                        <p class="text-3xl font-bold">${statistics.total_expenses}</p>
+                    </div>
+                    <i class="fas fa-file-invoice-dollar text-4xl text-blue-200"></i>
+                </div>
+            </div>
+        `;
+
+        $("#categoryBreakdown").innerHTML = categories.map(cat => `
+            <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4 border border-gray-200">
+                <h3 class="font-semibold text-gray-800 mb-2">${cat.category}</h3>
+                <p class="text-sm text-gray-600">Entries: ${cat.count}</p>
+                <p class="text-sm text-green-600 font-medium">Paid: ${fmtMoney(cat.total_paid)}</p>
+                <p class="text-sm text-orange-600 font-medium">Balance: ${fmtMoney(cat.total_balance)}</p>
+            </div>
+        `).join('');
+    }
+
+    // Expense Functions
+    window.editExpense = async (id) => {
+        const expense = expenses.find(e => e.id === id);
+        if (!expense) return;
+        
+        $("#expenseDateTime").value = expense.date_time.replace(' ', 'T').substring(0, 16);
+        $("#expenseCategory").value = expense.category;
+        $("#expenseSession").value = expense.session_term || "";
+        $("#expenseRecipient").value = expense.recipient;
+        $("#expenseDescription").value = expense.description;
+        $("#expenseAmountPaid").value = expense.amount_paid;
+        $("#expenseBalanceDue").value = expense.balance_due;
+        
+        $("#expenseModalTitle").textContent = "Edit Expense";
+        $("#expenseModal").classList.remove("hidden");
+        window.editingExpenseId = id;
+    };
+
+    window.deleteExpense = async (id) => {
+        if (!confirm("Are you sure you want to delete this expense?")) return;
+        
+        try {
+            await apiCall(`/expenses/${id}`, { method: 'DELETE' });
+            expenses = expenses.filter(e => e.id !== id);
+            renderExpenses();
+            loadData(); // Reload dashboard stats
+            notify("Expense deleted successfully!");
+        } catch (error) {
+            notify("Error deleting expense", true);
+        }
+    };
+
+    // Blog Post Functions
+    window.editBlogPost = async (id) => {
+        const post = blogPosts.find(p => p.id === id);
+        if (!post) return;
+        
+        $("#blogDateTime").value = post.date_time.replace(' ', 'T').substring(0, 16);
+        $("#blogCategory").value = post.category;
+        $("#blogTitle").value = post.title;
+        $("#blogContent").value = post.content;
+        
+        $("#blogModalTitle").textContent = "Edit Blog Post";
+        $("#blogModal").classList.remove("hidden");
+        window.editingBlogPostId = id;
+    };
+
+    window.deleteBlogPost = async (id) => {
+        if (!confirm("Are you sure you want to delete this blog post?")) return;
+        
+        try {
+            await apiCall(`/blog-posts/${id}`, { method: 'DELETE' });
+            blogPosts = blogPosts.filter(p => p.id !== id);
+            renderBlogPosts();
+            notify("Blog post deleted successfully!");
+        } catch (error) {
+            notify("Error deleting blog post", true);
+        }
+    };
+
+    // Event Listeners
+    document.addEventListener('DOMContentLoaded', function() {
+        // Check authentication
+        if (authToken && currentUser) {
+            $("#authScreen").classList.add("hidden");
+            $("#app").classList.remove("hidden");
+            $("#usernameDisplay").textContent = currentUser.username;
+            loadData();
+        }
+
+        // Authentication
+        $("#loginBtn").addEventListener('click', async () => {
+            const username = $("#loginUsername").value.trim();
+            const password = $("#loginPassword").value.trim();
+            
+            if (!username || !password) {
+                $("#authError").textContent = "Please enter username and password";
+                $("#authError").classList.remove("hidden");
+                return;
+            }
+
+            try {
+                await login(username, password);
+                $("#authScreen").classList.add("hidden");
+                $("#app").classList.remove("hidden");
+                $("#usernameDisplay").textContent = currentUser.username;
+                loadData();
+                notify("Login successful!");
+            } catch (error) {
+                $("#authError").textContent = error.message;
+                $("#authError").classList.remove("hidden");
+            }
+        });
+
+        $("#registerBtn").addEventListener('click', async () => {
+            const username = $("#registerUsername").value.trim();
+            const password = $("#registerPassword").value.trim();
+            
+            if (!username || !password) {
+                $("#authError").textContent = "Please enter username and password";
+                $("#authError").classList.remove("hidden");
+                return;
+            }
+
+            try {
+                await register(username, password);
+                $("#authScreen").classList.add("hidden");
+                $("#app").classList.remove("hidden");
+                $("#usernameDisplay").textContent = currentUser.username;
+                notify("Registration successful!");
+            } catch (error) {
+                $("#authError").textContent = error.message;
+                $("#authError").classList.remove("hidden");
+            }
+        });
+
+        $("#showRegister").addEventListener('click', () => {
+            $("#loginForm").classList.add("hidden");
+            $("#registerForm").classList.remove("hidden");
+            $("#authError").classList.add("hidden");
+        });
+
+        $("#showLogin").addEventListener('click', () => {
+            $("#registerForm").classList.add("hidden");
+            $("#loginForm").classList.remove("hidden");
+            $("#authError").classList.add("hidden");
+        });
+
+        $("#logoutBtn").addEventListener('click', logout);
+
+        // Expense Form
+        $("#expenseForm").addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const expenseData = {
+                date_time: $("#expenseDateTime").value.replace('T', ' '),
+                category: $("#expenseCategory").value,
+                session_term: $("#expenseSession").value,
+                recipient: $("#expenseRecipient").value,
+                description: $("#expenseDescription").value,
+                amount_paid: parseFloat($("#expenseAmountPaid").value),
+                balance_due: parseFloat($("#expenseBalanceDue").value) || 0
+            };
+
+            try {
+                if (window.editingExpenseId) {
+                    await apiCall(`/expenses/${window.editingExpenseId}`, {
+                        method: 'PUT',
+                        body: expenseData
+                    });
+                    notify("Expense updated successfully!");
+                } else {
+                    await apiCall('/expenses', {
+                        method: 'POST',
+                        body: expenseData
+                    });
+                    notify("Expense added successfully!");
+                }
+                
+                $("#expenseModal").classList.add("hidden");
+                loadData();
+                window.editingExpenseId = null;
+            } catch (error) {
+                notify("Error saving expense", true);
+            }
+        });
+
+        // Blog Form
+        $("#blogForm").addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const postData = {
+                date_time: $("#blogDateTime").value.replace('T', ' '),
+                category: $("#blogCategory").value,
+                title: $("#blogTitle").value,
+                content: $("#blogContent").value
+            };
+
+            try {
+                if (window.editingBlogPostId) {
+                    await apiCall(`/blog-posts/${window.editingBlogPostId}`, {
+                        method: 'PUT',
+                        body: postData
+                    });
+                    notify("Blog post updated successfully!");
+                } else {
+                    await apiCall('/blog-posts', {
+                        method: 'POST',
+                        body: postData
+                    });
+                    notify("Blog post published successfully!");
+                }
+                
+                $("#blogModal").classList.add("hidden");
+                loadData();
+                window.editingBlogPostId = null;
+            } catch (error) {
+                notify("Error saving blog post", true);
+            }
+        });
+
+        // Modal Controls
+        $("#addExpenseBtn").addEventListener('click', () => {
+            window.editingExpenseId = null;
+            $("#expenseForm").reset();
+            $("#expenseDateTime").value = new Date().toISOString().slice(0, 16);
+            $("#expenseModalTitle").textContent = "Add Expense";
+            $("#expenseModal").classList.remove("hidden");
+        });
+
+        $("#addFirstExpenseBtn").addEventListener('click', () => {
+            $("#addExpenseBtn").click();
+        });
+
+        $("#addBlogPostBtn").addEventListener('click', () => {
+            window.editingBlogPostId = null;
+            $("#blogForm").reset();
+            $("#blogDateTime").value = new Date().toISOString().slice(0, 16);
+            $("#blogModalTitle").textContent = "Write New Post";
+            $("#blogModal").classList.remove("hidden");
+        });
+
+        // Close modals
+        $("#closeExpenseModal").addEventListener('click', () => $("#expenseModal").classList.add("hidden"));
+        $("#closeBlogModal").addEventListener('click', () => $("#blogModal").classList.add("hidden"));
+        $("#cancelExpense").addEventListener('click', () => $("#expenseModal").classList.add("hidden"));
+        $("#cancelBlog").addEventListener('click', () => $("#blogModal").classList.add("hidden"));
+
+        // Export functionality
+        $("#exportBtn").addEventListener('click', () => {
+            const data = {
+                expenses: expenses,
+                blogPosts: blogPosts,
+                exportedAt: new Date().toISOString(),
+                user: currentUser.username
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `expense-tracker-export-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            notify("Data exported successfully!");
+        });
+    });
+    </script>
+</body>
+</html>
