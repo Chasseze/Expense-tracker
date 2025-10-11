@@ -1,0 +1,31 @@
+# Expense Tracker AI Guide
+- **Stack**: Node 18+/Express 4 app using @libsql/client (Turso/LiteFS) when `LIBSQL_URL` env is set; falls back to sqlite3; static SPA served from public/index.html.
+- **Startup**: Use npm install; run npm start or node server.js; server listens on PORT env or 3000.
+- **Deployment**: Procfile.txt and railway.json both run node server.js; set `JWT_SECRET`, `LIBSQL_URL`, and `LIBSQL_AUTH_TOKEN` (if required) in hosting dashboard.
+- **Database Path**: Without `LIBSQL_URL` the server opens SQLite at ./expense_tracker.db (or /tmp/expense_tracker.db in production); remote LibSQL uses the configured URL.
+- **Schema Bootstrapping**: async initializeDatabase in server.js runs via dbRun to create users, expenses, blog_posts, and budget_limits tables on each boot; safe for repeated runs.
+- **Data Types**: date_time stored as TEXT; frontend supplies ISO strings like 2024-03-01T09:30 converted to "YYYY-MM-DD HH:MM".
+- **Auth Workflow**: /api/register and /api/login issue 24h JWT; Authentication middleware expects Bearer token and adds req.user.userId.
+- **Password Security**: bcrypt.hash with cost 12; always use bcrypt.compare for checks; never log raw passwords.
+- **Token Secret**: JWT_SECRET reads from env with a fallback constant; always override in production.
+- **LibSQL Helpers**: dbAll/dbRun detect LibSQL vs sqlite and normalize result sets/row metadata so consumers always receive plain objects with {id, changes} on writes.
+- **DB Helpers**: Use dbRun for writes (returns {id, changes}); use dbAll for queries returning promise-based arrays.
+- **Error Handling**: catch blocks respond with 500 and {error}; log internal errors with console.error before responding.
+- **Status Endpoint**: /api/status is unauthenticated; returns {storageMode, libsqlUrl} so clients can surface the active backend.
+- **Expense API**: CRUD endpoints under /api/expenses require authenticateToken, enforce WHERE user_id = ?, and accept optional query params (term, category, status, startDate, endDate) for filtered reads.
+- **Blog API**: /api/blog-posts mirrors expense structure; reuse fetch patterns from client before adding new routes.
+- **Budget API**: /api/budgets (GET/PUT/DELETE) persists category thresholds with INSERT ... ON CONFLICT; dashboard uses these for overspend alerts.
+- **Dashboard API**: /api/dashboard aggregates totals, categories, active budgets, overspend alerts, and echoes storageMode for badges.
+- **Static Client**: public/index.html (vanilla JS + Tailwind CDN) stores state in global arrays and tracks filters/budgets/import progress with helper functions.
+- **Filters UI**: Expense table filters (term/category/status/date range) sync with query string builders; remember to mutate the shared filters object so buildExpenseQuery picks up new values.
+- **Client Auth State**: auth token stored in localStorage (keys authToken/currentUser); logout clears storage and toggles screens.
+- **API Helpers**: apiCall attaches Authorization header automatically; return JSON body or throw with data.error.
+- **Status Logic**: Expense status derived from balance_due > 0 ? 'Partial' : 'Paid'; keep server + client consistent.
+- **Money Formatting**: fmtMoney uses Intl.NumberFormat en-NG; amounts expect numeric values (not strings).
+- **Budgets Modal**: Budget manager reuses defaultExpenseCategories plus live expense categories; fillBudgetCategoryOptions must run before rendering select options.
+- **Import/Export**: Export button writes current arrays; Import button accepts JSON (with {expenses, blogPosts}) or CSV (type column optional) and fans out POST calls.
+- **CORS/Static**: app.use(cors()) allows local dev; static assets from public/ so keep SPA under that folder.
+- **Adding Routes**: Always register new Express routes before app.listen; secure with authenticateToken unless public path.
+- **Testing Tips**: Use curl/Postman with Authorization: Bearer <token> to exercise APIs; seed data via POST endpoints after login.
+- **Backups**: `npm run backup` executes scripts/export-backup.js, honoring LIBSQL_URL/LIBSQL_AUTH_TOKEN or local sqlite path and writes JSON to ./backups (override via BACKUP_DIR).
+- **Persisted Data**: sqlite database file committed for dev; delete to reset schema; production resets each deploy due to /tmp path; for remote LibSQL ensure url/token set in env.

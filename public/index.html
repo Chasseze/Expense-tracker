@@ -79,6 +79,9 @@
     <!-- MAIN APP -->
 <div id="app" class="max-w-7xl mx-auto hidden">
     <header class="bg-gradient-to-r from-primary to-secondary rounded-2xl shadow-xl p-6 md:p-8 mb-8 text-white">
+        <div class="flex justify-end mb-2">
+            <span id="storageBadge" class="hidden px-4 py-1 rounded-full bg-white/20 text-white text-xs font-semibold tracking-wide shadow-inner"></span>
+        </div>
         <div class="text-center mb-6">
             <h1 class="text-3xl md:text-4xl font-bold mb-3">Secure Expense Tracker & Blog</h1>
             <p class="text-indigo-100 mb-6">Track payments, manage balances, jot down thoughts – all securely stored</p>
@@ -93,7 +96,14 @@
             <button id="exportBtn" class="btn bg-emerald-500 hover:bg-emerald-600 flex items-center gap-2 px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all">
                 <i class="fas fa-download"></i> Export Data
             </button>
+            <button id="importBtn" class="btn bg-sky-500 hover:bg-sky-600 flex items-center gap-2 px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all">
+                <i class="fas fa-upload"></i> Import Data
+            </button>
+            <button id="manageBudgetsBtn" class="btn bg-amber-400 hover:bg-amber-500 text-amber-900 flex items-center gap-2 px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all">
+                <i class="fas fa-bullseye"></i> Manage Budgets
+            </button>
         </div>
+        <input id="importFile" type="file" accept=".json,.csv" class="hidden">
         <div class="text-center mt-4">
             <span id="usernameDisplay" class="text-indigo-200 font-medium"></span>
             <button id="logoutBtn" class="ml-4 bg-white text-primary px-4 py-1 rounded-lg font-semibold hover:bg-gray-100 text-sm">Logout</button>
@@ -114,6 +124,44 @@
             <div class="text-center mb-6">
                 <h2 class="text-2xl md:text-3xl font-bold mb-2">Expense Records</h2>
                 <p class="text-blue-100">Your complete financial history</p>
+            </div>
+            <div class="bg-white/10 backdrop-blur-sm rounded-xl p-4 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm items-end">
+                    <div>
+                        <label class="block text-blue-100 mb-1">Session/Term</label>
+                        <select id="filterTerm" class="w-full rounded-lg border border-white/30 bg-white/10 text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/60">
+                            <option value="">All</option>
+                            <option>First Term</option>
+                            <option>Second Term</option>
+                            <option>Third Term</option>
+                            <option>First Semester</option>
+                            <option>Second Semester</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-blue-100 mb-1">Category</label>
+                        <select id="filterCategory" class="w-full rounded-lg border border-white/30 bg-white/10 text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/60">
+                            <option value="">All</option>
+                            <option>Home Upkeep</option>
+                            <option>School Upkeep</option>
+                            <option>School Fees</option>
+                            <option>Projects</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-blue-100 mb-1">Status</label>
+                        <select id="filterStatus" class="w-full rounded-lg border border-white/30 bg-white/10 text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/60">
+                            <option value="">All</option>
+                            <option value="Paid">Paid</option>
+                            <option value="Partial">Partial</option>
+                        </select>
+                    </div>
+                    <div class="flex flex-wrap w-full gap-3">
+                        <button id="applyFiltersBtn" class="flex-1 bg-white text-blue-700 px-4 py-2 rounded-lg font-semibold hover:bg-blue-50">Apply Filters</button>
+                        <button id="clearFiltersBtn" class="flex-1 border border-white/50 px-4 py-2 rounded-lg font-semibold text-white hover:bg-white/10">Reset</button>
+                    </div>
+                </div>
+                <span id="activeFilters" class="text-blue-100 text-xs block mt-3"></span>
             </div>
             <div id="emptyExpenseState" class="text-center py-8">
                 <i class="fas fa-file-invoice text-5xl opacity-80 mb-4"></i>
@@ -258,6 +306,45 @@
         </div>
     </div>
 
+    <!-- BUDGET MODAL -->
+    <div id="budgetModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-40 hidden">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-800">Budget Thresholds</h2>
+                <button id="closeBudgetModal" class="text-gray-500 hover:text-gray-700 text-2xl"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="budgetForm" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                    <select id="budgetCategory" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-500"></select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Threshold (₦)</label>
+                    <input type="number" id="budgetThreshold" min="0" step="0.01" required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-500" placeholder="0.00">
+                </div>
+                <div class="md:col-span-2 flex gap-3 justify-end">
+                    <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white px-5 py-3 rounded-lg font-semibold">Save Threshold</button>
+                    <button type="button" id="clearBudgetForm" class="border border-gray-300 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-50">Reset</button>
+                </div>
+            </form>
+            <div>
+                <h3 class="text-lg font-semibold text-gray-800 mb-3">Current Budgets</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-gray-700 border rounded-lg">
+                        <thead class="bg-amber-50 text-amber-700">
+                            <tr>
+                                <th class="p-3 text-left">Category</th>
+                                <th class="p-3 text-left">Threshold</th>
+                                <th class="p-3 text-left">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="budgetTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- NOTIFICATION -->
     <div id="notification" class="fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg hidden">
         <i class="fas fa-check-circle mr-2"></i><span id="notificationText"></span>
@@ -265,10 +352,16 @@
 
     <script>
     const API_BASE = 'http://localhost:3000/api';
+    const defaultExpenseCategories = ['Home Upkeep', 'School Upkeep', 'School Fees', 'Projects'];
     let authToken = localStorage.getItem('authToken');
     let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
     let expenses = [];
     let blogPosts = [];
+    let budgets = [];
+    let budgetAlerts = [];
+    let lastAlertSignature = '';
+    let storageInfo = { storageMode: 'sqlite', libsqlUrl: null };
+    const filters = { term: '', category: '', status: '' };
 
     // UI Helpers
     const $ = q => document.querySelector(q);
@@ -281,6 +374,56 @@
     };
 
     const fmtMoney = n => new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(n || 0);
+
+    const updateStorageBadge = info => {
+        storageInfo = { ...storageInfo, ...info };
+        const badge = $("#storageBadge");
+        if (!badge) return;
+        const label = storageInfo.storageMode === 'libsql' ? 'Synced via Turso' : 'Local SQLite';
+        badge.textContent = storageInfo.libsqlUrl ? `${label}` : label;
+        badge.classList.remove("hidden");
+    };
+
+    const buildExpenseQuery = () => {
+        const params = new URLSearchParams();
+        if (filters.term) params.append('term', filters.term);
+        if (filters.category) params.append('category', filters.category);
+        if (filters.status) params.append('status', filters.status);
+        const qs = params.toString();
+        return qs ? `?${qs}` : '';
+    };
+
+    const updateActiveFiltersLabel = () => {
+        const label = $("#activeFilters");
+        if (!label) return;
+        const active = Object.entries(filters)
+            .filter(([_, value]) => Boolean(value))
+            .map(([key, value]) => `${key}: ${value}`);
+        label.textContent = active.length ? `Active filters → ${active.join(', ')}` : '';
+    };
+
+    const syncFilterInputs = () => {
+        const term = $("#filterTerm");
+        const category = $("#filterCategory");
+        const status = $("#filterStatus");
+        if (term) term.value = filters.term;
+        if (category) category.value = filters.category;
+        if (status) status.value = filters.status;
+    };
+
+    const toNumber = value => {
+        const num = Number(value);
+        return Number.isFinite(num) ? num : 0;
+    };
+
+    const normalizeImportDate = value => {
+        if (!value) return new Date().toISOString().slice(0, 16).replace('T', ' ');
+        const str = value.toString().trim();
+        if (!str) return new Date().toISOString().slice(0, 16).replace('T', ' ');
+        if (str.includes('T')) return str.replace('T', ' ').slice(0, 16);
+        if (str.length === 10) return `${str} 00:00`;
+        return str.slice(0, 16);
+    };
 
     // API Helper
     const apiCall = async (endpoint, options = {}) => {
@@ -310,6 +453,17 @@
             throw error;
         }
     };
+
+    async function hydrateStorageInfo() {
+        try {
+            const response = await fetch(`${API_BASE}/status`);
+            if (!response.ok) return;
+            const info = await response.json();
+            updateStorageBadge(info);
+        } catch (error) {
+            console.warn('Status check failed:', error);
+        }
+    }
 
     // Authentication
     async function login(username, password) {
@@ -350,15 +504,181 @@
     // Data Management
     async function loadData() {
         try {
-            expenses = await apiCall('/expenses');
+            expenses = await apiCall(`/expenses${buildExpenseQuery()}`);
             blogPosts = await apiCall('/blog-posts');
             const dashboard = await apiCall('/dashboard');
+            budgets = dashboard.budgets || [];
+            budgetAlerts = dashboard.alerts || [];
+            updateStorageBadge({ storageMode: dashboard.storageMode, libsqlUrl: storageInfo.libsqlUrl });
             
             renderExpenses();
             renderBlogPosts();
             renderDashboard(dashboard);
+            renderBudgetsTable();
+            fillBudgetCategoryOptions();
+            announceBudgetAlerts();
+            updateActiveFiltersLabel();
+            syncFilterInputs();
         } catch (error) {
             console.error('Error loading data:', error);
+        }
+    }
+
+    function renderBudgetsTable() {
+        const tbody = document.querySelector("#budgetTableBody");
+        if (!tbody) return;
+        if (!budgets.length) {
+            tbody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-gray-500">No budgets defined yet.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = budgets
+            .map((item) => `
+                <tr class="border-b last:border-0">
+                    <td class="p-3 font-medium">${item.category}</td>
+                    <td class="p-3">${fmtMoney(item.threshold)}</td>
+                    <td class="p-3">
+                        <button data-category="${item.category}" class="text-red-600 hover:text-red-800 delete-budget">Remove</button>
+                    </td>
+                </tr>
+            `)
+            .join('');
+    }
+
+    function syncBudgetThresholdInput() {
+        const select = document.querySelector("#budgetCategory");
+        const input = document.querySelector("#budgetThreshold");
+        if (!select || !input) return;
+        const match = budgets.find(b => b.category === select.value);
+        input.value = match ? match.threshold : '';
+    }
+
+    function fillBudgetCategoryOptions() {
+        const select = document.querySelector("#budgetCategory");
+        if (!select) return;
+        const categories = new Set([...defaultExpenseCategories, ...expenses.map(e => e.category), ...budgets.map(b => b.category)]);
+        const current = select.value;
+        select.innerHTML = Array.from(categories)
+            .sort()
+            .map((cat) => `<option value="${cat}">${cat}</option>`)
+            .join('');
+        if (current && categories.has(current)) {
+            select.value = current;
+        }
+        syncBudgetThresholdInput();
+    }
+
+    function announceBudgetAlerts() {
+        if (!budgetAlerts.length) {
+            lastAlertSignature = '';
+            return;
+        }
+        const signature = JSON.stringify(budgetAlerts.map(a => `${a.category}:${a.total}:${a.threshold}`));
+        if (signature === lastAlertSignature) return;
+        budgetAlerts.forEach((alert) => {
+            notify(`Budget alert: ${alert.category} reached ${fmtMoney(alert.total)} of ${fmtMoney(alert.threshold)}`, true);
+        });
+        lastAlertSignature = signature;
+    }
+
+    const parseCsv = (text) => {
+        const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+        if (!lines.length) return [];
+        const headers = lines[0].split(',').map(h => h.trim());
+        return lines.slice(1).map(line => {
+            const values = line.split(',');
+            const row = {};
+            headers.forEach((header, idx) => {
+                row[header] = (values[idx] || '').trim();
+            });
+            return row;
+        });
+    };
+
+    async function processImportedData(data) {
+        const result = { expenses: 0, blogPosts: 0 };
+
+        if (Array.isArray(data.expenses)) {
+            for (const entry of data.expenses) {
+                try {
+                    const payload = {
+                        date_time: normalizeImportDate(entry.date_time || entry.dateTime),
+                        category: entry.category || 'General',
+                        session_term: entry.session_term || entry.sessionTerm || '',
+                        recipient: entry.recipient || 'Unknown',
+                        description: entry.description || 'Imported expense',
+                        amount_paid: toNumber(entry.amount_paid ?? entry.amountPaid),
+                        balance_due: toNumber(entry.balance_due ?? entry.balanceDue)
+                    };
+                    await apiCall('/expenses', { method: 'POST', body: payload });
+                    result.expenses += 1;
+                } catch (error) {
+                    console.error('Import expense error:', error);
+                }
+            }
+        }
+
+        if (Array.isArray(data.blogPosts)) {
+            for (const entry of data.blogPosts) {
+                try {
+                    const payload = {
+                        date_time: normalizeImportDate(entry.date_time || entry.dateTime),
+                        category: entry.category || 'Financial Insights',
+                        title: entry.title || 'Imported Post',
+                        content: entry.content || ''
+                    };
+                    await apiCall('/blog-posts', { method: 'POST', body: payload });
+                    result.blogPosts += 1;
+                } catch (error) {
+                    console.error('Import blog error:', error);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    async function handleImportFile(file) {
+        if (!file) return;
+        try {
+            const text = await file.text();
+            let payload;
+            const name = file.name.toLowerCase();
+
+            if (name.endsWith('.json')) {
+                const parsed = JSON.parse(text);
+                payload = Array.isArray(parsed)
+                    ? {
+                        expenses: parsed.filter(item => item.type === 'expense'),
+                        blogPosts: parsed.filter(item => item.type === 'blog')
+                    }
+                    : parsed;
+            } else if (name.endsWith('.csv')) {
+                const rows = parseCsv(text);
+                const expensesRows = [];
+                const postRows = [];
+                rows.forEach((row) => {
+                    const type = (row.type || '').toLowerCase();
+                    if (type === 'blog' || type === 'post') {
+                        postRows.push(row);
+                    } else {
+                        expensesRows.push(row);
+                    }
+                });
+                payload = { expenses: expensesRows, blogPosts: postRows };
+            } else {
+                throw new Error('Unsupported file type. Use JSON or CSV.');
+            }
+
+            const summary = await processImportedData(payload);
+            notify(`Import complete: ${summary.expenses} expenses, ${summary.blogPosts} posts.`);
+            await loadData();
+        } catch (error) {
+            console.error('Import failed:', error);
+            notify(error.message || 'Import failed', true);
+        } finally {
+            const input = document.querySelector('#importFile');
+            if (input) input.value = '';
         }
     }
 
@@ -427,6 +747,11 @@
 
     function renderDashboard(dashboard) {
         const { statistics, categories } = dashboard;
+        const budgetMap = budgets.reduce((acc, item) => {
+            acc[item.category] = item.threshold;
+            return acc;
+        }, {});
+        const alertSet = new Set((dashboard.alerts || []).map(alert => alert.category));
         
         $("#summaryCards").innerHTML = `
             <div class="card bg-gradient-to-br from-green-500 to-emerald-600 text-white rounded-2xl p-6 shadow-lg">
@@ -459,11 +784,15 @@
         `;
 
         $("#categoryBreakdown").innerHTML = categories.map(cat => `
-            <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4 border border-gray-200">
-                <h3 class="font-semibold text-gray-800 mb-2">${cat.category}</h3>
+            <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4 border ${alertSet.has(cat.category) ? 'border-red-400 shadow-md' : 'border-gray-200'}">
+                <div class="flex justify-between items-start mb-2">
+                    <h3 class="font-semibold text-gray-800">${cat.category}</h3>
+                    ${budgetMap[cat.category] ? `<span class="text-xs font-semibold ${alertSet.has(cat.category) ? 'text-red-600' : 'text-amber-600'}">Limit ${fmtMoney(budgetMap[cat.category])}</span>` : ''}
+                </div>
                 <p class="text-sm text-gray-600">Entries: ${cat.count}</p>
                 <p class="text-sm text-green-600 font-medium">Paid: ${fmtMoney(cat.total_paid)}</p>
                 <p class="text-sm text-orange-600 font-medium">Balance: ${fmtMoney(cat.total_balance)}</p>
+                ${alertSet.has(cat.category) ? `<p class="text-sm text-red-600 font-semibold mt-2"><i class="fas fa-exclamation-triangle mr-1"></i>Over budget</p>` : ''}
             </div>
         `).join('');
     }
@@ -530,7 +859,10 @@
 
     // Event Listeners
     document.addEventListener('DOMContentLoaded', function() {
-        // Check authentication
+        hydrateStorageInfo();
+        fillBudgetCategoryOptions();
+        syncFilterInputs();
+
         if (authToken && currentUser) {
             $("#authScreen").classList.add("hidden");
             $("#app").classList.remove("hidden");
@@ -597,6 +929,33 @@
         });
 
         $("#logoutBtn").addEventListener('click', logout);
+
+        // Filters
+        $("#applyFiltersBtn").addEventListener('click', () => {
+            filters.term = $("#filterTerm").value;
+            filters.category = $("#filterCategory").value;
+            filters.status = $("#filterStatus").value;
+            updateActiveFiltersLabel();
+            loadData();
+        });
+
+        $("#clearFiltersBtn").addEventListener('click', () => {
+            Object.keys(filters).forEach(key => filters[key] = '');
+            syncFilterInputs();
+            updateActiveFiltersLabel();
+            loadData();
+        });
+
+        // Import/Export
+        $("#importBtn").addEventListener('click', () => {
+            const input = document.querySelector('#importFile');
+            if (input) input.click();
+        });
+
+        $("#importFile").addEventListener('change', (e) => {
+            const file = e.target.files?.[0];
+            handleImportFile(file);
+        });
 
         // Expense Form
         $("#expenseForm").addEventListener('submit', async (e) => {
@@ -695,6 +1054,50 @@
         $("#closeBlogModal").addEventListener('click', () => $("#blogModal").classList.add("hidden"));
         $("#cancelExpense").addEventListener('click', () => $("#expenseModal").classList.add("hidden"));
         $("#cancelBlog").addEventListener('click', () => $("#blogModal").classList.add("hidden"));
+
+        // Budget modal controls
+        $("#manageBudgetsBtn").addEventListener('click', () => {
+            renderBudgetsTable();
+            fillBudgetCategoryOptions();
+            $("#budgetModal").classList.remove("hidden");
+        });
+
+        $("#closeBudgetModal").addEventListener('click', () => $("#budgetModal").classList.add("hidden"));
+        $("#clearBudgetForm").addEventListener('click', () => {
+            $("#budgetForm").reset();
+            fillBudgetCategoryOptions();
+        });
+
+        $("#budgetCategory").addEventListener('change', syncBudgetThresholdInput);
+
+        $("#budgetForm").addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const category = $("#budgetCategory").value;
+            const threshold = toNumber($("#budgetThreshold").value);
+            try {
+                await apiCall('/budgets', { method: 'PUT', body: { category, threshold } });
+                notify('Budget saved successfully!');
+                await loadData();
+                $("#budgetThreshold").value = '';
+            } catch (error) {
+                notify('Error saving budget', true);
+            }
+        });
+
+        $("#budgetTableBody").addEventListener('click', async (e) => {
+            if (e.target.matches('.delete-budget')) {
+                const category = e.target.dataset.category;
+                if (!category) return;
+                if (!confirm(`Remove budget for ${category}?`)) return;
+                try {
+                    await apiCall(`/budgets/${encodeURIComponent(category)}`, { method: 'DELETE' });
+                    notify('Budget removed');
+                    await loadData();
+                } catch (error) {
+                    notify('Error removing budget', true);
+                }
+            }
+        });
 
         // Export functionality
         $("#exportBtn").addEventListener('click', () => {
