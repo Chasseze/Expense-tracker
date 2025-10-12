@@ -1,10 +1,11 @@
 const express = require('express');
 const { createClient } = require('@libsql/client');
-const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const path = require('path');
+
+let sqlite3;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -27,6 +28,15 @@ const useLibsql = Boolean(process.env.LIBSQL_URL);
 const storageMode = useLibsql ? 'libsql' : 'sqlite';
 const dbPath = process.env.NODE_ENV === 'production' ? '/tmp/expense_tracker.db' : './expense_tracker.db';
 let db;
+
+if (!useLibsql) {
+    try {
+        sqlite3 = require('sqlite3').verbose();
+    } catch (err) {
+        console.error('Failed to load sqlite3 driver. Set LIBSQL_URL for remote DB or install sqlite3:', err);
+        process.exit(1);
+    }
+}
 
 if (useLibsql) {
     db = createClient({
