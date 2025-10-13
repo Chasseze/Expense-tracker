@@ -43,10 +43,8 @@ if (useLibsql) {
         url: process.env.LIBSQL_URL,
         authToken: process.env.LIBSQL_AUTH_TOKEN
     });
-    initializeDatabase().catch((err) => {
-        console.error('Error initializing LibSQL database:', err);
-    });
     console.log('Connected to LibSQL database');
+    console.log('LibSQL mode assumes schema is managed via turso migrations or CLI.');
 } else {
     db = new sqlite3.Database(dbPath, (err) => {
         if (err) {
