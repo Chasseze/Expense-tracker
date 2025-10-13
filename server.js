@@ -16,13 +16,6 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-app.get('/api/status', (req, res) => {
-    res.json({
-        storageMode,
-        libsqlUrl: useLibsql ? process.env.LIBSQL_URL : null
-    });
-});
-
 // Database setup (LibSQL/Turso first, fallback to local SQLite)
 const useLibsql = Boolean(process.env.LIBSQL_URL);
 const storageMode = useLibsql ? 'libsql' : 'sqlite';
@@ -179,6 +172,14 @@ function authenticateToken(req, res, next) {
 }
 
 // Routes
+
+// Status endpoint (unauthenticated)
+app.get('/api/status', (req, res) => {
+    res.json({
+        storageMode,
+        libsqlUrl: useLibsql ? process.env.LIBSQL_URL : null
+    });
+});
 
 // User registration
 app.post('/api/register', async (req, res) => {
