@@ -25,8 +25,10 @@ let db;
 if (!useLibsql) {
     try {
         sqlite3 = require('sqlite3').verbose();
+        console.log('SQLite3 module loaded successfully');
     } catch (err) {
-        console.error('Failed to load sqlite3 driver. Set LIBSQL_URL for remote DB or install sqlite3:', err);
+        console.error('Failed to load sqlite3 driver:', err.message);
+        console.error('Either set LIBSQL_URL for remote DB or ensure sqlite3 is installed');
         process.exit(1);
     }
 }
