@@ -33,32 +33,24 @@ if (!useLibsql) {
 
 if (useLibsql) {
     console.log('Attempting LibSQL connection...');
-    console.log('Original URL:', process.env.LIBSQL_URL);
-    
-    // Convert libsql:// to https:// to avoid migration API calls
-    let connectionUrl = process.env.LIBSQL_URL;
-    if (connectionUrl.startsWith('libsql://')) {
-        connectionUrl = connectionUrl.replace('libsql://', 'https://');
-        console.log('Converted to HTTPS URL:', connectionUrl);
-    }
-    
+    console.log('URL:', process.env.LIBSQL_URL);
     console.log('Auth token present:', !!process.env.LIBSQL_AUTH_TOKEN);
-    console.log('Auth token length:', process.env.LIBSQL_AUTH_TOKEN ? process.env.LIBSQL_AUTH_TOKEN.length : 0);
     
     db = createClient({
-        url: connectionUrl,
+        url: process.env.LIBSQL_URL,
         authToken: process.env.LIBSQL_AUTH_TOKEN
     });
+    
+    console.log('LibSQL client created, testing connection...');
     
     // Test the connection immediately
     db.execute('SELECT 1 as test')
         .then(() => {
             console.log('✓ LibSQL connection successful!');
-            console.log('LibSQL mode - schema managed manually via CLI.');
         })
         .catch((err) => {
-            console.error('✗ LibSQL connection FAILED:', err.message);
-            console.error('Full error:', err);
+            console.error('✗ LibSQL connection test failed:', err.message);
+            console.error('Note: Connection might still work for actual queries');
         });
 } else {
     db = new sqlite3.Database(dbPath, (err) => {
