@@ -32,12 +32,26 @@ if (!useLibsql) {
 }
 
 if (useLibsql) {
+    console.log('Attempting LibSQL connection...');
+    console.log('URL:', process.env.LIBSQL_URL);
+    console.log('Auth token present:', !!process.env.LIBSQL_AUTH_TOKEN);
+    console.log('Auth token length:', process.env.LIBSQL_AUTH_TOKEN ? process.env.LIBSQL_AUTH_TOKEN.length : 0);
+    
     db = createClient({
         url: process.env.LIBSQL_URL,
         authToken: process.env.LIBSQL_AUTH_TOKEN
     });
-    console.log('Connected to LibSQL database');
-    console.log('LibSQL mode assumes schema is managed via turso migrations or CLI.');
+    
+    // Test the connection immediately
+    db.execute('SELECT 1 as test')
+        .then(() => {
+            console.log('✓ LibSQL connection successful!');
+            console.log('LibSQL mode assumes schema is managed via turso migrations or CLI.');
+        })
+        .catch((err) => {
+            console.error('✗ LibSQL connection FAILED:', err.message);
+            console.error('This will cause issues when handling requests!');
+        });
 } else {
     db = new sqlite3.Database(dbPath, (err) => {
         if (err) {
@@ -174,11 +188,27 @@ function authenticateToken(req, res, next) {
 // Routes
 
 // Status endpoint (unauthenticated)
-app.get('/api/status', (req, res) => {
-    res.json({
-        storageMode,
-        libsqlUrl: useLibsql ? process.env.LIBSQL_URL : null
-    });
+app.get('/api/status', async (req, res) => {
+    try {
+        // Test database connection
+        if (useLibsql) {
+            await db.execute('SELECT 1 as test');
+        }
+        
+        res.json({
+            storageMode,
+            libsqlUrl: useLibsql ? process.env.LIBSQL_URL : null,
+            status: 'ok'
+        });
+    } catch (error) {
+        console.error('Status check error:', error);
+        res.status(500).json({
+            storageMode,
+            libsqlUrl: useLibsql ? process.env.LIBSQL_URL : null,
+            status: 'error',
+            error: error.message
+        });
+    }
 });
 
 // User registration
