@@ -41,17 +41,8 @@ if (useLibsql) {
         authToken: process.env.LIBSQL_AUTH_TOKEN
     });
     
-    console.log('LibSQL client created, testing connection...');
-    
-    // Test the connection immediately
-    db.execute('SELECT 1 as test')
-        .then(() => {
-            console.log('✓ LibSQL connection successful!');
-        })
-        .catch((err) => {
-            console.error('✗ LibSQL connection test failed:', err.message);
-            console.error('Note: Connection might still work for actual queries');
-        });
+    console.log('LibSQL client created.');
+    console.log('Note: Migration API errors can be ignored - actual queries may still work.');
 } else {
     db = new sqlite3.Database(dbPath, (err) => {
         if (err) {
