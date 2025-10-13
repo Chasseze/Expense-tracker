@@ -33,16 +33,20 @@ if (!useLibsql) {
 
 if (useLibsql) {
     console.log('Attempting LibSQL connection...');
-    console.log('URL:', process.env.LIBSQL_URL);
+    console.log('Original URL:', process.env.LIBSQL_URL);
     console.log('Auth token present:', !!process.env.LIBSQL_AUTH_TOKEN);
     console.log('Auth token length:', process.env.LIBSQL_AUTH_TOKEN ? process.env.LIBSQL_AUTH_TOKEN.length : 0);
     
+    // Convert libsql:// to https:// to avoid migration API calls
+    let connectionUrl = process.env.LIBSQL_URL;
+    if (connectionUrl.startsWith('libsql://')) {
+        connectionUrl = connectionUrl.replace('libsql://', 'https://');
+        console.log('Using HTTPS URL:', connectionUrl);
+    }
+    
     db = createClient({
-        url: process.env.LIBSQL_URL,
-        authToken: process.env.LIBSQL_AUTH_TOKEN,
-        // Disable syncing with Turso's migration API (we manage schema manually)
-        syncUrl: undefined,
-        syncInterval: undefined
+        url: connectionUrl,
+        authToken: process.env.LIBSQL_AUTH_TOKEN
     });
     
     // Test the connection immediately
