@@ -34,15 +34,16 @@ if (!useLibsql) {
 if (useLibsql) {
     console.log('Attempting LibSQL connection...');
     console.log('Original URL:', process.env.LIBSQL_URL);
-    console.log('Auth token present:', !!process.env.LIBSQL_AUTH_TOKEN);
-    console.log('Auth token length:', process.env.LIBSQL_AUTH_TOKEN ? process.env.LIBSQL_AUTH_TOKEN.length : 0);
     
     // Convert libsql:// to https:// to avoid migration API calls
     let connectionUrl = process.env.LIBSQL_URL;
     if (connectionUrl.startsWith('libsql://')) {
         connectionUrl = connectionUrl.replace('libsql://', 'https://');
-        console.log('Using HTTPS URL:', connectionUrl);
+        console.log('Converted to HTTPS URL:', connectionUrl);
     }
+    
+    console.log('Auth token present:', !!process.env.LIBSQL_AUTH_TOKEN);
+    console.log('Auth token length:', process.env.LIBSQL_AUTH_TOKEN ? process.env.LIBSQL_AUTH_TOKEN.length : 0);
     
     db = createClient({
         url: connectionUrl,
@@ -57,7 +58,7 @@ if (useLibsql) {
         })
         .catch((err) => {
             console.error('✗ LibSQL connection FAILED:', err.message);
-            console.error('This will cause issues when handling requests!');
+            console.error('Full error:', err);
         });
 } else {
     db = new sqlite3.Database(dbPath, (err) => {
