@@ -39,14 +39,17 @@ if (useLibsql) {
     
     db = createClient({
         url: process.env.LIBSQL_URL,
-        authToken: process.env.LIBSQL_AUTH_TOKEN
+        authToken: process.env.LIBSQL_AUTH_TOKEN,
+        // Disable syncing with Turso's migration API (we manage schema manually)
+        syncUrl: undefined,
+        syncInterval: undefined
     });
     
     // Test the connection immediately
     db.execute('SELECT 1 as test')
         .then(() => {
             console.log('✓ LibSQL connection successful!');
-            console.log('LibSQL mode assumes schema is managed via turso migrations or CLI.');
+            console.log('LibSQL mode - schema managed manually via CLI.');
         })
         .catch((err) => {
             console.error('✗ LibSQL connection FAILED:', err.message);
