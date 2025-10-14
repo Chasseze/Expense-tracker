@@ -1,11 +1,11 @@
 const express = require('express');
-const { createClient } = require('@libsql/client');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const path = require('path');
 
 let sqlite3;
+let createClient;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -34,6 +34,12 @@ if (!useLibsql) {
 }
 
 if (useLibsql) {
+    try {
+        ({ createClient } = require('@libsql/client'));
+    } catch (err) {
+        console.error('Failed to load @libsql/client:', err);
+        process.exit(1);
+    }
     console.log('Attempting LibSQL connection...');
     console.log('URL:', process.env.LIBSQL_URL);
     console.log('Auth token present:', !!process.env.LIBSQL_AUTH_TOKEN);
