@@ -1,0 +1,8 @@
+[phases.setup]
+nixPkgs = ["nodejs", "python3", "gcc", "gnumake", "sqlite"]
+
+[phases.install]
+cmds = ["npm ci --include=optional"]
+
+[start]
+cmd = "node server.js"
