@@ -2,7 +2,10 @@
 nixPkgs = ["nodejs", "python3", "gcc", "gnumake", "sqlite"]
 
 [phases.install]
-cmds = ["npm ci --include=optional"]
+cmds = [
+	"npm ci --include=optional",
+	"npm rebuild sqlite3 --build-from-source"
+]
 
 [start]
 cmd = "node server.js"
