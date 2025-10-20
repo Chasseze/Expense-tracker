@@ -6,6 +6,7 @@
     <title>Secure Expense Tracker & Blog</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="firebase-config.js" defer></script>
     <script>
         tailwind.config = {
             theme: {
@@ -54,7 +55,7 @@
             <h2 class="text-2xl font-bold text-center text-gray-800">Secure Expense Tracker</h2>
             <div id="loginForm">
                 <h3 class="text-lg font-semibold mb-4">Login to your account</h3>
-                <input type="text" id="loginUsername" placeholder="Username" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary mb-3">
+                <input type="email" id="loginUsername" placeholder="Email" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary mb-3">
                 <input type="password" id="loginPassword" placeholder="Password" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary mb-4">
                 <button id="loginBtn" class="w-full btn-primary text-white py-3 rounded-lg font-semibold">Login</button>
                 <p class="text-center mt-4 text-sm text-gray-600">
@@ -64,7 +65,7 @@
             </div>
             <div id="registerForm" class="hidden">
                 <h3 class="text-lg font-semibold mb-4">Create new account</h3>
-                <input type="text" id="registerUsername" placeholder="Username" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary mb-3">
+                <input type="email" id="registerUsername" placeholder="Email" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary mb-3">
                 <input type="password" id="registerPassword" placeholder="Password" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary mb-4">
                 <button id="registerBtn" class="w-full btn-primary text-white py-3 rounded-lg font-semibold">Register</button>
                 <p class="text-center mt-4 text-sm text-gray-600">
@@ -428,10 +429,11 @@
 
     // API Helper
     const apiCall = async (endpoint, options = {}) => {
+        const token = await getIdToken();
         const config = {
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${authToken}`
+                'Authorization': `Bearer ${token}`
             },
             ...options
         };
@@ -467,37 +469,36 @@
     }
 
     // Authentication
-    async function login(username, password) {
-        const data = await apiCall('/login', {
-            method: 'POST',
-            body: { username, password }
-        });
-        
-        authToken = data.token;
-        currentUser = data.user;
-        localStorage.setItem('authToken', authToken);
-        localStorage.setItem('currentUser', JSON.stringify(currentUser));
-        return data;
+    async function login(email, password) {
+        try {
+            const result = await firebaseLogin(email, password);
+            const idToken = await getIdToken();
+            currentUser = result.user;
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            return { token: idToken, user: currentUser };
+        } catch (error) {
+            throw new Error(error.message);
+        }
     }
 
-    async function register(username, password) {
-        const data = await apiCall('/register', {
-            method: 'POST',
-            body: { username, password }
-        });
-        
-        authToken = data.token;
-        currentUser = data.user;
-        localStorage.setItem('authToken', authToken);
-        localStorage.setItem('currentUser', JSON.stringify(currentUser));
-        return data;
+    async function register(email, password) {
+        try {
+            const result = await firebaseRegister(email, password);
+            const idToken = await getIdToken();
+            currentUser = result.user;
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            return { token: idToken, user: currentUser };
+        } catch (error) {
+            throw new Error(error.message);
+        }
     }
 
     function logout() {
-        authToken = null;
+        firebaseLogout();
         currentUser = null;
-        localStorage.removeItem('authToken');
+        authToken = null;
         localStorage.removeItem('currentUser');
+        localStorage.removeItem('authToken');
         $("#authScreen").classList.remove("hidden");
         $("#app").classList.add("hidden");
     }
@@ -867,26 +868,26 @@
         if (authToken && currentUser) {
             $("#authScreen").classList.add("hidden");
             $("#app").classList.remove("hidden");
-            $("#usernameDisplay").textContent = currentUser.username;
+            $("#usernameDisplay").textContent = currentUser.email || currentUser.uid;
             loadData();
         }
 
         // Authentication
         $("#loginBtn").addEventListener('click', async () => {
-            const username = $("#loginUsername").value.trim();
+            const email = $("#loginUsername").value.trim();
             const password = $("#loginPassword").value.trim();
             
-            if (!username || !password) {
-                $("#authError").textContent = "Please enter username and password";
+            if (!email || !password) {
+                $("#authError").textContent = "Please enter email and password";
                 $("#authError").classList.remove("hidden");
                 return;
             }
 
             try {
-                await login(username, password);
+                await login(email, password);
                 $("#authScreen").classList.add("hidden");
                 $("#app").classList.remove("hidden");
-                $("#usernameDisplay").textContent = currentUser.username;
+                $("#usernameDisplay").textContent = currentUser.email || currentUser.uid;
                 loadData();
                 notify("Login successful!");
             } catch (error) {
@@ -896,20 +897,21 @@
         });
 
         $("#registerBtn").addEventListener('click', async () => {
-            const username = $("#registerUsername").value.trim();
+            const email = $("#registerUsername").value.trim();
             const password = $("#registerPassword").value.trim();
             
-            if (!username || !password) {
-                $("#authError").textContent = "Please enter username and password";
+            if (!email || !password) {
+                $("#authError").textContent = "Please enter email and password";
                 $("#authError").classList.remove("hidden");
                 return;
             }
 
             try {
-                await register(username, password);
+                await register(email, password);
                 $("#authScreen").classList.add("hidden");
                 $("#app").classList.remove("hidden");
-                $("#usernameDisplay").textContent = currentUser.username;
+                $("#usernameDisplay").textContent = currentUser.email || currentUser.uid;
+                loadData();
                 notify("Registration successful!");
             } catch (error) {
                 $("#authError").textContent = error.message;

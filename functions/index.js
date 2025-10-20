@@ -16,7 +16,8 @@ const auth = admin.auth();
 
 // Middleware to verify Firebase ID token
 async function verifyToken(req, res, next) {
-  const token = req.headers.authorization?.split('Bearer ')[1];
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.split('Bearer ')[1];
   if (!token) {
     return res.status(401).json({ error: 'Access token required' });
   }
