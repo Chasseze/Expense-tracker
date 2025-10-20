@@ -12,6 +12,7 @@ const firebaseConfig = {
 let auth;
 let currentUser = null;
 let currentIdToken = null;
+let firebaseReady = false;
 
 async function initFirebase() {
   try {
@@ -29,6 +30,10 @@ async function initFirebase() {
     
     // Set persistence so user stays logged in
     await setPersistence(auth, browserLocalPersistence);
+    
+    // Mark Firebase as ready
+    firebaseReady = true;
+    console.log('✅ Firebase initialized');
     
     // Listen for auth state changes
     onAuthStateChanged(auth, async (user) => {
@@ -62,6 +67,11 @@ function loadScript(src) {
 }
 
 async function firebaseRegister(email, password) {
+  // Wait for Firebase to be ready
+  while (!firebaseReady || !auth) {
+    await new Promise(r => setTimeout(r, 100));
+  }
+  
   try {
     const { createUserWithEmailAndPassword } = await import('https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js');
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -72,6 +82,11 @@ async function firebaseRegister(email, password) {
 }
 
 async function firebaseLogin(email, password) {
+  // Wait for Firebase to be ready
+  while (!firebaseReady || !auth) {
+    await new Promise(r => setTimeout(r, 100));
+  }
+  
   try {
     const { signInWithEmailAndPassword } = await import('https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js');
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
