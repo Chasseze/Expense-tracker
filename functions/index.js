@@ -48,65 +48,12 @@ app.get('/api/status', async (req, res) => {
   }
 });
 
-// User registration
-app.post('/api/register', async (req, res) => {
-  try {
-    const { email, password } = req.body;
+// User registration is handled CLIENT-SIDE via Firebase Auth SDK
+// Backend only handles authenticated data operations
 
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password required' });
-    }
-
-    // Create Firebase Auth user
-    const userRecord = await auth.createUser({
-      email,
-      password
-    });
-
-    // Create Firestore user document
-    await db.collection('users').doc(userRecord.uid).set({
-      email,
-      created_at: admin.firestore.FieldValue.serverTimestamp()
-    });
-
-    // Generate custom token for immediate login
-    const customToken = await auth.createCustomToken(userRecord.uid);
-
-    res.json({
-      message: 'User created successfully',
-      token: customToken,
-      user: { uid: userRecord.uid, email }
-    });
-  } catch (error) {
-    console.error('Registration error:', error);
-    if (error.code === 'auth/email-already-exists') {
-      return res.status(400).json({ error: 'Email already exists' });
-    }
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// User login (returns Firebase ID token for client to use)
-app.post('/api/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password required' });
-    }
-
-    // For Firebase Auth, the client should handle login via Firebase SDK
-    // This endpoint is for reference; actual login happens on client with Firebase SDK
-    // Return a message guiding client to use Firebase SDK
-    res.json({
-      message: 'Use Firebase SDK on client for login. Email/password provided.',
-      email
-    });
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+// User creation trigger: When user registers via Firebase Auth,
+// create a Firestore user document via Cloud Function trigger
+// (This would be in a separate callable function or Auth trigger)
 
 // Get expenses
 app.get('/api/expenses', verifyToken, async (req, res) => {
