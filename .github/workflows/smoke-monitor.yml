@@ -1,8 +1,15 @@
 name: Deploy Smoke Monitor
 
+# This workflow runs smoke tests against the hosted site.
+# Triggers:
+# - push tags matching v* (e.g. v1.2.3) — use this for releases
+# - repository_dispatch with type=hosting_deploy_success — your deploy process can call the GitHub API to notify CI
+# - manual dispatch for debugging
 on:
   push:
-    branches: [ main ]
+    tags: ['v*']
+  repository_dispatch:
+    types: [hosting_deploy_success]
   workflow_dispatch: {}
 
 jobs:
