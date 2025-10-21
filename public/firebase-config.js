@@ -36,7 +36,9 @@ function persistAuthState() {
     const snapshot = { uid: firebaseUser.uid || null, email: firebaseUser.email || null };
     currentUserSnapshot = snapshot;
     try {
+      // Write both legacy and new keys to ease migration for clients
       localStorage.setItem('currentUser', JSON.stringify(snapshot));
+      localStorage.setItem('appCurrentUser', JSON.stringify(snapshot));
     } catch (err) {
       console.warn('Could not store current user:', err);
     }
@@ -70,8 +72,10 @@ function showAuthScreen() {
     if (app) app.classList.add('hidden');
 
     try {
+      // Clear both legacy and new keys
       localStorage.removeItem('authToken');
       localStorage.removeItem('currentUser');
+      localStorage.removeItem('appCurrentUser');
       currentUserSnapshot = null;
     } catch (err) {
       console.warn('Could not clear auth storage:', err);

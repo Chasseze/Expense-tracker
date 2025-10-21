@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "backup": "node scripts/export-backup.js"
+    "backup": "node scripts/export-backup.js",
+    "test:e2e": "node scripts/playwright-smoke.js"
   },
   "dependencies": {
     "@libsql/client": "^0.6.1",

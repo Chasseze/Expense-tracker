@@ -6,7 +6,9 @@
     <title>Secure Expense Tracker & Blog</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="firebase-config.js" defer></script>
+    <!-- Cache-bust with a version query param; bump APP_VERSION on release to force clients to fetch new assets -->
+    <script>const APP_VERSION = '1';</script>
+    <script src="firebase-config.js?v=1" defer></script>
     <script>
         tailwind.config = {
             theme: {
@@ -423,10 +425,12 @@
 
     function getStoredUser() {
         try {
-            return JSON.parse(localStorage.getItem('currentUser') || 'null');
+            // Prefer the newer 'appCurrentUser' key; fall back to legacy 'currentUser'
+            const raw = localStorage.getItem('appCurrentUser') ?? localStorage.getItem('currentUser');
+            return JSON.parse(raw || 'null');
         } catch (err) {
             console.warn('Stored user data was invalid; clearing entry.', err);
-            localStorage.removeItem('currentUser');
+            try { localStorage.removeItem('currentUser'); localStorage.removeItem('appCurrentUser'); } catch(e){}
             return null;
         }
     }

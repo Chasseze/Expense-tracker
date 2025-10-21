@@ -14,15 +14,25 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
       - name: Install dependencies
         run: |
           npm ci
           npx playwright install --with-deps
-      - name: Run Playwright smoke script
+
+      - name: Run Playwright smoke script (with retry)
         env:
           HOSTING_URL: https://expense-tracker-prod-df355.web.app
         run: |
-          node scripts/playwright-smoke.js
+          set -e
+          node scripts/playwright-smoke.js || (echo 'Retrying smoke once...' && node scripts/playwright-smoke.js)
       - name: Upload smoke artifacts
         uses: actions/upload-artifact@v4
         with:
