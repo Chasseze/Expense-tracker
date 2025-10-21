@@ -122,3 +122,25 @@ async function getIdToken() {
 
 // Initialize Firebase when page loads
 document.addEventListener('DOMContentLoaded', initFirebase);
+
+// Also start initialization immediately for faster loading
+// This ensures Firebase functions are available when event listeners are attached
+const firebaseInitPromise = (async () => {
+  // Wait a bit for DOM to be ready, then init
+  if (document.readyState === 'loading') {
+    // DOM not ready, wait for it
+    await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve));
+  }
+  // Initialize Firebase
+  if (!firebaseReady) {
+    await initFirebase();
+  }
+})();
+
+// Export functions to global scope to ensure they're always accessible
+// This prevents "function not defined" errors during race conditions
+window.firebaseRegister = firebaseRegister;
+window.firebaseLogin = firebaseLogin;
+window.firebaseLogout = firebaseLogout;
+window.getIdToken = getIdToken;
+window.initFirebase = initFirebase;
