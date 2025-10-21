@@ -7,7 +7,9 @@
     "start": "node server.js",
     "dev": "node server.js",
     "backup": "node scripts/export-backup.js",
-    "test:e2e": "node scripts/playwright-smoke.js"
+    "test:e2e": "node scripts/playwright-smoke.js",
+    "build:css": "npx tailwindcss -i ./src/input.css -o ./public/styles/tailwind.css --minify",
+    "build": "npm run build:css"
   },
   "dependencies": {
     "@libsql/client": "^0.6.1",

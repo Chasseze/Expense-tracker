@@ -26,6 +26,9 @@ jobs:
         run: |
           npm ci
           npx playwright install --with-deps
+      - name: Build assets
+        run: |
+          npm run build
 
       - name: Run Playwright smoke script (with retry)
         env:
