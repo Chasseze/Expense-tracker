@@ -49,31 +49,96 @@
 
 </head>
 <body class="p-4 md:p-6">
+    <script>
+    // Unregister any service workers and clear Cache API entries on page load.
+    // This helps prevent stale assets during rapid deploys or E2E tests.
+    (async function unregisterSWsAndClearCaches() {
+        try {
+            if ('serviceWorker' in navigator) {
+                const regs = await navigator.serviceWorker.getRegistrations();
+                for (const r of regs) {
+                    try { await r.unregister(); } catch (e) { console.warn('SW unregister failed', e); }
+                }
+            }
+        } catch (err) {
+            console.warn('Service worker cleanup failed', err);
+        }
+
+        try {
+            if (window.caches && caches.keys) {
+                const keys = await caches.keys();
+                for (const k of keys) {
+                    try { await caches.delete(k); } catch (e) { console.warn('Cache delete failed', e); }
+                }
+            }
+        } catch (err) {
+            console.warn('Cache cleanup failed', err);
+        }
+    })();
+    </script>
     <!-- AUTH SCREEN -->
     <div id="authScreen" class="fixed inset-0 bg-gradient-to-br from-primary to-secondary flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
-            <h2 class="text-2xl font-bold text-center text-gray-800">Secure Expense Tracker</h2>
-            <div id="loginForm">
-                <h3 class="text-lg font-semibold mb-4">Login to your account</h3>
-                <input type="email" id="loginUsername" placeholder="Email" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary mb-3">
-                <input type="password" id="loginPassword" placeholder="Password" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary mb-4">
-                <button id="loginBtn" class="w-full btn-primary text-white py-3 rounded-lg font-semibold">Login</button>
-                <p class="text-center mt-4 text-sm text-gray-600">
-                    Don't have an account? 
-                    <button id="showRegister" class="text-primary hover:underline">Register here</button>
-                </p>
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col md:flex-row">
+            <div class="hidden md:flex md:w-1/2 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-white p-10 flex-col justify-between">
+                <div>
+                    <span class="inline-flex items-center px-3 py-1 rounded-full bg-white/20 text-xs uppercase tracking-widest">Secure Finance Hub</span>
+                    <h2 class="mt-6 text-3xl font-bold leading-tight">Track spending, stay on budget, and log your wins in one place.</h2>
+                    <p class="mt-4 text-indigo-100 text-sm">Every record is protected with Firebase Authentication and stored safely in Firestore.</p>
+                </div>
+                <ul class="space-y-3 text-sm text-indigo-100">
+                    <li class="flex items-center gap-3"><i class="fas fa-shield-alt text-lg"></i> End-to-end token security</li>
+                    <li class="flex items-center gap-3"><i class="fas fa-chart-line text-lg"></i> Real-time dashboards</li>
+                    <li class="flex items-center gap-3"><i class="fas fa-cloud-upload-alt text-lg"></i> Fast cloud sync</li>
+                </ul>
             </div>
-            <div id="registerForm" class="hidden">
-                <h3 class="text-lg font-semibold mb-4">Create new account</h3>
-                <input type="email" id="registerUsername" placeholder="Email" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary mb-3">
-                <input type="password" id="registerPassword" placeholder="Password" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary mb-4">
-                <button id="registerBtn" class="w-full btn-primary text-white py-3 rounded-lg font-semibold">Register</button>
-                <p class="text-center mt-4 text-sm text-gray-600">
-                    Already have an account? 
-                    <button id="showLogin" class="text-primary hover:underline">Login here</button>
-                </p>
+            <div class="md:w-1/2 w-full p-6 sm:p-10 bg-white">
+                <h2 class="text-2xl font-bold text-gray-900 text-center">Welcome back</h2>
+                <p class="text-sm text-gray-500 text-center mt-2">Log in to continue managing your expenses or create a new account in seconds.</p>
+
+                <div id="loginForm" class="mt-8 space-y-4">
+                    <div>
+                        <label for="loginUsername" class="block text-sm font-medium text-gray-600 mb-1">Email</label>
+                        <input type="email" id="loginUsername" placeholder="you@example.com" class="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition">
+                    </div>
+                    <div>
+                        <label for="loginPassword" class="block text-sm font-medium text-gray-600 mb-1">Password</label>
+                        <input type="password" id="loginPassword" placeholder="Enter your password" class="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition">
+                    </div>
+                    <button id="loginBtn" class="w-full btn-primary text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2">
+                        <i class="fas fa-sign-in-alt"></i>
+                        Login
+                    </button>
+                    <p class="text-center text-sm text-gray-600">
+                        New here?
+                        <button id="showRegister" class="text-primary font-semibold hover:underline">Create an account</button>
+                    </p>
+                </div>
+
+                <div id="registerForm" class="hidden mt-8 space-y-4">
+                    <div class="text-center">
+                        <h3 class="text-2xl font-semibold text-gray-900">Create your account</h3>
+                        <p class="text-sm text-gray-500 mt-1">Start tracking your expenses with secure cloud storage.</p>
+                    </div>
+                    <div>
+                        <label for="registerUsername" class="block text-sm font-medium text-gray-600 mb-1">Email</label>
+                        <input type="email" id="registerUsername" placeholder="you@example.com" class="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition">
+                    </div>
+                    <div>
+                        <label for="registerPassword" class="block text-sm font-medium text-gray-600 mb-1">Password</label>
+                        <input type="password" id="registerPassword" placeholder="Choose a secure password" class="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition">
+                    </div>
+                    <button id="registerBtn" class="w-full btn-primary text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2">
+                        <i class="fas fa-user-plus"></i>
+                        Create Account
+                    </button>
+                    <p class="text-center text-sm text-gray-600">
+                        Already registered?
+                        <button id="showLogin" class="text-primary font-semibold hover:underline">Log in instead</button>
+                    </p>
+                </div>
+
+                <p id="authError" class="mt-6 text-red-600 text-sm text-center hidden"></p>
             </div>
-            <p id="authError" class="text-red-600 text-sm text-center hidden"></p>
         </div>
     </div>
 
@@ -355,8 +420,21 @@
     // Dynamically determine API base URL (works for both local dev and production)
     const API_BASE = window.location.origin + '/api';
     const defaultExpenseCategories = ['Home Upkeep', 'School Upkeep', 'School Fees', 'Projects'];
+
+    function getStoredUser() {
+        try {
+            return JSON.parse(localStorage.getItem('currentUser') || 'null');
+        } catch (err) {
+            console.warn('Stored user data was invalid; clearing entry.', err);
+            localStorage.removeItem('currentUser');
+            return null;
+        }
+    }
+
     let authToken = localStorage.getItem('authToken');
-    let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
+    // Use a less-generic global name to avoid collisions with other scripts
+    // localStorage key remains 'currentUser' for compatibility with firebase-config.js
+    let appCurrentUser = getStoredUser();
     let expenses = [];
     let blogPosts = [];
     let budgets = [];
@@ -364,6 +442,102 @@
     let lastAlertSignature = '';
     let storageInfo = { storageMode: 'sqlite', libsqlUrl: null };
     const filters = { term: '', category: '', status: '' };
+
+    const ensureFirebaseReady = async () => {
+        if (window.firebaseInitPromise) {
+            try {
+                await window.firebaseInitPromise;
+            } catch (err) {
+                console.error('Firebase init failed:', err);
+            }
+        }
+        if (typeof window.firebaseLogin !== 'function' || typeof window.firebaseRegister !== 'function') {
+            throw new Error('Firebase failed to initialize. Please refresh the page.');
+        }
+    };
+
+    const serializeUser = (user) => {
+        if (!user) return null;
+        const source = user.user ? user.user : user;
+        if (!source) return null;
+        return {
+            uid: source.uid || null,
+            email: source.email || null
+        };
+    };
+
+    const applyAuthenticatedState = async (userDetail) => {
+        if (document.readyState === 'loading') {
+            await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve, { once: true }));
+        }
+
+        await ensureFirebaseReady();
+    const snapshot = serializeUser(userDetail) || getStoredUser();
+    if (!snapshot) return;
+
+    appCurrentUser = snapshot;
+
+        const authScreen = document.querySelector('#authScreen');
+        const app = document.querySelector('#app');
+        const usernameDisplay = document.querySelector('#usernameDisplay');
+
+        if (authScreen) authScreen.classList.add('hidden');
+        if (app) app.classList.remove('hidden');
+        if (usernameDisplay) {
+            usernameDisplay.textContent = snapshot.email || snapshot.uid || '';
+        }
+
+        try {
+            const latestToken = await getIdToken();
+            if (latestToken) {
+                authToken = latestToken;
+                localStorage.setItem('authToken', latestToken);
+            }
+        } catch (err) {
+            console.error('Unable to refresh auth token:', err);
+        }
+
+        try {
+            localStorage.setItem('currentUser', JSON.stringify(snapshot));
+        } catch (err) {
+            console.warn('Unable to persist user snapshot:', err);
+        }
+
+        try {
+            await loadData();
+        } catch (error) {
+            console.error('Failed to hydrate data after auth:', error);
+        }
+    };
+
+    window.addEventListener('auth:ready', (event) => {
+        applyAuthenticatedState(event.detail?.user);
+    });
+
+    window.addEventListener('auth:cleared', () => {
+        appCurrentUser = null;
+        authToken = null;
+        expenses = [];
+        blogPosts = [];
+        budgets = [];
+        budgetAlerts = [];
+        lastAlertSignature = '';
+        try {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('currentUser');
+        } catch (err) {
+            console.warn('Unable to clear stored auth state:', err);
+        }
+
+        const authScreen = document.querySelector('#authScreen');
+        const app = document.querySelector('#app');
+        if (authScreen) authScreen.classList.remove('hidden');
+        if (app) app.classList.add('hidden');
+
+        renderExpenses();
+        renderBlogPosts();
+        renderBudgetsTable();
+    });
 
     // UI Helpers
     const $ = q => document.querySelector(q);
@@ -429,6 +603,7 @@
 
     // API Helper
     const apiCall = async (endpoint, options = {}) => {
+        await ensureFirebaseReady();
         const token = await getIdToken();
         const config = {
             headers: {
@@ -471,11 +646,19 @@
     // Authentication
     async function login(email, password) {
         try {
+            await ensureFirebaseReady();
             const result = await firebaseLogin(email, password);
             const idToken = await getIdToken();
-            currentUser = result.user;
-            localStorage.setItem('currentUser', JSON.stringify(currentUser));
-            return { token: idToken, user: currentUser };
+            const snapshot = serializeUser(result.user);
+            appCurrentUser = snapshot;
+            authToken = idToken;
+            if (snapshot) {
+                localStorage.setItem('currentUser', JSON.stringify(snapshot));
+            }
+            if (idToken) {
+                localStorage.setItem('authToken', idToken);
+            }
+            return { token: idToken, user: snapshot };
         } catch (error) {
             throw new Error(error.message);
         }
@@ -483,19 +666,29 @@
 
     async function register(email, password) {
         try {
+            await ensureFirebaseReady();
             const result = await firebaseRegister(email, password);
             const idToken = await getIdToken();
-            currentUser = result.user;
-            localStorage.setItem('currentUser', JSON.stringify(currentUser));
-            return { token: idToken, user: currentUser };
+            const snapshot = serializeUser(result.user);
+            appCurrentUser = snapshot;
+            authToken = idToken;
+            if (snapshot) {
+                localStorage.setItem('currentUser', JSON.stringify(snapshot));
+            }
+            if (idToken) {
+                localStorage.setItem('authToken', idToken);
+            }
+            return { token: idToken, user: snapshot };
         } catch (error) {
             throw new Error(error.message);
         }
     }
 
     function logout() {
-        firebaseLogout();
-        currentUser = null;
+        if (typeof firebaseLogout === 'function') {
+            firebaseLogout();
+        }
+        appCurrentUser = null;
         authToken = null;
         localStorage.removeItem('currentUser');
         localStorage.removeItem('authToken');
@@ -860,23 +1053,20 @@
     };
 
     // Event Listeners
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', async function() {
         hydrateStorageInfo();
         fillBudgetCategoryOptions();
         syncFilterInputs();
 
         if (authToken && currentUser) {
-            $("#authScreen").classList.add("hidden");
-            $("#app").classList.remove("hidden");
-            $("#usernameDisplay").textContent = currentUser.email || currentUser.uid;
-            loadData();
+            await applyAuthenticatedState(currentUser);
         }
 
-        // Authentication
+        // Authentication: call Firebase helpers and rely on auth:ready/auth:cleared events
         $("#loginBtn").addEventListener('click', async () => {
             const email = $("#loginUsername").value.trim();
             const password = $("#loginPassword").value.trim();
-            
+
             if (!email || !password) {
                 $("#authError").textContent = "Please enter email and password";
                 $("#authError").classList.remove("hidden");
@@ -884,14 +1074,11 @@
             }
 
             try {
+                await ensureFirebaseReady();
                 await login(email, password);
-                $("#authScreen").classList.add("hidden");
-                $("#app").classList.remove("hidden");
-                $("#usernameDisplay").textContent = currentUser.email || currentUser.uid;
-                loadData();
-                notify("Login successful!");
+                // UI will update via auth:ready event
             } catch (error) {
-                $("#authError").textContent = error.message;
+                $("#authError").textContent = error.message || 'Login failed';
                 $("#authError").classList.remove("hidden");
             }
         });
@@ -899,7 +1086,7 @@
         $("#registerBtn").addEventListener('click', async () => {
             const email = $("#registerUsername").value.trim();
             const password = $("#registerPassword").value.trim();
-            
+
             if (!email || !password) {
                 $("#authError").textContent = "Please enter email and password";
                 $("#authError").classList.remove("hidden");
@@ -907,14 +1094,11 @@
             }
 
             try {
+                await ensureFirebaseReady();
                 await register(email, password);
-                $("#authScreen").classList.add("hidden");
-                $("#app").classList.remove("hidden");
-                $("#usernameDisplay").textContent = currentUser.email || currentUser.uid;
-                loadData();
-                notify("Registration successful!");
+                // UI will update via auth:ready event
             } catch (error) {
-                $("#authError").textContent = error.message;
+                $("#authError").textContent = error.message || 'Registration failed';
                 $("#authError").classList.remove("hidden");
             }
         });

@@ -10,9 +10,76 @@ const firebaseConfig = {
 
 // Initialize Firebase
 let auth;
-let currentUser = null;
-let currentIdToken = null;
+let firebaseUser = null; // internal firebase.User object
+let firebaseIdToken = null; // cached id token
 let firebaseReady = false;
+let currentUserSnapshot = null; // lightweight {uid,email}
+
+function whenDomReady(callback) {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', callback, { once: true });
+  } else {
+    callback();
+  }
+}
+
+function persistAuthState() {
+  if (firebaseIdToken) {
+    try {
+      localStorage.setItem('authToken', firebaseIdToken);
+    } catch (err) {
+      console.warn('Could not store auth token:', err);
+    }
+  }
+
+  if (firebaseUser) {
+    const snapshot = { uid: firebaseUser.uid || null, email: firebaseUser.email || null };
+    currentUserSnapshot = snapshot;
+    try {
+      localStorage.setItem('currentUser', JSON.stringify(snapshot));
+    } catch (err) {
+      console.warn('Could not store current user:', err);
+    }
+  }
+}
+
+function showApp() {
+  whenDomReady(() => {
+    const authScreen = document.getElementById('authScreen');
+    const app = document.getElementById('app');
+    const usernameDisplay = document.getElementById('usernameDisplay');
+
+    if (authScreen) authScreen.classList.add('hidden');
+    if (app) app.classList.remove('hidden');
+    if (usernameDisplay && currentUserSnapshot) {
+      usernameDisplay.textContent = currentUserSnapshot.email || currentUserSnapshot.uid || '';
+    }
+
+    persistAuthState();
+    // dispatch a lightweight user snapshot (uid/email) so other scripts don't rely on firebase.User methods
+    window.dispatchEvent(new CustomEvent('auth:ready', { detail: { user: currentUserSnapshot } }));
+  });
+}
+
+function showAuthScreen() {
+  whenDomReady(() => {
+    const authScreen = document.getElementById('authScreen');
+    const app = document.getElementById('app');
+
+    if (authScreen) authScreen.classList.remove('hidden');
+    if (app) app.classList.add('hidden');
+
+    try {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('currentUser');
+      currentUserSnapshot = null;
+    } catch (err) {
+      console.warn('Could not clear auth storage:', err);
+    }
+
+    window.dispatchEvent(new CustomEvent('auth:cleared'));
+  });
+}
 
 async function initFirebase() {
   try {
@@ -38,16 +105,20 @@ async function initFirebase() {
     // Listen for auth state changes
     onAuthStateChanged(auth, async (user) => {
       if (user) {
-        currentUser = user;
-        currentIdToken = await user.getIdToken();
-        // Token expires after ~1 hour, refresh when needed
+        // Keep the firebase.User object locally for token retrieval, but dispatch only a small snapshot
+        firebaseUser = user;
+        currentUserSnapshot = { uid: user.uid || null, email: user.email || null };
+        firebaseIdToken = await user.getIdToken();
+        persistAuthState();
+        // Token expires after ~1 hour, refresh when needed and persist
         user.getIdToken(/* forceRefresh */ true).then(token => {
-          currentIdToken = token;
-        });
+          firebaseIdToken = token;
+          persistAuthState();
+        }).catch(err => console.warn('Token refresh failed:', err));
         showApp();
       } else {
-        currentUser = null;
-        currentIdToken = null;
+        firebaseUser = null;
+        firebaseIdToken = null;
         showAuthScreen();
       }
     });
@@ -100,18 +171,19 @@ async function firebaseLogout() {
   try {
     const { signOut } = await import('https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js');
     await signOut(auth);
-    currentUser = null;
-    currentIdToken = null;
+    firebaseUser = null;
+    firebaseIdToken = null;
   } catch (error) {
     console.error('Logout error:', error);
   }
 }
 
 async function getIdToken() {
-  if (currentUser) {
+  if (firebaseUser) {
     try {
-      currentIdToken = await currentUser.getIdToken();
-      return currentIdToken;
+      firebaseIdToken = await firebaseUser.getIdToken();
+      persistAuthState();
+      return firebaseIdToken;
     } catch (error) {
       console.error('Error getting ID token:', error);
       return null;
@@ -144,3 +216,6 @@ window.firebaseLogin = firebaseLogin;
 window.firebaseLogout = firebaseLogout;
 window.getIdToken = getIdToken;
 window.initFirebase = initFirebase;
+window.showApp = showApp;
+window.showAuthScreen = showAuthScreen;
+window.firebaseInitPromise = firebaseInitPromise;

@@ -1,0 +1,26 @@
+[
+	{
+		"id": 1,
+		"title": "Verify Firebase email/password signup",
+		"description": "Use Firebase REST API to create a test user and confirm signup works.",
+		"status": "completed"
+	},
+	{
+		"id": 2,
+		"title": "Verify Firebase login",
+		"description": "Sign in with test credentials and ensure we receive an ID token.",
+		"status": "completed"
+	},
+	{
+		"id": 3,
+		"title": "Call protected API with ID token",
+		"description": "Invoke /api/expenses using the token to confirm backend auth pipeline.",
+		"status": "completed"
+	},
+	{
+		"id": 4,
+		"title": "Fix firebaseRegister not defined in browser",
+		"description": "Ensure firebase-config.js loads before inline scripts and exposes global functions on window.",
+		"status": "completed"
+	}
+]
