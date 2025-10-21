@@ -5,25 +5,10 @@
    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Secure Expense Tracker & Blog</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Cache-bust with a version query param; bump APP_VERSION on release to force clients to fetch new assets -->
+    <!-- Use built Tailwind CSS for production instead of the CDN. Bump APP_VERSION to force cache refresh. -->
+    <link rel="stylesheet" href="/styles/tailwind.css?v=1">
     <script>const APP_VERSION = '1';</script>
     <script src="firebase-config.js?v=1" defer></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#4f46e5',
-                        secondary: '#7c3aed',
-                        accent: '#10b981',
-                        dark: '#1f2937',
-                        light: '#f9fafb'
-                    }
-                }
-            }
-        }
-    </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         body {
