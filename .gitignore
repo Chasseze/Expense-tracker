@@ -1,2 +1,14 @@
 node_modules/
 backups/
+
+# Firebase service account (NEVER commit!)
+serviceAccountKey.json
+
+# Secrets and environment files
+.env
+.env.local
+.env.*.local
+
+# Firebase emulator data
+.firebase/
+firebase-debug.log
