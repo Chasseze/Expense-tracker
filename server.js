@@ -22,6 +22,11 @@ const storageMode = useLibsql ? 'libsql' : 'sqlite';
 const dbPath = process.env.NODE_ENV === 'production' ? '/tmp/expense_tracker.db' : './expense_tracker.db';
 let db;
 
+// Development auth toggle: set DISABLE_AUTH=1 to disable auth checks globally.
+// Additionally, when not in production we expose small routes to enable/disable auth at runtime:
+const devAuthFromEnv = process.env.DISABLE_AUTH === '1';
+let devAuthDisabled = Boolean(devAuthFromEnv);
+
 if (!useLibsql) {
     try {
         sqlite3 = require('sqlite3').verbose();
@@ -170,6 +175,13 @@ function formatDateTimeBoundary(value, edge) {
 
 // Authentication middleware
 function authenticateToken(req, res, next) {
+    // Bypass auth in development when explicitly disabled
+    if (devAuthDisabled) {
+        // Inject a lightweight dev user
+        req.user = { userId: 1, username: 'dev' };
+        return next();
+    }
+
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
@@ -185,6 +197,23 @@ function authenticateToken(req, res, next) {
 }
 
 // Routes
+
+// Dev-only: runtime toggle endpoints to enable/disable auth checks without restarting the server
+if (process.env.NODE_ENV !== 'production') {
+    app.post('/dev/disable-auth', (req, res) => {
+        devAuthDisabled = true;
+        res.json({ message: 'Auth disabled for development' });
+    });
+
+    app.post('/dev/enable-auth', (req, res) => {
+        devAuthDisabled = false;
+        res.json({ message: 'Auth enabled' });
+    });
+
+    app.get('/dev/auth-status', (req, res) => {
+        res.json({ devAuthDisabled });
+    });
+}
 
 // Status endpoint (unauthenticated)
 app.get('/api/status', async (req, res) => {
