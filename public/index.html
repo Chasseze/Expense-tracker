@@ -63,10 +63,16 @@
         @media (max-width: 1200px) { .expense-table { display: block; overflow-x: auto; } }
         /* Theme variables and dark theme overrides */
         :root {
-            --page-bg-light: linear-gradient(135deg, #f0f9ff 0%, #fdf2ff 100%);
+            /* Light background is a soft, desaturated blue (light-dark-blue feel) */
+            --page-bg-light: linear-gradient(135deg, #e6eef8 0%, #d7e7fb 100%);
             --page-bg-dark: linear-gradient(135deg, #071025 0%, #071825 100%);
             --header-bg-light: linear-gradient(90deg, #2563eb 0%, #60a5fa 50%, #f97316 100%);
             --header-bg-dark: linear-gradient(90deg, #0b3d91 0%, #0f172a 60%, #7c2d00 100%);
+        }
+
+        /* light default background uses the soft 'light dark blue' gradient */
+        body {
+            background: var(--page-bg-light);
         }
 
         body.theme-dark {
