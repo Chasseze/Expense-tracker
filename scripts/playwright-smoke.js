@@ -56,7 +56,12 @@ async function run() {
     // Call protected API from the page context
     const apiResult = await page.evaluate(async () => {
       const token = localStorage.getItem('authToken');
-      const res = await fetch('/api/expenses', { headers: { Authorization: `Bearer ${token}` } });
+      const localOnly = localStorage.getItem('localOnly') === '1';
+      const headers = {};
+      if (!localOnly && token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const res = await fetch('/api/expenses', { headers });
       const ct = res.headers.get('content-type') || '';
       const body = ct.includes('application/json') ? await res.json() : await res.text();
       return { status: res.status, body };
