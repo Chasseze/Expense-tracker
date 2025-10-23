@@ -1,7 +1,7 @@
 const { chromium } = require('playwright');
 const fs = require('fs');
 
-const BASE = 'https://expense-tracker-prod-df355.web.app';
+const BASE = process.argv[2] || process.env.BASE_URL || 'https://expense-tracker-prod-df355.web.app';
 
 async function run() {
   const browser = await chromium.launch({ headless: true });
