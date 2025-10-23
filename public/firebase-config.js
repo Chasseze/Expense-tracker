@@ -140,11 +140,7 @@ function showAuthScreen() {
 
 async function initFirebase() {
   try {
-    // Dynamically load Firebase SDK
-    await loadScript('https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js');
-    await loadScript('https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js');
-    
-    // Import Firebase modules
+    // Use ESM dynamic imports (do NOT insert script tags) so the browser treats the files as modules.
     const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js');
     const { getAuth, setPersistence, browserLocalPersistence, onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js');
     
@@ -185,13 +181,8 @@ async function initFirebase() {
 }
 
 function loadScript(src) {
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = src;
-    script.onload = resolve;
-    script.onerror = reject;
-    document.body.appendChild(script);
-  });
+  // Deprecated: keep for backwards compatibility but prefer dynamic ESM imports.
+  return Promise.reject(new Error('loadScript is deprecated; use dynamic import() instead'));
 }
 
 async function firebaseRegister(email, password) {
