@@ -18,6 +18,13 @@ async function run() {
     console.log('Opening app...', BASE);
     await page.goto(BASE, { waitUntil: 'networkidle' });
 
+    // If testing locally, enable client local-only mode so mocked auth is used and no real Firebase calls are made.
+    if (BASE.includes('localhost') || BASE.includes('127.0.0.1')) {
+      await page.evaluate(() => localStorage.setItem('localOnly', '1'));
+      await page.reload({ waitUntil: 'networkidle' });
+      console.log('Local-only client mode enabled');
+    }
+
     // Ensure firebase initialized (listen to window.firebaseInitPromise)
     const initOk = await page.evaluate(() => {
       return !!(window.firebaseInitPromise || window.firebaseInitPromise === null);
