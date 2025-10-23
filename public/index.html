@@ -90,6 +90,13 @@
             background-color: rgba(255,255,255,0.03) !important;
             color: #e6eef8 !important;
         }
+        /* Category card tint - subtle light dark-blue */
+        #categoryCard {
+            background: linear-gradient(180deg, rgba(38,99,235,0.06) 0%, rgba(96,165,250,0.03) 100%);
+        }
+        body.theme-dark #categoryCard {
+            background: linear-gradient(180deg, rgba(3,37,76,0.45) 0%, rgba(3,37,76,0.25) 100%);
+        }
     </style>
 
 </head>
@@ -225,7 +232,7 @@
         <!-- SUMMARY SECTION -->
         <div id="summarySection" class="mb-8">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6" id="summaryCards"></div>
-            <div class="card bg-white rounded-2xl shadow-lg p-6">
+            <div id="categoryCard" class="card bg-white rounded-2xl shadow-lg p-6">
                 <h2 class="text-2xl font-bold text-gray-800 mb-4"><center>Category Breakdown</center></h2>
                 <div id="categoryBreakdown" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"></div>
             </div>
