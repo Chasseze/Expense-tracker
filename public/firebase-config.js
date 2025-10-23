@@ -15,6 +15,59 @@ let firebaseIdToken = null; // cached id token
 let firebaseReady = false;
 let currentUserSnapshot = null; // lightweight {uid,email}
 
+// Local-only mode: do not contact Firebase when running locally.
+// Enable by visiting http://localhost:3000/?local=true or setting localStorage.setItem('localOnly','1')
+const localOnly = (typeof window !== 'undefined') && (window.location && window.location.search && window.location.search.includes('local=true') || localStorage.getItem('localOnly') === '1');
+if (localOnly) {
+  console.log('⚠️ Firebase initialization skipped: running in local-only mode');
+  firebaseReady = true;
+  try {
+    const stored = localStorage.getItem('currentUser') || localStorage.getItem('appCurrentUser');
+    currentUserSnapshot = stored ? JSON.parse(stored) : null;
+    firebaseIdToken = localStorage.getItem('authToken') || null;
+  } catch (err) {
+    console.warn('Local-only: failed to read stored auth state', err);
+  }
+
+  // Minimal mocked helpers so index.html can call the same functions
+  async function firebaseRegister(email, password) {
+    // In local mode we just create a fake snapshot and token
+    const snapshot = { uid: `local-${Date.now()}`, email };
+    currentUserSnapshot = snapshot;
+    firebaseIdToken = `local-token-${Date.now()}`;
+    try { localStorage.setItem('currentUser', JSON.stringify(snapshot)); localStorage.setItem('authToken', firebaseIdToken); } catch (e) {}
+    return { user: snapshot };
+  }
+
+  async function firebaseLogin(email, password) {
+    // Accept any credentials in local-only mode
+    const snapshot = { uid: `local-${Date.now()}`, email };
+    currentUserSnapshot = snapshot;
+    firebaseIdToken = `local-token-${Date.now()}`;
+    try { localStorage.setItem('currentUser', JSON.stringify(snapshot)); localStorage.setItem('authToken', firebaseIdToken); } catch (e) {}
+    return { user: snapshot };
+  }
+
+  async function firebaseLogout() {
+    currentUserSnapshot = null;
+    firebaseIdToken = null;
+    try { localStorage.removeItem('currentUser'); localStorage.removeItem('authToken'); } catch (e) {}
+    // dispatch cleared event so UI reacts
+    window.dispatchEvent(new CustomEvent('auth:cleared'));
+  }
+
+  async function getIdToken() {
+    return firebaseIdToken;
+  }
+
+  // Export mocked helpers
+  window.firebaseRegister = firebaseRegister;
+  window.firebaseLogin = firebaseLogin;
+  window.firebaseLogout = firebaseLogout;
+  window.getIdToken = getIdToken;
+  window.firebaseInitPromise = Promise.resolve();
+}
+
 function whenDomReady(callback) {
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', callback, { once: true });
@@ -150,6 +203,19 @@ async function firebaseRegister(email, password) {
   try {
     const { createUserWithEmailAndPassword } = await import('https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js');
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    // Immediately populate local state so callers can get an ID token without waiting for onAuthStateChanged
+    try {
+      firebaseUser = userCredential.user;
+      firebaseIdToken = await firebaseUser.getIdToken();
+      currentUserSnapshot = { uid: firebaseUser.uid || null, email: firebaseUser.email || null };
+      persistAuthState();
+      // notify listeners that auth is ready
+      window.dispatchEvent(new CustomEvent('auth:ready', { detail: { user: currentUserSnapshot } }));
+    } catch (e) {
+      // non-fatal: continue and return user info
+      console.warn('Post-register token retrieval failed:', e);
+    }
+
     return { user: { uid: userCredential.user.uid, email: userCredential.user.email } };
   } catch (error) {
     throw new Error(error.message);
@@ -165,6 +231,17 @@ async function firebaseLogin(email, password) {
   try {
     const { signInWithEmailAndPassword } = await import('https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js');
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    // Populate local state immediately so callers can obtain token and UI can update without waiting for onAuthStateChanged
+    try {
+      firebaseUser = userCredential.user;
+      firebaseIdToken = await firebaseUser.getIdToken();
+      currentUserSnapshot = { uid: firebaseUser.uid || null, email: firebaseUser.email || null };
+      persistAuthState();
+      window.dispatchEvent(new CustomEvent('auth:ready', { detail: { user: currentUserSnapshot } }));
+    } catch (e) {
+      console.warn('Post-login token retrieval failed:', e);
+    }
+
     return { user: { uid: userCredential.user.uid, email: userCredential.user.email } };
   } catch (error) {
     throw new Error(error.message);
