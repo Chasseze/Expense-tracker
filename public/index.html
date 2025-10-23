@@ -61,6 +61,29 @@
         .logout-btn:hover { background: rgba(0,0,0,0.04); transform: translateY(-1px); }
         .logout-btn:focus { outline: 3px solid rgba(37,99,235,0.22); outline-offset: 2px; }
         @media (max-width: 1200px) { .expense-table { display: block; overflow-x: auto; } }
+        /* Theme variables and dark theme overrides */
+        :root {
+            --page-bg-light: linear-gradient(135deg, #f0f9ff 0%, #fdf2ff 100%);
+            --page-bg-dark: linear-gradient(135deg, #071025 0%, #071825 100%);
+            --header-bg-light: linear-gradient(90deg, #2563eb 0%, #60a5fa 50%, #f97316 100%);
+            --header-bg-dark: linear-gradient(90deg, #0b3d91 0%, #0f172a 60%, #7c2d00 100%);
+        }
+
+        body.theme-dark {
+            background: var(--page-bg-dark);
+            color: #e6eef8;
+        }
+
+        body.theme-dark .header-hero {
+            background: var(--header-bg-dark);
+        }
+
+        /* Slight adjustments for cards in dark mode */
+        body.theme-dark .card,
+        body.theme-dark .bg-white {
+            background-color: rgba(255,255,255,0.03) !important;
+            color: #e6eef8 !important;
+        }
     </style>
 
 </head>
@@ -186,8 +209,9 @@
             </button>
         </div>
         <input id="importFile" type="file" accept=".json,.csv" class="hidden">
-        <div class="text-center mt-4">
+        <div class="text-center mt-4 flex items-center justify-center gap-3">
             <span id="usernameDisplay" class="text-indigo-200 font-medium"></span>
+            <button id="themeToggle" aria-label="Toggle theme" title="Toggle light/dark theme" class="ml-2 px-3 py-1 rounded-md bg-white/10 text-white">🌙</button>
             <button id="logoutBtn" class="logout-btn ml-4 text-sm">Logout</button>
         </div>
     </header>
@@ -287,6 +311,40 @@
         </section>
     </div>
 
+    <script>
+    // Theme toggle: persist in localStorage and apply on load
+    (function() {
+        const root = document.documentElement;
+        const body = document.body;
+        const toggle = document.getElementById('themeToggle');
+        function applyTheme(t) {
+            if (t === 'dark') {
+                body.classList.add('theme-dark');
+                toggle.textContent = '☀️';
+                toggle.title = 'Switch to light theme';
+            } else {
+                body.classList.remove('theme-dark');
+                toggle.textContent = '🌙';
+                toggle.title = 'Switch to dark theme';
+            }
+        }
+
+        // initialize
+        try {
+            const stored = localStorage.getItem('theme') || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            applyTheme(stored);
+        } catch (e) { applyTheme('light'); }
+
+        if (toggle) {
+            toggle.addEventListener('click', () => {
+                const current = body.classList.contains('theme-dark') ? 'dark' : 'light';
+                const next = current === 'dark' ? 'light' : 'dark';
+                try { localStorage.setItem('theme', next); } catch (e) {}
+                applyTheme(next);
+            });
+        }
+    })();
+    </script>
     <!-- EXPENSE MODAL -->
     <div id="expenseModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-40 hidden">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
