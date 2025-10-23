@@ -31,6 +31,35 @@
             to { transform: translateX(0); opacity: 1; }
         }
         .expense-table th { background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%); }
+        /* Header hero gradient: regular blue -> soft blue midpoint -> orange + subtle overlay */
+        .header-hero {
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(90deg, #2563eb 0%, #60a5fa 50%, #f97316 100%);
+            color: white;
+        }
+
+        /* subtle dark overlay to improve text contrast without changing colors */
+        .header-hero::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.05);
+            pointer-events: none;
+        }
+        /* Accessible logout button styles */
+        .logout-btn {
+            background: rgba(255,255,255,0.95); /* nearly white to stand out */
+            color: #0f172a; /* slate-900 for strong contrast */
+            padding: .35rem .9rem;
+            border-radius: .5rem;
+            font-weight: 600;
+            box-shadow: 0 6px 18px -10px rgba(2,6,23,0.4);
+            border: none;
+            transition: background .15s ease, transform .08s ease;
+        }
+        .logout-btn:hover { background: rgba(0,0,0,0.04); transform: translateY(-1px); }
+        .logout-btn:focus { outline: 3px solid rgba(37,99,235,0.22); outline-offset: 2px; }
         @media (max-width: 1200px) { .expense-table { display: block; overflow-x: auto; } }
     </style>
 
@@ -131,7 +160,7 @@
 
     <!-- MAIN APP -->
 <div id="app" class="max-w-7xl mx-auto hidden">
-    <header class="bg-gradient-to-r from-primary to-secondary rounded-2xl shadow-xl p-6 md:p-8 mb-8 text-white">
+    <header class="header-hero rounded-2xl shadow-xl p-6 md:p-8 mb-8 text-white">
         <div class="flex justify-end mb-2">
             <span id="storageBadge" class="hidden px-4 py-1 rounded-full bg-white/20 text-white text-xs font-semibold tracking-wide shadow-inner"></span>
         </div>
@@ -159,7 +188,7 @@
         <input id="importFile" type="file" accept=".json,.csv" class="hidden">
         <div class="text-center mt-4">
             <span id="usernameDisplay" class="text-indigo-200 font-medium"></span>
-            <button id="logoutBtn" class="ml-4 bg-white text-primary px-4 py-1 rounded-lg font-semibold hover:bg-gray-100 text-sm">Logout</button>
+            <button id="logoutBtn" class="logout-btn ml-4 text-sm">Logout</button>
         </div>
     </header>
 
@@ -432,16 +461,22 @@
     let storageInfo = { storageMode: 'sqlite', libsqlUrl: null };
     const filters = { term: '', category: '', status: '' };
 
-    const ensureFirebaseReady = async () => {
+    const ensureFirebaseReady = async (timeoutMs = 5000) => {
         if (window.firebaseInitPromise) {
             try {
-                await window.firebaseInitPromise;
+                // Fail fast if initialization doesn't complete in reasonable time
+                await Promise.race([
+                    window.firebaseInitPromise,
+                    new Promise((_, rej) => setTimeout(() => rej(new Error('Firebase init timeout')), timeoutMs))
+                ]);
             } catch (err) {
-                console.error('Firebase init failed:', err);
+                console.error('Firebase init failed or timed out:', err);
+                throw err;
             }
         }
+
         if (typeof window.firebaseLogin !== 'function' || typeof window.firebaseRegister !== 'function') {
-            throw new Error('Firebase failed to initialize. Please refresh the page.');
+            throw new Error('Firebase functions not available. Please refresh the page.');
         }
     };
 
@@ -1051,8 +1086,8 @@
         fillBudgetCategoryOptions();
         syncFilterInputs();
 
-        if (authToken && currentUser) {
-            await applyAuthenticatedState(currentUser);
+        if (authToken && appCurrentUser) {
+            await applyAuthenticatedState(appCurrentUser);
         }
 
         // Authentication: call Firebase helpers and rely on auth:ready/auth:cleared events
@@ -1285,7 +1320,7 @@
                 expenses: expenses,
                 blogPosts: blogPosts,
                 exportedAt: new Date().toISOString(),
-                user: currentUser.username
+                user: appCurrentUser ? appCurrentUser.email || appCurrentUser.uid : 'anonymous'
             };
             
             const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
