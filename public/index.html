@@ -595,10 +595,9 @@
         await ensureFirebaseReady();
         const token = await getIdToken();
         const config = {
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
+                headers: {
+                    'Content-Type': 'application/json'
+                },
             ...options
         };
 
@@ -607,6 +606,11 @@
         }
 
         try {
+            // If running in local-only mode, the client uses mocked tokens that the server may not accept.
+            // In that case do not send Authorization header; server's dev-auth toggle will accept requests.
+            if (!window.appLocalOnly && token) {
+                config.headers['Authorization'] = `Bearer ${token}`;
+            }
             const response = await fetch(`${API_BASE}${endpoint}`, config);
             const data = await response.json();
             
