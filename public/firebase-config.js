@@ -190,8 +190,11 @@ function loadScript(src) {
 }
 
 async function firebaseRegister(email, password) {
-  // Wait for Firebase to be ready
+  // Wait for Firebase to be ready, but fail after a timeout to avoid infinite hang
+  const start = Date.now();
+  const timeoutMs = 8000;
   while (!firebaseReady || !auth) {
+    if (Date.now() - start > timeoutMs) throw new Error('Firebase did not initialize in time');
     await new Promise(r => setTimeout(r, 100));
   }
   
@@ -218,8 +221,11 @@ async function firebaseRegister(email, password) {
 }
 
 async function firebaseLogin(email, password) {
-  // Wait for Firebase to be ready
+  // Wait for Firebase to be ready, but fail after a timeout to avoid infinite hang
+  const start = Date.now();
+  const timeoutMs = 8000;
   while (!firebaseReady || !auth) {
+    if (Date.now() - start > timeoutMs) throw new Error('Firebase did not initialize in time');
     await new Promise(r => setTimeout(r, 100));
   }
   
