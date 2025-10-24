@@ -306,6 +306,15 @@
                         <tbody id="expenseTableBody"></tbody>
                     </table>
                 </div>
+                <div id="expensePagination" class="flex items-center justify-between mt-3 hidden">
+                    <button id="expensePrevPage" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50" disabled>
+                        <i class="fas fa-arrow-left mr-2"></i>Previous
+                    </button>
+                    <span id="expensePageInfo" class="text-sm text-gray-600">Page 1</span>
+                    <button id="expenseNextPage" class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
+                        Next<i class="fas fa-arrow-right ml-2"></i>
+                    </button>
+                </div>
             </div>
         </section>
 
@@ -798,7 +807,28 @@
     // Data Management
     async function loadData() {
         try {
-            expenses = await apiCall(`/expenses${buildExpenseQuery()}`);
+            // Pagination-aware fetch for expenses
+            const pageSize = 10;
+            const qs = new URLSearchParams();
+            const filterQs = buildExpenseQuery().replace(/^\?/, '');
+            if (filterQs) {
+                filterQs.split('&').filter(Boolean).forEach(kv => {
+                    const [k, v] = kv.split('=');
+                    if (k) qs.append(k, decodeURIComponent(v || ''));
+                });
+            }
+            qs.set('pageSize', String(pageSize));
+            if (window.expenseCursor) qs.set('cursor', window.expenseCursor);
+            const expResp = await apiCall(`/expenses?${qs.toString()}`);
+            if (Array.isArray(expResp)) {
+                // Backward-compat (no paging object)
+                expenses = expResp;
+                window.expenseHasMore = false;
+            } else {
+                expenses = expResp.items || [];
+                window.expenseHasMore = Boolean(expResp.hasMore);
+                window.expenseNextCursor = expResp.nextCursor || null;
+            }
             blogPosts = await apiCall('/blog-posts');
             const dashboard = await apiCall('/dashboard');
             budgets = dashboard.budgets || [];
@@ -813,6 +843,7 @@
             announceBudgetAlerts();
             updateActiveFiltersLabel();
             syncFilterInputs();
+            updateExpensePaginationUI();
         } catch (error) {
             console.error('Error loading data:', error);
         }
@@ -1009,6 +1040,49 @@
             emptyExp.classList.remove("hidden");
             tblCont.classList.add("hidden");
         }
+    }
+
+    // Pagination state and helpers for expenses
+    window.expenseCursor = null;           // current start cursor (date_time string)
+    window.expenseNextCursor = null;       // next cursor from last fetch
+    window.expenseHasMore = false;         // server reported more pages
+    window.expensePrevCursors = [];        // stack of previous cursors for back navigation
+
+    function resetExpensePagination() {
+        window.expenseCursor = null;
+        window.expenseNextCursor = null;
+        window.expenseHasMore = false;
+        window.expensePrevCursors = [];
+    }
+
+    function updateExpensePaginationUI() {
+        const pager = document.querySelector('#expensePagination');
+        if (!pager) return;
+        const hasData = (expenses && expenses.length > 0);
+        pager.classList.toggle('hidden', !hasData);
+        const prevBtn = document.querySelector('#expensePrevPage');
+        const nextBtn = document.querySelector('#expenseNextPage');
+        const info = document.querySelector('#expensePageInfo');
+        const pageNum = (window.expensePrevCursors.length || 0) + 1;
+        if (info) info.textContent = `Page ${pageNum}`;
+        if (prevBtn) prevBtn.disabled = window.expensePrevCursors.length === 0;
+        if (nextBtn) nextBtn.disabled = !window.expenseHasMore;
+    }
+
+    async function goNextExpensesPage() {
+        if (!window.expenseHasMore || !window.expenseNextCursor) return;
+        // push current cursor to history, then advance
+        window.expensePrevCursors.push(window.expenseCursor);
+        window.expenseCursor = window.expenseNextCursor;
+        await loadData();
+    }
+
+    async function goPrevExpensesPage() {
+        if (window.expensePrevCursors.length === 0) return;
+        // pop last cursor, set as current
+        const prev = window.expensePrevCursors.pop();
+        window.expenseCursor = prev || null;
+        await loadData();
     }
 
     function renderBlogPosts() {
@@ -1225,6 +1299,7 @@
             filters.term = $("#filterTerm").value;
             filters.category = $("#filterCategory").value;
             filters.status = $("#filterStatus").value;
+            resetExpensePagination();
             updateActiveFiltersLabel();
             loadData();
         });
@@ -1232,6 +1307,7 @@
         $("#clearFiltersBtn").addEventListener('click', () => {
             Object.keys(filters).forEach(key => filters[key] = '');
             syncFilterInputs();
+            resetExpensePagination();
             updateActiveFiltersLabel();
             loadData();
         });
@@ -1330,6 +1406,12 @@
         $("#addFirstExpenseBtn").addEventListener('click', () => {
             $("#addExpenseBtn").click();
         });
+
+        // Hook up pagination controls
+        const prevBtn = document.querySelector('#expensePrevPage');
+        const nextBtn = document.querySelector('#expenseNextPage');
+        if (prevBtn) prevBtn.addEventListener('click', () => { goPrevExpensesPage(); });
+        if (nextBtn) nextBtn.addEventListener('click', () => { goNextExpensesPage(); });
 
         $("#addBlogPostBtn").addEventListener('click', () => {
             window.editingBlogPostId = null;

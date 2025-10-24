@@ -59,6 +59,10 @@ app.get('/api/status', async (req, res) => {
 app.get('/api/expenses', verifyToken, async (req, res) => {
   try {
     const { category, status, startDate, endDate } = req.query;
+    // Pagination params
+    const pageSize = Math.min(Math.max(parseInt(req.query.pageSize, 10) || 0, 0), 100); // 0 (no paging) to 100 max
+    const cursor = req.query.cursor || null; // expected to be date_time string
+
     let query = db.collection('users').doc(req.user.uid).collection('expenses');
 
     if (category) {
@@ -74,7 +78,26 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
       query = query.where('date_time', '<=', endDate);
     }
 
-    const snapshot = await query.orderBy('date_time', 'desc').get();
+    query = query.orderBy('date_time', 'desc');
+
+    // If pageSize is provided (>0), use cursor-based pagination
+    if (pageSize > 0) {
+      let pagedQuery = query;
+      if (cursor) {
+        pagedQuery = pagedQuery.startAfter(cursor);
+      }
+      // fetch one extra to determine if there is another page
+      const snapshot = await pagedQuery.limit(pageSize + 1).get();
+      const docs = snapshot.docs;
+      const hasMore = docs.length > pageSize;
+      const slice = hasMore ? docs.slice(0, pageSize) : docs;
+      const items = slice.map(doc => ({ id: doc.id, ...doc.data() }));
+      const nextCursor = hasMore ? slice[slice.length - 1].get('date_time') : null;
+      return res.json({ items, nextCursor, hasMore });
+    }
+
+    // No pagination requested: return full list (legacy behavior)
+    const snapshot = await query.get();
     const expenses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     res.json(expenses);
   } catch (error) {
