@@ -12,3 +12,8 @@ serviceAccountKey.json
 # Firebase emulator data
 .firebase/
 firebase-debug.log
+
+# Local Playwright smoke artifacts (do not commit)
+playwright-smoke-*.png
+playwright-smoke-artifacts.zip
+playwright-smoke-report.json

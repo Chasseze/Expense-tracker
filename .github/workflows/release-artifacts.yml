@@ -1,0 +1,23 @@
+name: Release Playwright Artifacts
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Upload Playwright smoke artifacts
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            playwright-smoke-artifacts.zip
+            playwright-smoke-*.png
+            playwright-smoke-report.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
