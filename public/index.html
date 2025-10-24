@@ -1093,7 +1093,8 @@
 
     // Expense Functions
     window.editExpense = async (id) => {
-        const expense = expenses.find(e => e.id === id);
+        const idStr = String(id);
+        const expense = expenses.find(e => String(e.id) === idStr);
         if (!expense) return;
         
         $("#expenseDateTime").value = expense.date_time.replace(' ', 'T').substring(0, 16);
@@ -1113,19 +1114,21 @@
         if (!confirm("Are you sure you want to delete this expense?")) return;
         
         try {
-            await apiCall(`/expenses/${id}`, { method: 'DELETE' });
-            expenses = expenses.filter(e => e.id !== id);
+            const idStr = String(id);
+            await apiCall(`/expenses/${encodeURIComponent(idStr)}`, { method: 'DELETE' });
+            expenses = expenses.filter(e => String(e.id) !== idStr);
             renderExpenses();
-            loadData(); // Reload dashboard stats
+            await loadData(); // Reload dashboard stats
             notify("Expense deleted successfully!");
         } catch (error) {
-            notify("Error deleting expense", true);
+            notify(error?.message || "Error deleting expense", true);
         }
     };
 
     // Blog Post Functions
     window.editBlogPost = async (id) => {
-        const post = blogPosts.find(p => p.id === id);
+        const idStr = String(id);
+        const post = blogPosts.find(p => String(p.id) === idStr);
         if (!post) return;
         
         $("#blogDateTime").value = post.date_time.replace(' ', 'T').substring(0, 16);
@@ -1142,12 +1145,13 @@
         if (!confirm("Are you sure you want to delete this blog post?")) return;
         
         try {
-            await apiCall(`/blog-posts/${id}`, { method: 'DELETE' });
-            blogPosts = blogPosts.filter(p => p.id !== id);
+            const idStr = String(id);
+            await apiCall(`/blog-posts/${encodeURIComponent(idStr)}`, { method: 'DELETE' });
+            blogPosts = blogPosts.filter(p => String(p.id) !== idStr);
             renderBlogPosts();
             notify("Blog post deleted successfully!");
         } catch (error) {
-            notify("Error deleting blog post", true);
+            notify(error?.message || "Error deleting blog post", true);
         }
     };
 
