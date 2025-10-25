@@ -317,6 +317,14 @@
                             <input id="expenseGotoPage" type="number" min="1" class="w-20 px-2 py-1 border rounded" placeholder="1">
                             <button id="expenseGotoBtn" class="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-700">Go</button>
                         </div>
+                        <div class="flex items-center gap-2">
+                            <label for="expensePageSize" class="text-sm text-gray-600">Page size</label>
+                            <select id="expensePageSize" class="px-2 py-1 border rounded">
+                                <option value="10">10</option>
+                                <option value="25">25</option>
+                                <option value="50">50</option>
+                            </select>
+                        </div>
                         <span id="expenseTotalInfo" class="text-sm text-gray-500"></span>
                     </div>
                     <button id="expenseNextPage" class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
@@ -816,7 +824,7 @@
     async function loadData() {
         try {
             // Pagination-aware fetch for expenses (page-based)
-            const pageSize = 10;
+            const pageSize = window.expensePageSize && Number.isFinite(window.expensePageSize) ? window.expensePageSize : 10;
             const qs = new URLSearchParams();
             const filterQs = buildExpenseQuery().replace(/^\?/, '');
             if (filterQs) {
@@ -1051,6 +1059,7 @@
 
     // Pagination state and helpers for expenses
     window.expensePage = 1;                // current page number (1-based)
+    window.expensePageSize = (() => { try { return parseInt(localStorage.getItem('expensePageSize'), 10) || 10; } catch { return 10; } })();
     window.expenseTotal = null;            // total items (from count)
     window.expenseTotalPages = null;       // derived from total and page size
     window.expenseCursor = null;           // retained for compatibility (not used for go-to)
@@ -1075,12 +1084,16 @@
         const nextBtn = document.querySelector('#expenseNextPage');
         const info = document.querySelector('#expensePageInfo');
         const totalInfo = document.querySelector('#expenseTotalInfo');
+        const sizeSel = document.querySelector('#expensePageSize');
         const pageNum = window.expensePage || 1;
         const totalPages = window.expenseTotalPages || 1;
         if (info) info.textContent = `Page ${pageNum} of ${totalPages}`;
         if (totalInfo) {
             const total = window.expenseTotal;
             totalInfo.textContent = (typeof total === 'number') ? `(Total ${total})` : '';
+        }
+        if (sizeSel) {
+            sizeSel.value = String(window.expensePageSize || 10);
         }
         if (prevBtn) prevBtn.disabled = pageNum <= 1;
         if (nextBtn) nextBtn.disabled = (window.expenseTotalPages != null) ? (pageNum >= window.expenseTotalPages) : !window.expenseHasMore;
@@ -1428,6 +1441,7 @@
         if (nextBtn) nextBtn.addEventListener('click', () => { goNextExpensesPage(); });
         const gotoBtn = document.querySelector('#expenseGotoBtn');
         const gotoInput = document.querySelector('#expenseGotoPage');
+        const sizeSel = document.querySelector('#expensePageSize');
         if (gotoBtn && gotoInput) {
             gotoBtn.addEventListener('click', () => {
                 const raw = parseInt(gotoInput.value, 10);
@@ -1441,6 +1455,15 @@
                 if (e.key === 'Enter') {
                     gotoBtn.click();
                 }
+            });
+        }
+        if (sizeSel) {
+            sizeSel.addEventListener('change', () => {
+                const v = parseInt(sizeSel.value, 10) || 10;
+                window.expensePageSize = v;
+                try { localStorage.setItem('expensePageSize', String(v)); } catch {}
+                window.expensePage = 1;
+                loadData();
             });
         }
 

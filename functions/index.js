@@ -13,6 +13,7 @@ app.use(express.json());
 
 const db = admin.firestore();
 const auth = admin.auth();
+const FieldPath = admin.firestore.FieldPath;
 
 // Middleware to verify Firebase ID token
 async function verifyToken(req, res, next) {
@@ -79,7 +80,7 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
       query = query.where('date_time', '<=', endDate);
     }
 
-    query = query.orderBy('date_time', 'desc');
+  query = query.orderBy('date_time', 'desc').orderBy(FieldPath.documentId(), 'desc');
 
     // If explicit page number provided, prefer offset-based pagination for direct jumps
     if (pageSize > 0 && page > 0) {
@@ -97,7 +98,13 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
     if (pageSize > 0) {
       let pagedQuery = query;
       if (cursor) {
-        pagedQuery = pagedQuery.startAfter(cursor);
+        // Support composite cursor: "date_time|docId"
+        if (typeof cursor === 'string' && cursor.includes('|')) {
+          const [dt, id] = cursor.split('|');
+          pagedQuery = pagedQuery.startAfter(dt, id);
+        } else {
+          pagedQuery = pagedQuery.startAfter(cursor);
+        }
       }
       // fetch one extra to determine if there is another page
       const snapshot = await pagedQuery.limit(pageSize + 1).get();
@@ -105,7 +112,8 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
       const hasMore = docs.length > pageSize;
       const slice = hasMore ? docs.slice(0, pageSize) : docs;
       const items = slice.map(doc => ({ id: doc.id, ...doc.data() }));
-      const nextCursor = hasMore ? slice[slice.length - 1].get('date_time') : null;
+      const last = slice[slice.length - 1];
+      const nextCursor = hasMore && last ? `${last.get('date_time')}|${last.id}` : null;
       return res.json({ items, nextCursor, hasMore });
     }
 
