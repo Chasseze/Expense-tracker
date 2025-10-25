@@ -306,26 +306,26 @@
                         <tbody id="expenseTableBody"></tbody>
                     </table>
                 </div>
-                <div id="expensePagination" class="flex items-center justify-between mt-3 hidden">
+                <div id="expensePagination" class="flex items-center justify-between mt-3 p-4 bg-white rounded-lg shadow hidden">
                     <button id="expensePrevPage" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50" disabled>
                         <i class="fas fa-arrow-left mr-2"></i>Previous
                     </button>
                     <div class="flex items-center gap-3">
-                        <span id="expensePageInfo" class="text-sm text-gray-600">Page 1</span>
+                        <span id="expensePageInfo" class="text-sm text-gray-800 font-medium">Page 1</span>
                         <div class="flex items-center gap-2">
-                            <label for="expenseGotoPage" class="text-sm text-gray-600">Go to page</label>
+                            <label for="expenseGotoPage" class="text-sm text-gray-800 font-medium">Go to page</label>
                             <input id="expenseGotoPage" type="number" min="1" class="w-20 px-2 py-1 border rounded" placeholder="1">
-                            <button id="expenseGotoBtn" class="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-700">Go</button>
+                            <button id="expenseGotoBtn" class="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white font-medium">Go</button>
                         </div>
                         <div class="flex items-center gap-2">
-                            <label for="expensePageSize" class="text-sm text-gray-600">Page size</label>
+                            <label for="expensePageSize" class="text-sm text-gray-800 font-medium">Page size</label>
                             <select id="expensePageSize" class="px-2 py-1 border rounded">
                                 <option value="10">10</option>
                                 <option value="25">25</option>
                                 <option value="50">50</option>
                             </select>
                         </div>
-                        <span id="expenseTotalInfo" class="text-sm text-gray-500"></span>
+                        <span id="expenseTotalInfo" class="text-sm text-gray-700 font-medium"></span>
                     </div>
                     <button id="expenseNextPage" class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
                         Next<i class="fas fa-arrow-right ml-2"></i>
