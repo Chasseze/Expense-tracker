@@ -310,7 +310,15 @@
                     <button id="expensePrevPage" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50" disabled>
                         <i class="fas fa-arrow-left mr-2"></i>Previous
                     </button>
-                    <span id="expensePageInfo" class="text-sm text-gray-600">Page 1</span>
+                    <div class="flex items-center gap-3">
+                        <span id="expensePageInfo" class="text-sm text-gray-600">Page 1</span>
+                        <div class="flex items-center gap-2">
+                            <label for="expenseGotoPage" class="text-sm text-gray-600">Go to page</label>
+                            <input id="expenseGotoPage" type="number" min="1" class="w-20 px-2 py-1 border rounded" placeholder="1">
+                            <button id="expenseGotoBtn" class="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-700">Go</button>
+                        </div>
+                        <span id="expenseTotalInfo" class="text-sm text-gray-500"></span>
+                    </div>
                     <button id="expenseNextPage" class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
                         Next<i class="fas fa-arrow-right ml-2"></i>
                     </button>
@@ -807,7 +815,7 @@
     // Data Management
     async function loadData() {
         try {
-            // Pagination-aware fetch for expenses
+            // Pagination-aware fetch for expenses (page-based)
             const pageSize = 10;
             const qs = new URLSearchParams();
             const filterQs = buildExpenseQuery().replace(/^\?/, '');
@@ -817,18 +825,17 @@
                     if (k) qs.append(k, decodeURIComponent(v || ''));
                 });
             }
+            const currentPage = window.expensePage && window.expensePage > 0 ? window.expensePage : 1;
             qs.set('pageSize', String(pageSize));
-            if (window.expenseCursor) qs.set('cursor', window.expenseCursor);
+            qs.set('page', String(currentPage));
+            // Fetch total count for UI
+            const countResp = await apiCall(`/expenses/count?${qs.toString()}`.replace(/&page=\d+/, ''));
+            window.expenseTotal = countResp && typeof countResp.total === 'number' ? countResp.total : null;
+            window.expenseTotalPages = window.expenseTotal != null ? Math.max(Math.ceil(window.expenseTotal / pageSize), 1) : null;
             const expResp = await apiCall(`/expenses?${qs.toString()}`);
-            if (Array.isArray(expResp)) {
-                // Backward-compat (no paging object)
-                expenses = expResp;
-                window.expenseHasMore = false;
-            } else {
-                expenses = expResp.items || [];
-                window.expenseHasMore = Boolean(expResp.hasMore);
-                window.expenseNextCursor = expResp.nextCursor || null;
-            }
+            expenses = Array.isArray(expResp) ? expResp : (expResp.items || []);
+            window.expenseHasMore = Array.isArray(expResp) ? false : Boolean(expResp.hasMore);
+            window.expenseNextCursor = Array.isArray(expResp) ? null : (expResp.nextCursor || null);
             blogPosts = await apiCall('/blog-posts');
             const dashboard = await apiCall('/dashboard');
             budgets = dashboard.budgets || [];
@@ -1043,12 +1050,16 @@
     }
 
     // Pagination state and helpers for expenses
-    window.expenseCursor = null;           // current start cursor (date_time string)
+    window.expensePage = 1;                // current page number (1-based)
+    window.expenseTotal = null;            // total items (from count)
+    window.expenseTotalPages = null;       // derived from total and page size
+    window.expenseCursor = null;           // retained for compatibility (not used for go-to)
     window.expenseNextCursor = null;       // next cursor from last fetch
     window.expenseHasMore = false;         // server reported more pages
-    window.expensePrevCursors = [];        // stack of previous cursors for back navigation
+    window.expensePrevCursors = [];        // retained for compatibility
 
     function resetExpensePagination() {
+        window.expensePage = 1;
         window.expenseCursor = null;
         window.expenseNextCursor = null;
         window.expenseHasMore = false;
@@ -1063,25 +1074,28 @@
         const prevBtn = document.querySelector('#expensePrevPage');
         const nextBtn = document.querySelector('#expenseNextPage');
         const info = document.querySelector('#expensePageInfo');
-        const pageNum = (window.expensePrevCursors.length || 0) + 1;
-        if (info) info.textContent = `Page ${pageNum}`;
-        if (prevBtn) prevBtn.disabled = window.expensePrevCursors.length === 0;
-        if (nextBtn) nextBtn.disabled = !window.expenseHasMore;
+        const totalInfo = document.querySelector('#expenseTotalInfo');
+        const pageNum = window.expensePage || 1;
+        const totalPages = window.expenseTotalPages || 1;
+        if (info) info.textContent = `Page ${pageNum} of ${totalPages}`;
+        if (totalInfo) {
+            const total = window.expenseTotal;
+            totalInfo.textContent = (typeof total === 'number') ? `(Total ${total})` : '';
+        }
+        if (prevBtn) prevBtn.disabled = pageNum <= 1;
+        if (nextBtn) nextBtn.disabled = (window.expenseTotalPages != null) ? (pageNum >= window.expenseTotalPages) : !window.expenseHasMore;
     }
 
     async function goNextExpensesPage() {
-        if (!window.expenseHasMore || !window.expenseNextCursor) return;
-        // push current cursor to history, then advance
-        window.expensePrevCursors.push(window.expenseCursor);
-        window.expenseCursor = window.expenseNextCursor;
+        // page-based navigation
+        window.expensePage = (window.expensePage || 1) + 1;
         await loadData();
     }
 
     async function goPrevExpensesPage() {
-        if (window.expensePrevCursors.length === 0) return;
-        // pop last cursor, set as current
-        const prev = window.expensePrevCursors.pop();
-        window.expenseCursor = prev || null;
+        const page = window.expensePage || 1;
+        if (page <= 1) return;
+        window.expensePage = page - 1;
         await loadData();
     }
 
@@ -1412,6 +1426,23 @@
         const nextBtn = document.querySelector('#expenseNextPage');
         if (prevBtn) prevBtn.addEventListener('click', () => { goPrevExpensesPage(); });
         if (nextBtn) nextBtn.addEventListener('click', () => { goNextExpensesPage(); });
+        const gotoBtn = document.querySelector('#expenseGotoBtn');
+        const gotoInput = document.querySelector('#expenseGotoPage');
+        if (gotoBtn && gotoInput) {
+            gotoBtn.addEventListener('click', () => {
+                const raw = parseInt(gotoInput.value, 10);
+                const totalPages = window.expenseTotalPages || 1;
+                if (!raw || raw < 1) return;
+                const target = Math.min(Math.max(raw, 1), totalPages);
+                window.expensePage = target;
+                loadData();
+            });
+            gotoInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    gotoBtn.click();
+                }
+            });
+        }
 
         $("#addBlogPostBtn").addEventListener('click', () => {
             window.editingBlogPostId = null;

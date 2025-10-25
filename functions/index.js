@@ -61,6 +61,7 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
     const { category, status, startDate, endDate } = req.query;
     // Pagination params
     const pageSize = Math.min(Math.max(parseInt(req.query.pageSize, 10) || 0, 0), 100); // 0 (no paging) to 100 max
+    const page = Math.max(parseInt(req.query.page, 10) || 0, 0); // 0 means not provided
     const cursor = req.query.cursor || null; // expected to be date_time string
 
     let query = db.collection('users').doc(req.user.uid).collection('expenses');
@@ -79,6 +80,18 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
     }
 
     query = query.orderBy('date_time', 'desc');
+
+    // If explicit page number provided, prefer offset-based pagination for direct jumps
+    if (pageSize > 0 && page > 0) {
+      const pageNum = page; // 1-based expected from client
+      const offset = Math.max((pageNum - 1) * pageSize, 0);
+      const snapshot = await query.offset(offset).limit(pageSize).get();
+      const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Compute next cursor hint for possible mixed navigation
+      const last = snapshot.docs[snapshot.docs.length - 1];
+      const nextCursor = last ? last.get('date_time') : null;
+      return res.json({ items, nextCursor, hasMore: items.length === pageSize });
+    }
 
     // If pageSize is provided (>0), use cursor-based pagination
     if (pageSize > 0) {
@@ -102,6 +115,36 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
     res.json(expenses);
   } catch (error) {
     console.error('Get expenses error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Count expenses (for pagination UI)
+app.get('/api/expenses/count', verifyToken, async (req, res) => {
+  try {
+    const { category, status, startDate, endDate } = req.query;
+    let query = db.collection('users').doc(req.user.uid).collection('expenses');
+
+    if (category) {
+      query = query.where('category', '==', category);
+    }
+    if (status) {
+      query = query.where('status', '==', status);
+    }
+    if (startDate) {
+      query = query.where('date_time', '>=', startDate);
+    }
+    if (endDate) {
+      query = query.where('date_time', '<=', endDate);
+    }
+
+    // Use aggregate count if available (Admin SDK >= 12)
+    const agg = await query.count().get();
+    const total = agg.data().count || 0;
+    res.json({ total });
+  } catch (error) {
+    console.error('Count expenses error:', error);
+    // Fallback: return error to client; client can degrade gracefully
     res.status(500).json({ error: 'Internal server error' });
   }
 });
