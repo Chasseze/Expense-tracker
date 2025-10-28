@@ -310,13 +310,17 @@ app.post('/api/login', async (req, res) => {
 // Expenses routes
 app.get('/api/expenses', authenticateToken, async (req, res) => {
     try {
-        const { term, category, status, startDate, endDate } = req.query;
+        // Log incoming query params for debugging
+        console.log('Expense filter query:', req.query);
+        const { session_term, term, category, status, startDate, endDate } = req.query;
         const conditions = ['user_id = ?'];
         const params = [req.user.userId];
 
-        if (term) {
+        // Accept both session_term and term for compatibility
+        const sessionTermValue = session_term || term;
+        if (sessionTermValue) {
             conditions.push('session_term = ?');
-            params.push(term);
+            params.push(sessionTermValue);
         }
 
         if (category) {
@@ -341,6 +345,9 @@ app.get('/api/expenses', authenticateToken, async (req, res) => {
 
         const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
         const sql = `SELECT * FROM expenses ${whereClause} ORDER BY date_time DESC`;
+        // Log the final SQL and params for debugging
+        console.log('Expense SQL:', sql);
+        console.log('Expense SQL params:', params);
         const expenses = await dbAll(sql, params);
         res.json(expenses);
     } catch (error) {
