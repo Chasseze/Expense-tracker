@@ -555,7 +555,7 @@
     let budgetAlerts = [];
     let lastAlertSignature = '';
     let storageInfo = { storageMode: 'sqlite', libsqlUrl: null };
-    const filters = { term: '', category: '', status: '' };
+    const filters = { session_term: '', category: '', status: '' };
 
     const ensureFirebaseReady = async (timeoutMs = 5000) => {
         if (window.firebaseInitPromise) {
@@ -682,7 +682,7 @@
 
     const buildExpenseQuery = () => {
         const params = new URLSearchParams();
-        if (filters.term) params.append('term', filters.term);
+        if (filters.session_term) params.append('session_term', filters.session_term);
         if (filters.category) params.append('category', filters.category);
         if (filters.status) params.append('status', filters.status);
         const qs = params.toString();
@@ -702,7 +702,7 @@
         const term = $("#filterTerm");
         const category = $("#filterCategory");
         const status = $("#filterStatus");
-        if (term) term.value = filters.term;
+        if (term) term.value = filters.session_term;
         if (category) category.value = filters.category;
         if (status) status.value = filters.status;
     };
@@ -1323,7 +1323,7 @@
 
         // Filters
         $("#applyFiltersBtn").addEventListener('click', () => {
-            filters.term = $("#filterTerm").value;
+            filters.session_term = $("#filterTerm").value;
             filters.category = $("#filterCategory").value;
             filters.status = $("#filterStatus").value;
             resetExpensePagination();
