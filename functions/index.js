@@ -59,6 +59,7 @@ app.get('/api/status', async (req, res) => {
 // Get expenses
 app.get('/api/expenses', verifyToken, async (req, res) => {
   try {
+    console.log('Expense filter query:', req.query); // Debug log
     const { session_term, category, status, startDate, endDate } = req.query;
     // Pagination params
     const pageSize = Math.min(Math.max(parseInt(req.query.pageSize, 10) || 0, 0), 100); // 0 (no paging) to 100 max
@@ -133,6 +134,7 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
 // Count expenses (for pagination UI)
 app.get('/api/expenses/count', verifyToken, async (req, res) => {
   try {
+    console.log('Expense count filter query:', req.query); // Debug log
     const { session_term, category, status, startDate, endDate } = req.query;
     let query = db.collection('users').doc(req.user.uid).collection('expenses');
 
