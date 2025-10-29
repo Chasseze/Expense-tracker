@@ -59,7 +59,7 @@ app.get('/api/status', async (req, res) => {
 // Get expenses
 app.get('/api/expenses', verifyToken, async (req, res) => {
   try {
-    const { category, status, startDate, endDate } = req.query;
+    const { session_term, category, status, startDate, endDate } = req.query;
     // Pagination params
     const pageSize = Math.min(Math.max(parseInt(req.query.pageSize, 10) || 0, 0), 100); // 0 (no paging) to 100 max
     const page = Math.max(parseInt(req.query.page, 10) || 0, 0); // 0 means not provided
@@ -67,6 +67,9 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
 
     let query = db.collection('users').doc(req.user.uid).collection('expenses');
 
+    if (session_term) {
+      query = query.where('session_term', '==', session_term);
+    }
     if (category) {
       query = query.where('category', '==', category);
     }
@@ -130,9 +133,12 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
 // Count expenses (for pagination UI)
 app.get('/api/expenses/count', verifyToken, async (req, res) => {
   try {
-    const { category, status, startDate, endDate } = req.query;
+    const { session_term, category, status, startDate, endDate } = req.query;
     let query = db.collection('users').doc(req.user.uid).collection('expenses');
 
+    if (session_term) {
+      query = query.where('session_term', '==', session_term);
+    }
     if (category) {
       query = query.where('category', '==', category);
     }
