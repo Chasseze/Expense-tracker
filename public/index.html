@@ -686,6 +686,8 @@
         if (filters.category) params.append('category', filters.category);
         if (filters.status) params.append('status', filters.status);
         const qs = params.toString();
+        console.log('buildExpenseQuery - filters:', filters);
+        console.log('buildExpenseQuery - query string:', qs);
         return qs ? `?${qs}` : '';
     };
 
@@ -827,6 +829,7 @@
             const pageSize = window.expensePageSize && Number.isFinite(window.expensePageSize) ? window.expensePageSize : 10;
             const qs = new URLSearchParams();
             const filterQs = buildExpenseQuery().replace(/^\?/, '');
+            console.log('loadData - filterQs:', filterQs);
             if (filterQs) {
                 filterQs.split('&').filter(Boolean).forEach(kv => {
                     const [k, v] = kv.split('=');
@@ -836,6 +839,7 @@
             const currentPage = window.expensePage && window.expensePage > 0 ? window.expensePage : 1;
             qs.set('pageSize', String(pageSize));
             qs.set('page', String(currentPage));
+            console.log('loadData - final query params:', qs.toString());
             // Fetch total count for UI
             const countResp = await apiCall(`/expenses/count?${qs.toString()}`.replace(/&page=\d+/, ''));
             window.expenseTotal = countResp && typeof countResp.total === 'number' ? countResp.total : null;
@@ -1326,6 +1330,7 @@
             filters.session_term = $("#filterTerm").value;
             filters.category = $("#filterCategory").value;
             filters.status = $("#filterStatus").value;
+            console.log('Apply Filters clicked - filters:', filters);
             resetExpensePagination();
             updateActiveFiltersLabel();
             loadData();
