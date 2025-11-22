@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -96,6 +96,37 @@
         }
         body.theme-dark #categoryCard {
             background: linear-gradient(180deg, rgba(3,37,76,0.45) 0%, rgba(3,37,76,0.25) 100%);
+        }
+        /* Loading cursor */
+        body[style*="cursor: wait"] * {
+            cursor: wait !important;
+        }
+        /* Better empty states */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+        }
+        .empty-state i {
+            font-size: 4rem;
+            opacity: 0.5;
+            margin-bottom: 1rem;
+            display: block;
+        }
+        .empty-state h3 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 0.5rem;
+        }
+        body.theme-dark .empty-state h3 {
+            color: #e6eef8;
+        }
+        .empty-state p {
+            color: #6b7280;
+            margin-bottom: 1.5rem;
+        }
+        body.theme-dark .empty-state p {
+            color: #9ca3af;
         }
     </style>
 
@@ -282,10 +313,11 @@
                 </div>
                 <span id="activeFilters" class="text-blue-100 text-xs block mt-3"></span>
             </div>
-            <div id="emptyExpenseState" class="text-center py-8">
-                <i class="fas fa-file-invoice text-5xl opacity-80 mb-4"></i>
-                <p class="text-lg mb-4">No expenses yet – add your first expense!</p>
-                <button id="addFirstExpenseBtn" class="btn bg-white text-blue-600 px-6 py-3 rounded-xl font-semibold">Add First Expense</button>
+            <div id="emptyExpenseState" class="empty-state">
+                <i class="fas fa-file-invoice"></i>
+                <h3>No expenses yet</h3>
+                <p>Start tracking your financial activity by adding your first expense</p>
+                <button id="addFirstExpenseBtn" class="btn bg-white text-blue-600 px-6 py-3 rounded-xl font-semibold hover:bg-blue-50 transition-all">Add First Expense</button>
             </div>
             <div id="expenseTableContainer" class="hidden">
                 <div class="bg-white rounded-xl shadow-lg overflow-hidden">
@@ -340,10 +372,10 @@
                 <h2 class="text-2xl md:text-3xl font-bold mb-2">Personal Financial Blog</h2>
                 <p class="text-purple-100">Your notes & insights</p>
             </div>
-            <div id="emptyBlogState" class="text-center py-8">
-                <i class="fas fa-blog text-5xl opacity-80 mb-4"></i>
-                <p class="text-lg mb-2">No blog posts yet.</p>
-                <p class="text-purple-100">Start documenting your journey.</p>
+            <div id="emptyBlogState" class="empty-state">
+                <i class="fas fa-blog"></i>
+                <h3>No blog posts yet</h3>
+                <p>Document your financial journey and insights</p>
             </div>
             <div id="blogPostsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 hidden"></div>
         </section>
@@ -430,11 +462,11 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Amount Paid (₦)</label>
-                        <input type="number" step="0.01" id="expenseAmountPaid" placeholder="0.00" required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary">
+                        <input type="number" step="0.01" min="0" id="expenseAmountPaid" placeholder="0.00" required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Balance Due (₦)</label>
-                        <input type="number" step="0.01" id="expenseBalanceDue" placeholder="0.00" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary">
+                        <input type="number" step="0.01" min="0" id="expenseBalanceDue" placeholder="0.00" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary">
                     </div>
                 </div>
                 <div class="flex gap-3 pt-4">
@@ -686,8 +718,6 @@
         if (filters.category) params.append('category', filters.category);
         if (filters.status) params.append('status', filters.status);
         const qs = params.toString();
-        console.log('buildExpenseQuery - filters:', filters);
-        console.log('buildExpenseQuery - query string:', qs);
         return qs ? `?${qs}` : '';
     };
 
@@ -825,11 +855,12 @@
     // Data Management
     async function loadData() {
         try {
+            // Show loading state
+            document.body.style.cursor = 'wait';
             // Pagination-aware fetch for expenses (page-based)
             const pageSize = window.expensePageSize && Number.isFinite(window.expensePageSize) ? window.expensePageSize : 10;
             const qs = new URLSearchParams();
             const filterQs = buildExpenseQuery().replace(/^\?/, '');
-            console.log('loadData - filterQs:', filterQs);
             if (filterQs) {
                 filterQs.split('&').filter(Boolean).forEach(kv => {
                     const [k, v] = kv.split('=');
@@ -839,7 +870,6 @@
             const currentPage = window.expensePage && window.expensePage > 0 ? window.expensePage : 1;
             qs.set('pageSize', String(pageSize));
             qs.set('page', String(currentPage));
-            console.log('loadData - final query params:', qs.toString());
             // Fetch total count for UI
             const countResp = await apiCall(`/expenses/count?${qs.toString()}`.replace(/&page=\d+/, ''));
             window.expenseTotal = countResp && typeof countResp.total === 'number' ? countResp.total : null;
@@ -865,6 +895,10 @@
             updateExpensePaginationUI();
         } catch (error) {
             console.error('Error loading data:', error);
+            notify('Failed to load data. Please refresh the page.', true);
+        } finally {
+            // Hide loading state
+            document.body.style.cursor = 'default';
         }
     }
 
@@ -1325,12 +1359,41 @@
 
         $("#logoutBtn").addEventListener('click', logout);
 
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            // Ctrl/Cmd + N: New expense
+            if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+                e.preventDefault();
+                $("#addExpenseBtn").click();
+            }
+            // Escape: Close modals
+            if (e.key === 'Escape') {
+                const expenseModal = $("#expenseModal");
+                const blogModal = $("#blogModal");
+                const budgetModal = $("#budgetModal");
+                if (!expenseModal.classList.contains('hidden')) {
+                    expenseModal.classList.add('hidden');
+                }
+                if (!blogModal.classList.contains('hidden')) {
+                    blogModal.classList.add('hidden');
+                }
+                if (!budgetModal.classList.contains('hidden')) {
+                    budgetModal.classList.add('hidden');
+                }
+            }
+            // Ctrl/Cmd + F: Focus filter
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                const filterTerm = $("#filterTerm");
+                if (filterTerm) filterTerm.focus();
+            }
+        });
+
         // Filters
         $("#applyFiltersBtn").addEventListener('click', () => {
             filters.session_term = $("#filterTerm").value;
             filters.category = $("#filterCategory").value;
             filters.status = $("#filterStatus").value;
-            console.log('Apply Filters clicked - filters:', filters);
             resetExpensePagination();
             updateActiveFiltersLabel();
             loadData();
@@ -1359,14 +1422,28 @@
         $("#expenseForm").addEventListener('submit', async (e) => {
             e.preventDefault();
             
+            const amountPaid = parseFloat($("#expenseAmountPaid").value);
+            const balanceDue = parseFloat($("#expenseBalanceDue").value) || 0;
+            
+            // Validation
+            if (isNaN(amountPaid) || amountPaid < 0) {
+                notify('Amount paid must be a positive number', true);
+                return;
+            }
+            
+            if (balanceDue < 0) {
+                notify('Balance due cannot be negative', true);
+                return;
+            }
+            
             const expenseData = {
                 date_time: $("#expenseDateTime").value.replace('T', ' '),
                 category: $("#expenseCategory").value,
                 session_term: $("#expenseSession").value,
                 recipient: $("#expenseRecipient").value,
                 description: $("#expenseDescription").value,
-                amount_paid: parseFloat($("#expenseAmountPaid").value),
-                balance_due: parseFloat($("#expenseBalanceDue").value) || 0
+                amount_paid: amountPaid,
+                balance_due: balanceDue
             };
 
             try {
@@ -1388,7 +1465,7 @@
                 loadData();
                 window.editingExpenseId = null;
             } catch (error) {
-                notify("Error saving expense", true);
+                notify(error.message || "Unable to save expense. Please try again.", true);
             }
         });
 

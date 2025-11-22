@@ -59,7 +59,10 @@ app.get('/api/status', async (req, res) => {
 // Get expenses
 app.get('/api/expenses', verifyToken, async (req, res) => {
   try {
-    console.log('Expense filter query:', req.query); // Debug log
+    console.log('=== GET /api/expenses ===');
+    console.log('User ID:', req.user.uid);
+    console.log('Query params:', req.query);
+
     const { session_term, category, status, startDate, endDate } = req.query;
     // Pagination params
     const pageSize = Math.min(Math.max(parseInt(req.query.pageSize, 10) || 0, 0), 100); // 0 (no paging) to 100 max
@@ -68,49 +71,69 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
 
     let query = db.collection('users').doc(req.user.uid).collection('expenses');
 
+    console.log('Building query with filters:');
+    // Apply filters
     if (session_term) {
+      console.log('  - session_term ==', session_term);
       query = query.where('session_term', '==', session_term);
     }
     if (category) {
+      console.log('  - category ==', category);
       query = query.where('category', '==', category);
     }
     if (status) {
+      console.log('  - status ==', status);
       query = query.where('status', '==', status);
     }
     if (startDate) {
+      console.log('  - date_time >=', startDate);
       query = query.where('date_time', '>=', startDate);
     }
     if (endDate) {
+      console.log('  - date_time <=', endDate);
       query = query.where('date_time', '<=', endDate);
     }
 
-  query = query.orderBy('date_time', 'desc').orderBy(FieldPath.documentId(), 'desc');
+    // Only apply date sorting if NO filters are present (or only date filters)
+    // This avoids the need for complex composite indexes for every combination
+    const hasNonDateFilters = session_term || category || status;
+    console.log('Has non-date filters:', hasNonDateFilters);
 
-    // If explicit page number provided, prefer offset-based pagination for direct jumps
-    if (pageSize > 0 && page > 0) {
-      const pageNum = page; // 1-based expected from client
-      const offset = Math.max((pageNum - 1) * pageSize, 0);
-      const snapshot = await query.offset(offset).limit(pageSize).get();
-      const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // Compute next cursor hint for possible mixed navigation
-      const last = snapshot.docs[snapshot.docs.length - 1];
-      const nextCursor = last ? last.get('date_time') : null;
-      return res.json({ items, nextCursor, hasMore: items.length === pageSize });
+    if (!hasNonDateFilters) {
+      console.log('Applying date sorting');
+      query = query.orderBy('date_time', 'desc').orderBy(FieldPath.documentId(), 'desc');
+    } else {
+      console.log('Skipping date sorting (filters present)');
     }
 
-    // If pageSize is provided (>0), use cursor-based pagination
-    if (pageSize > 0) {
+    // If explicit page number provided, prefer offset-based pagination
+    if (pageSize > 0 && page > 0) {
+      const pageNum = page;
+      const offset = Math.max((pageNum - 1) * pageSize, 0);
+      console.log(`Using offset pagination: offset=${offset}, limit=${pageSize}`);
+      const snapshot = await query.offset(offset).limit(pageSize).get();
+      const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      console.log(`Offset query returned ${items.length} items`);
+      if (items.length > 0) {
+        console.log('First item:', items[0]);
+      }
+      return res.json({ items, nextCursor: null, hasMore: items.length === pageSize });
+    }
+
+    // If pageSize is provided (>0), use cursor-based pagination (ONLY for non-filtered queries)
+    if (pageSize > 0 && !hasNonDateFilters) {
       let pagedQuery = query;
+      console.log(`Using cursor pagination: pageSize=${pageSize}, cursor=${cursor}`);
       if (cursor) {
-        // Support composite cursor: "date_time|docId"
         if (typeof cursor === 'string' && cursor.includes('|')) {
           const [dt, id] = cursor.split('|');
           pagedQuery = pagedQuery.startAfter(dt, id);
+          console.log(`  - Starting after date_time: ${dt}, id: ${id}`);
         } else {
           pagedQuery = pagedQuery.startAfter(cursor);
+          console.log(`  - Starting after cursor: ${cursor}`);
         }
       }
-      // fetch one extra to determine if there is another page
       const snapshot = await pagedQuery.limit(pageSize + 1).get();
       const docs = snapshot.docs;
       const hasMore = docs.length > pageSize;
@@ -118,16 +141,58 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
       const items = slice.map(doc => ({ id: doc.id, ...doc.data() }));
       const last = slice[slice.length - 1];
       const nextCursor = hasMore && last ? `${last.get('date_time')}|${last.id}` : null;
+      console.log(`Cursor query returned ${items.length} items`);
       return res.json({ items, nextCursor, hasMore });
     }
 
-    // No pagination requested: return full list (legacy behavior)
+    // Fallback for filtered queries with pageSize (simple limit) or no pagination
+    if (pageSize > 0) {
+      console.log(`Applying limit: ${pageSize}`);
+      query = query.limit(pageSize);
+    }
+
+    console.log('Executing query...');
     const snapshot = await query.get();
-    const expenses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    res.json(expenses);
+    console.log(`Query returned ${snapshot.size} documents`);
+
+    const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    if (items.length > 0) {
+      console.log('First item fields:', Object.keys(items[0]));
+      console.log('First item sample:', {
+        id: items[0].id,
+        session_term: items[0].session_term,
+        category: items[0].category,
+        status: items[0].status,
+        date_time: items[0].date_time
+      });
+    } else {
+      console.log('No items found - checking if collection exists...');
+      const allDocs = await db.collection('users').doc(req.user.uid).collection('expenses').limit(1).get();
+      console.log(`Total expenses in collection: ${allDocs.size}`);
+      if (allDocs.size > 0) {
+        const sampleDoc = allDocs.docs[0].data();
+        console.log('Sample document fields:', Object.keys(sampleDoc));
+        console.log('Sample values:', {
+          session_term: sampleDoc.session_term,
+          category: sampleDoc.category,
+          status: sampleDoc.status
+        });
+      }
+    }
+
+    // For filtered results, we sort in memory to ensure best UX without database index requirements
+    if (hasNonDateFilters) {
+      console.log('Sorting in memory by date_time');
+      items.sort((a, b) => (b.date_time || '').localeCompare(a.date_time || ''));
+    }
+
+    console.log(`Returning ${items.length} items`);
+    return res.json({ items, nextCursor: null, hasMore: false });
   } catch (error) {
     console.error('Get expenses error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 });
 

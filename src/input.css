@@ -2,5 +2,120 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custom app tweaks */
-body { font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@layer base {
+  :root {
+    /* Light background is a soft, desaturated blue (light-dark-blue feel) */
+    --page-bg-light: linear-gradient(135deg, #e6eef8 0%, #d7e7fb 100%);
+    --page-bg-dark: linear-gradient(135deg, #071025 0%, #071825 100%);
+    /* Darker gradient for better text contrast: Blue 800 -> Blue 600 -> Orange 600 */
+    --header-bg-light: linear-gradient(90deg, #1e40af 0%, #2563eb 50%, #ea580c 100%);
+    --header-bg-dark: linear-gradient(90deg, #0b3d91 0%, #0f172a 60%, #7c2d00 100%);
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--page-bg-light);
+    min-height: 100vh;
+  }
+
+  body.theme-dark {
+    background: var(--page-bg-dark);
+    color: #e6eef8;
+  }
+}
+
+@layer components {
+  .card {
+    @apply transition-transform duration-300 shadow-lg;
+  }
+
+  .card:hover {
+    @apply -translate-y-1;
+  }
+
+  /* Dark mode overrides for cards */
+  body.theme-dark .card,
+  body.theme-dark .bg-white {
+    background-color: rgba(255, 255, 255, 0.03) !important;
+    color: #e6eef8 !important;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    @apply transition-transform duration-200;
+  }
+
+  .btn-primary:hover {
+    background: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%);
+    @apply -translate-y-0.5;
+  }
+
+  .header-hero {
+    @apply relative overflow-hidden text-white;
+    background: var(--header-bg-light);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  }
+
+  body.theme-dark .header-hero {
+    background: var(--header-bg-dark);
+  }
+
+  .header-hero::after {
+    content: "";
+    @apply absolute inset-0 pointer-events-none;
+    background: rgba(0, 0, 0, 0.05);
+  }
+
+  .logout-btn {
+    background: rgba(255, 255, 255, 0.95);
+    color: #0f172a;
+    @apply px-3.5 py-1.5 rounded-lg font-semibold shadow-lg border-none transition-all duration-150 ease-out;
+  }
+
+  .logout-btn:hover {
+    background: rgba(0, 0, 0, 0.04);
+    @apply -translate-y-px;
+  }
+
+  .logout-btn:focus {
+    @apply outline-none ring-2 ring-blue-600 ring-offset-2;
+  }
+
+  .expense-table th {
+    background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+  }
+
+  /* Responsive table adjustment */
+  @media (max-width: 1200px) {
+    .expense-table {
+      display: block;
+      overflow-x: auto;
+    }
+  }
+
+  .notification {
+    animation: slideIn .3s ease;
+  }
+
+  #categoryCard {
+    background: linear-gradient(180deg, rgba(38, 99, 235, 0.06) 0%, rgba(96, 165, 250, 0.03) 100%);
+  }
+
+  body.theme-dark #categoryCard {
+    background: linear-gradient(180deg, rgba(3, 37, 76, 0.45) 0%, rgba(3, 37, 76, 0.25) 100%);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}

@@ -110,7 +110,13 @@ async function initializeDatabase() {
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(user_id, category),
             FOREIGN KEY (user_id) REFERENCES users (id)
-        )`
+        )`,
+        // Performance indexes
+        `CREATE INDEX IF NOT EXISTS idx_expenses_user_date ON expenses(user_id, date_time DESC)`,
+        `CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(user_id, category)`,
+        `CREATE INDEX IF NOT EXISTS idx_expenses_session_term ON expenses(user_id, session_term)`,
+        `CREATE INDEX IF NOT EXISTS idx_expenses_status ON expenses(user_id, status)`,
+        `CREATE INDEX IF NOT EXISTS idx_blog_user_date ON blog_posts(user_id, date_time DESC)`
     ];
 
     for (const statement of statements) {
@@ -310,9 +316,7 @@ app.post('/api/login', async (req, res) => {
 // Expenses routes
 app.get('/api/expenses', authenticateToken, async (req, res) => {
     try {
-        // Log incoming query params for debugging
-        console.log('Expense filter query:', req.query);
-        const { session_term, term, category, status, startDate, endDate } = req.query;
+        const { session_term, term, category, status, startDate, endDate, pageSize, page, cursor } = req.query;
         const conditions = ['user_id = ?'];
         const params = [req.user.userId];
 
@@ -344,52 +348,134 @@ app.get('/api/expenses', authenticateToken, async (req, res) => {
         }
 
         const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-        const sql = `SELECT * FROM expenses ${whereClause} ORDER BY date_time DESC`;
-        // Log the final SQL and params for debugging
-        console.log('Expense SQL:', sql);
-        console.log('Expense SQL params:', params);
+        
+        // Handle pagination
+        const pageSizeNum = Math.min(Math.max(parseInt(pageSize) || 0, 0), 100);
+        const pageNum = Math.max(parseInt(page) || 0, 0);
+        
+        let sql = `SELECT * FROM expenses ${whereClause} ORDER BY date_time DESC`;
+        
+        if (pageSizeNum > 0 && pageNum > 0) {
+            const offset = Math.max((pageNum - 1) * pageSizeNum, 0);
+            sql += ` LIMIT ${pageSizeNum} OFFSET ${offset}`;
+            const expenses = await dbAll(sql, params);
+            return res.json({ items: expenses, hasMore: expenses.length === pageSizeNum });
+        }
+        
         const expenses = await dbAll(sql, params);
         res.json(expenses);
     } catch (error) {
         console.error('Get expenses error:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ error: 'Unable to fetch expenses. Please try again.' });
+    }
+});
+
+// Count expenses (for pagination)
+app.get('/api/expenses/count', authenticateToken, async (req, res) => {
+    try {
+        const { session_term, term, category, status, startDate, endDate } = req.query;
+        const conditions = ['user_id = ?'];
+        const params = [req.user.userId];
+
+        const sessionTermValue = session_term || term;
+        if (sessionTermValue) {
+            conditions.push('session_term = ?');
+            params.push(sessionTermValue);
+        }
+
+        if (category) {
+            conditions.push('category = ?');
+            params.push(category);
+        }
+
+        if (status) {
+            conditions.push('status = ?');
+            params.push(status);
+        }
+
+        if (startDate) {
+            conditions.push('date_time >= ?');
+            params.push(formatDateTimeBoundary(startDate, 'start'));
+        }
+
+        if (endDate) {
+            conditions.push('date_time <= ?');
+            params.push(formatDateTimeBoundary(endDate, 'end'));
+        }
+
+        const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+        const sql = `SELECT COUNT(*) as total FROM expenses ${whereClause}`;
+        const result = await dbAll(sql, params);
+        res.json({ total: result[0].total });
+    } catch (error) {
+        console.error('Count expenses error:', error);
+        res.status(500).json({ error: 'Unable to count expenses.' });
     }
 });
 
 app.post('/api/expenses', authenticateToken, async (req, res) => {
     try {
         const { date_time, category, session_term, recipient, description, amount_paid, balance_due } = req.body;
-        const status = balance_due > 0 ? 'Partial' : 'Paid';
+        
+        // Validation
+        if (!date_time || !category || !recipient || !description) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
+        
+        const amountPaid = parseFloat(amount_paid);
+        const balanceDue = parseFloat(balance_due) || 0;
+        
+        if (isNaN(amountPaid) || amountPaid < 0) {
+            return res.status(400).json({ error: 'Amount paid must be a positive number' });
+        }
+        
+        if (balanceDue < 0) {
+            return res.status(400).json({ error: 'Balance due cannot be negative' });
+        }
+        
+        const status = balanceDue > 0 ? 'Partial' : 'Paid';
         
         const result = await dbRun(
             `INSERT INTO expenses (user_id, date_time, category, session_term, recipient, description, amount_paid, balance_due, status)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [req.user.userId, date_time, category, session_term, recipient, description, amount_paid, balance_due, status]
+            [req.user.userId, date_time, category, session_term, recipient, description, amountPaid, balanceDue, status]
         );
 
         const newExpense = await dbAll('SELECT * FROM expenses WHERE id = ?', [result.id]);
         res.json({ message: 'Expense added successfully', expense: newExpense[0] });
     } catch (error) {
         console.error('Add expense error:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        const message = error.code === 'SQLITE_CONSTRAINT' 
+            ? 'Invalid data provided' 
+            : 'Unable to save expense. Please try again.';
+        res.status(500).json({ error: message });
     }
 });
 
 app.put('/api/expenses/:id', authenticateToken, async (req, res) => {
     try {
         const { date_time, category, session_term, recipient, description, amount_paid, balance_due } = req.body;
-        const status = balance_due > 0 ? 'Partial' : 'Paid';
+        
+        // Validation
+        const amountPaid = parseFloat(amount_paid);
+        const balanceDue = parseFloat(balance_due) || 0;
+        
+        if (isNaN(amountPaid) || amountPaid < 0 || balanceDue < 0) {
+            return res.status(400).json({ error: 'Invalid amount values' });
+        }
+        
+        const status = balanceDue > 0 ? 'Partial' : 'Paid';
         
         await dbRun(
             `UPDATE expenses SET date_time = ?, category = ?, session_term = ?, recipient = ?, 
              description = ?, amount_paid = ?, balance_due = ?, status = ? WHERE id = ? AND user_id = ?`,
-            [date_time, category, session_term, recipient, description, amount_paid, balance_due, status, req.params.id, req.user.userId]
+            [date_time, category, session_term, recipient, description, amountPaid, balanceDue, status, req.params.id, req.user.userId]
         );
 
         res.json({ message: 'Expense updated successfully' });
     } catch (error) {
         console.error('Update expense error:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ error: 'Unable to update expense. Please try again.' });
     }
 });
 
@@ -399,7 +485,7 @@ app.delete('/api/expenses/:id', authenticateToken, async (req, res) => {
         res.json({ message: 'Expense deleted successfully' });
     } catch (error) {
         console.error('Delete expense error:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ error: 'Unable to delete expense. Please try again.' });
     }
 });
 

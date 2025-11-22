@@ -1,0 +1,20 @@
+d940e9eea95970faab727d9ca087fbd37d7ca254|2025-11-11 02:43 PM|debug: add console logging for filter debugging
+5465a155230ffc218d7706505f703f4c622a7d2b|2025-10-28 10:34 PM|debug: add logging to expenses and count endpoints
+e0bef119040ceaef588d77f3ac8535091378be10|2025-10-28 10:24 PM|fix: add session_term filter to expenses and count endpoints
+4ba78e1c03bd5e64d7e046ae7e0e89d0affe0f9a|2025-10-28 04:36 PM|debug: log expense filter query and SQL for troubleshooting
+2f1962dc07192eb0a964bdee064aca346af87c39|2025-10-28 04:29 PM|fix: expense filter uses session_term for backend compatibility
+4d42501df6d63b9efb259181e13b958eb179a522|2025-10-25 01:30 AM|style(pagination): match Next button style to Previous for better visibility on white background
+4a2ddde2d6e38594601be4dc5e1af92615ced2a7|2025-10-25 01:22 AM|style(pagination): add white background and darker text to pagination bar for better contrast
+9c56987e2d868a43e3dabbd893ad657c2485c3b8|2025-10-25 01:09 AM|feat(expenses): add page-size selector (10/25/50), persist preference; add secondary orderBy by document ID; support composite cursor
+1f5eccdd9a4d3afa003da563d25bdb3c674c51d0|2025-10-25 01:03 AM|feat(expenses): add total count endpoint and page-based navigation with Go-to-page UI (10 per page)
+49f4977a968182dc7b401598aa0b5e0ed1239446|2025-10-24 02:31 PM|feat(expenses): add server-side cursor pagination (pageSize/cursor) and client UI with 10-per-page navigation
+bddb71f8f2e15aa5205db0281f9ce60ec9d00875|2025-10-24 09:29 AM|fix(ui): robust ID handling for edit/delete (string coercion, encoded paths) and clearer error messages
+ee4ddae334f2955149afa3e3e5c8c85a5905ecf6|2025-10-24 09:17 AM|refactor(ui): replace inline onclick with event delegation using data-id for expenses and blog posts
+7bf164661aa011a520367d1a0991297340a3b5eb|2025-10-24 09:13 AM|fix(ui): make edit/delete work with Firestore string IDs by quoting IDs in onclick handlers (expenses + blog posts)
+8c39b8f6364e8fe20e24d0ecf56a3bab5e8b86e7|2025-10-23 11:38 PM|chore(ci): add release workflow; chore(scripts): add utility scripts; build: update .gitignore to ignore local smoke artifacts
+7f96c58837ba8fde17487de3128b4a73ab04de91|2025-10-23 10:27 PM|chore: save workspace changes (tracked files)
+3e4706adcc5a066620f8d31bb3a7fb4d0bdbad9b|2025-10-23 02:21 AM|style(card): tint Category Breakdown card with light dark-blue and dark-mode variant
+67fbace7bfba7f10c4c28ba7e674a640257ce084|2025-10-23 02:07 AM|style(background): use soft dark-blue tint for page background
+9795322cbdc1ef38565864d1d5fd8a691dcefdd4|2025-10-23 02:03 AM|feat(theme): add light/dark theme toggle with persistence
+fc9d0267986a465a9838a3c064df9a9894b5a3aa|2025-10-23 01:59 AM|feat(a11y): add aria labels/titles for main controls and aria-live for auth errors
+eddbd067ee935f4b67eb454f8868935623449497|2025-10-23 01:51 AM|chore(style): soften header gradient, add overlay & accessible logout button

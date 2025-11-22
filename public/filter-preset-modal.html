@@ -1,0 +1,257 @@
+<!-- Filter Preset Modal -->
+<div id="filterPresetModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold text-gray-800">
+                <i class="fas fa-folder-open mr-2 text-purple-600"></i>
+                Filter Presets
+            </h2>
+            <button id="closeFilterPresetModal" class="text-gray-500 hover:text-gray-700 text-2xl">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <p class="text-sm text-gray-600 mb-4">
+            Save and manage your frequently used filter combinations for quick access.
+        </p>
+        
+        <!-- Preset List -->
+        <div id="filterPresetList" class="space-y-2 mb-6">
+            <!-- Presets will be rendered here dynamically -->
+        </div>
+        
+        <div id="emptyPresetState" class="text-center py-8 text-gray-500">
+            <i class="fas fa-filter text-5xl opacity-50 mb-3"></i>
+            <p>No saved presets yet.</p>
+            <p class="text-sm">Apply some filters and click "Save Preset" to create one.</p>
+        </div>
+        
+        <div class="flex gap-3 pt-4 border-t">
+            <button id="closeFilterPresetModalBtn" class="flex-1 border border-gray-300 text-gray-700 py-2.5 rounded-lg hover:bg-gray-50 font-medium">
+                Close
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .filter-preset-item {
+        display: flex;
+        justify-content: space-between;
+        align-items-center;
+        padding: 1rem;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.5rem;
+        transition: all 0.2s;
+    }
+    
+    .filter-preset-item:hover {
+        border-color: #6366f1;
+        background-color: #f9fafb;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+    
+    .filter-preset-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.5rem;
+        background-color: #ede9fe;
+        color: #6d28d9;
+        border-radius: 0.25rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+        margin-right: 0.5rem;
+    }
+</style>
+
+<script>
+// Enhanced filter preset modal management
+(function() {
+    function renderPresetList() {
+        const listContainer = document.getElementById('filterPresetList');
+        const emptyState = document.getElementById('emptyPresetState');
+        
+        if (!listContainer || !emptyState) return;
+        
+        const presets = window.filterPresets || [];
+        
+        if (presets.length === 0) {
+            listContainer.innerHTML = '';
+            listContainer.classList.add('hidden');
+            emptyState.classList.remove('hidden');
+            return;
+        }
+        
+        listContainer.classList.remove('hidden');
+        emptyState.classList.add('hidden');
+        
+        listContainer.innerHTML = presets.map((preset, index) => {
+            const filterCount = Object.values(preset.filters).filter(v => v && v !== 'date_desc').length;
+            const createdDate = new Date(preset.createdAt).toLocaleDateString();
+            
+            return `
+                <div class="filter-preset-item">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 mb-1">
+                            <h3 class="font-semibold text-gray-800">${preset.name}</h3>
+                            <span class="filter-preset-badge">
+                                <i class="fas fa-filter text-xs mr-1"></i>
+                                ${filterCount} filter${filterCount !== 1 ? 's' : ''}
+                            </span>
+                        </div>
+                        <p class="text-xs text-gray-500">Created: ${createdDate}</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button 
+                            class="load-preset-btn px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors"
+                            data-preset-index="${index}"
+                        >
+                            <i class="fas fa-download mr-1"></i>Load
+                        </button>
+                        <button 
+                            class="delete-preset-btn px-3 py-2 border border-red-300 hover:border-red-500 hover:bg-red-50 text-red-600 rounded-lg text-sm font-medium transition-colors"
+                            data-preset-index="${index}"
+                        >
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        // Add event listeners
+        listContainer.querySelectorAll('.load-preset-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const index = parseInt(e.currentTarget.getAttribute('data-preset-index'));
+                loadPresetByIndex(index);
+            });
+        });
+        
+        listContainer.querySelectorAll('.delete-preset-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const index = parseInt(e.currentTarget.getAttribute('data-preset-index'));
+                deletePresetByIndex(index);
+            });
+        });
+    }
+    
+    function loadPresetByIndex(index) {
+        const presets = window.filterPresets || [];
+        if (index < 0 || index >= presets.length) return;
+        
+        const preset = presets[index];
+        
+        // Apply filters
+        if (window.enhancedFilters) {
+            Object.assign(window.enhancedFilters, preset.filters);
+        }
+        
+        if (window.syncEnhancedFilterInputs) {
+            window.syncEnhancedFilterInputs();
+        }
+        
+        if (window.renderFilterChips) {
+            window.renderFilterChips();
+        }
+        
+        if (window.updateEnhancedFiltersLabel) {
+            window.updateEnhancedFiltersLabel();
+        }
+        
+        if (window.resetExpensePagination) {
+            window.resetExpensePagination();
+        }
+        
+        if (window.loadData) {
+            window.loadData();
+        }
+        
+        // Close modal
+        document.getElementById('filterPresetModal').classList.add('hidden');
+        
+        if (window.notify) {
+            window.notify(`Loaded preset: ${preset.name}`);
+        }
+    }
+    
+    function deletePresetByIndex(index) {
+        const presets = window.filterPresets || [];
+        if (index < 0 || index >= presets.length) return;
+        
+        const preset = presets[index];
+        if (!confirm(`Delete preset "${preset.name}"?`)) return;
+        
+        presets.splice(index, 1);
+        
+        // Save to localStorage
+        try {
+            localStorage.setItem('expenseFilterPresets', JSON.stringify(presets));
+        } catch (err) {
+            console.warn('Failed to save presets:', err);
+        }
+        
+        renderPresetList();
+        
+        if (window.notify) {
+            window.notify(`Deleted preset: ${preset.name}`);
+        }
+    }
+    
+    // Show preset modal with enhanced UI
+    function showPresetModal() {
+        // Load latest presets
+        try {
+            const stored = localStorage.getItem('expenseFilterPresets');
+            window.filterPresets = stored ? JSON.parse(stored) : [];
+        } catch (err) {
+            console.warn('Failed to load presets:', err);
+            window.filterPresets = [];
+        }
+        
+        renderPresetList();
+        document.getElementById('filterPresetModal').classList.remove('hidden');
+    }
+    
+    // Initialize modal controls
+    function initPresetModal() {
+        const modal = document.getElementById('filterPresetModal');
+        if (!modal) return;
+        
+        const closeBtn = document.getElementById('closeFilterPresetModal');
+        const closeBtnAlt = document.getElementById('closeFilterPresetModalBtn');
+        
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                modal.classList.add('hidden');
+            });
+        }
+        
+        if (closeBtnAlt) {
+            closeBtnAlt.addEventListener('click', () => {
+                modal.classList.add('hidden');
+            });
+        }
+        
+        // Update load preset button to show modal
+        const loadPresetBtn = document.getElementById('loadFilterPresetBtn');
+        if (loadPresetBtn) {
+            // Remove existing listeners and add new one
+            const newBtn = loadPresetBtn.cloneNode(true);
+            loadPresetBtn.parentNode.replaceChild(newBtn, loadPresetBtn);
+            newBtn.addEventListener('click', showPresetModal);
+        }
+    }
+    
+    // Export functions
+    window.showFilterPresetModal = showPresetModal;
+    window.initFilterPresetModal = initPresetModal;
+    
+    // Auto-initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initPresetModal);
+    } else {
+        initPresetModal();
+    }
+})();
+</script>

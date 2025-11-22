@@ -1,0 +1,1739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Expense Tracker & Blog</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Use built Tailwind CSS for production instead of the CDN. Bump APP_VERSION to force cache refresh. -->
+    <link rel="stylesheet" href="/styles/tailwind.css?v=1">
+    <script>const APP_VERSION = '1';</script>
+    <script src="firebase-config.js?v=1" defer></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f0f9ff 0%, #fdf2ff 100%);
+            min-height: 100vh;
+        }
+        .card { transition: transform .3s, box-shadow .3s; }
+        .card:hover { transform: translateY(-5px); }
+        .btn-primary {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%);
+            transform: translateY(-2px);
+        }
+        .notification { animation: slideIn .3s ease; }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .expense-table th { background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%); }
+        /* Header hero gradient: regular blue -> soft blue midpoint -> orange + subtle overlay */
+        .header-hero {
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(90deg, #2563eb 0%, #60a5fa 50%, #f97316 100%);
+            color: white;
+        }
+
+        /* subtle dark overlay to improve text contrast without changing colors */
+        .header-hero::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.05);
+            pointer-events: none;
+        }
+        /* Accessible logout button styles */
+        .logout-btn {
+            background: rgba(255,255,255,0.95); /* nearly white to stand out */
+            color: #0f172a; /* slate-900 for strong contrast */
+            padding: .35rem .9rem;
+            border-radius: .5rem;
+            font-weight: 600;
+            box-shadow: 0 6px 18px -10px rgba(2,6,23,0.4);
+            border: none;
+            transition: background .15s ease, transform .08s ease;
+        }
+        .logout-btn:hover { background: rgba(0,0,0,0.04); transform: translateY(-1px); }
+        .logout-btn:focus { outline: 3px solid rgba(37,99,235,0.22); outline-offset: 2px; }
+        @media (max-width: 1200px) { .expense-table { display: block; overflow-x: auto; } }
+        /* Theme variables and dark theme overrides */
+        :root {
+            /* Light background is a soft, desaturated blue (light-dark-blue feel) */
+            --page-bg-light: linear-gradient(135deg, #e6eef8 0%, #d7e7fb 100%);
+            --page-bg-dark: linear-gradient(135deg, #071025 0%, #071825 100%);
+            --header-bg-light: linear-gradient(90deg, #2563eb 0%, #60a5fa 50%, #f97316 100%);
+            --header-bg-dark: linear-gradient(90deg, #0b3d91 0%, #0f172a 60%, #7c2d00 100%);
+        }
+
+        /* light default background uses the soft 'light dark blue' gradient */
+        body {
+            background: var(--page-bg-light);
+        }
+
+        body.theme-dark {
+            background: var(--page-bg-dark);
+            color: #e6eef8;
+        }
+
+        body.theme-dark .header-hero {
+            background: var(--header-bg-dark);
+        }
+
+        /* Slight adjustments for cards in dark mode */
+        body.theme-dark .card,
+        body.theme-dark .bg-white {
+            background-color: rgba(255,255,255,0.03) !important;
+            color: #e6eef8 !important;
+        }
+        /* Category card tint - subtle light dark-blue */
+        #categoryCard {
+            background: linear-gradient(180deg, rgba(38,99,235,0.06) 0%, rgba(96,165,250,0.03) 100%);
+        }
+        body.theme-dark #categoryCard {
+            background: linear-gradient(180deg, rgba(3,37,76,0.45) 0%, rgba(3,37,76,0.25) 100%);
+        }
+    </style>
+
+</head>
+<body class="p-4 md:p-6">
+    <script>
+    // Unregister any service workers and clear Cache API entries on page load.
+    // This helps prevent stale assets during rapid deploys or E2E tests.
+    (async function unregisterSWsAndClearCaches() {
+        try {
+            if ('serviceWorker' in navigator) {
+                const regs = await navigator.serviceWorker.getRegistrations();
+                for (const r of regs) {
+                    try { await r.unregister(); } catch (e) { console.warn('SW unregister failed', e); }
+                }
+            }
+        } catch (err) {
+            console.warn('Service worker cleanup failed', err);
+        }
+
+        try {
+            if (window.caches && caches.keys) {
+                const keys = await caches.keys();
+                for (const k of keys) {
+                    try { await caches.delete(k); } catch (e) { console.warn('Cache delete failed', e); }
+                }
+            }
+        } catch (err) {
+            console.warn('Cache cleanup failed', err);
+        }
+    })();
+    </script>
+    <!-- AUTH SCREEN -->
+    <div id="authScreen" class="fixed inset-0 bg-gradient-to-br from-primary to-secondary flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col md:flex-row">
+            <div class="hidden md:flex md:w-1/2 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-white p-10 flex-col justify-between">
+                <div>
+                    <span class="inline-flex items-center px-3 py-1 rounded-full bg-white/20 text-xs uppercase tracking-widest">Secure Finance Hub</span>
+                    <h2 class="mt-6 text-3xl font-bold leading-tight">Track spending, stay on budget, and log your wins in one place.</h2>
+                    <p class="mt-4 text-indigo-100 text-sm">Every record is protected with Firebase Authentication and stored safely in Firestore.</p>
+                </div>
+                <ul class="space-y-3 text-sm text-indigo-100">
+                    <li class="flex items-center gap-3"><i class="fas fa-shield-alt text-lg"></i> End-to-end token security</li>
+                    <li class="flex items-center gap-3"><i class="fas fa-chart-line text-lg"></i> Real-time dashboards</li>
+                    <li class="flex items-center gap-3"><i class="fas fa-cloud-upload-alt text-lg"></i> Fast cloud sync</li>
+                </ul>
+            </div>
+            <div class="md:w-1/2 w-full p-6 sm:p-10 bg-white">
+                <h2 class="text-2xl font-bold text-gray-900 text-center">Welcome back</h2>
+                <p class="text-sm text-gray-500 text-center mt-2">Log in to continue managing your expenses or create a new account in seconds.</p>
+
+                <div id="loginForm" class="mt-8 space-y-4">
+                    <div>
+                        <label for="loginUsername" class="block text-sm font-medium text-gray-600 mb-1">Email</label>
+                        <input type="email" id="loginUsername" placeholder="you@example.com" class="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition">
+                    </div>
+                    <div>
+                        <label for="loginPassword" class="block text-sm font-medium text-gray-600 mb-1">Password</label>
+                        <input type="password" id="loginPassword" placeholder="Enter your password" class="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition">
+                    </div>
+                    <button id="loginBtn" aria-label="Log in" title="Log in to your account" class="w-full btn-primary text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2">
+                        <i class="fas fa-sign-in-alt"></i>
+                        Login
+                    </button>
+                    <p class="text-center text-sm text-gray-600">
+                        New here?
+                        <button id="showRegister" class="text-primary font-semibold hover:underline">Create an account</button>
+                    </p>
+                </div>
+
+                <div id="registerForm" class="hidden mt-8 space-y-4">
+                    <div class="text-center">
+                        <h3 class="text-2xl font-semibold text-gray-900">Create your account</h3>
+                        <p class="text-sm text-gray-500 mt-1">Start tracking your expenses with secure cloud storage.</p>
+                    </div>
+                    <div>
+                        <label for="registerUsername" class="block text-sm font-medium text-gray-600 mb-1">Email</label>
+                        <input type="email" id="registerUsername" placeholder="you@example.com" class="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition">
+                    </div>
+                    <div>
+                        <label for="registerPassword" class="block text-sm font-medium text-gray-600 mb-1">Password</label>
+                        <input type="password" id="registerPassword" placeholder="Choose a secure password" class="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition">
+                    </div>
+                    <button id="registerBtn" aria-label="Create account" title="Create a new account" class="w-full btn-primary text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2">
+                        <i class="fas fa-user-plus"></i>
+                        Create Account
+                    </button>
+                    <p class="text-center text-sm text-gray-600">
+                        Already registered?
+                        <button id="showLogin" class="text-primary font-semibold hover:underline">Log in instead</button>
+                    </p>
+                </div>
+
+                <p id="authError" aria-live="polite" class="mt-6 text-red-600 text-sm text-center hidden"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP -->
+<div id="app" class="max-w-7xl mx-auto hidden">
+    <header class="header-hero rounded-2xl shadow-xl p-6 md:p-8 mb-8 text-white">
+        <div class="flex justify-end mb-2">
+            <span id="storageBadge" class="hidden px-4 py-1 rounded-full bg-white/20 text-white text-xs font-semibold tracking-wide shadow-inner"></span>
+        </div>
+        <div class="text-center mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold mb-3">Secure Expense Tracker & Blog</h1>
+            <p class="text-indigo-100 mb-6">Track payments, manage balances, jot down thoughts – all securely stored</p>
+        </div>
+        <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
+            <button id="addExpenseBtn" aria-label="Add expense" title="Add a new expense" class="btn btn-primary flex items-center gap-2 px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all">
+                <i class="fas fa-plus"></i> Add Expense
+            </button>
+            <button id="addBlogPostBtn" aria-label="Write blog post" title="Write a personal financial blog post" class="btn bg-white text-purple-600 hover:bg-gray-100 flex items-center gap-2 px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all">
+                <i class="fas fa-plus"></i> Write Blog Post
+            </button>
+            <button id="exportBtn" aria-label="Export data" title="Export your expenses and posts as JSON" class="btn bg-emerald-500 hover:bg-emerald-600 flex items-center gap-2 px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all">
+                <i class="fas fa-download"></i> Export Data
+            </button>
+            <button id="importBtn" aria-label="Import data" title="Import expenses or posts from JSON/CSV" class="btn bg-sky-500 hover:bg-sky-600 flex items-center gap-2 px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all">
+                <i class="fas fa-upload"></i> Import Data
+            </button>
+            <button id="manageBudgetsBtn" aria-label="Manage budgets" title="Set or edit budget thresholds" class="btn bg-amber-400 hover:bg-amber-500 text-amber-900 flex items-center gap-2 px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all">
+                <i class="fas fa-bullseye"></i> Manage Budgets
+            </button>
+        </div>
+        <input id="importFile" type="file" accept=".json,.csv" class="hidden">
+        <div class="text-center mt-4 flex items-center justify-center gap-3">
+            <span id="usernameDisplay" class="text-indigo-200 font-medium"></span>
+            <button id="themeToggle" aria-label="Toggle theme" title="Toggle light/dark theme" class="ml-2 px-3 py-1 rounded-md bg-white/10 text-white">🌙</button>
+            <button id="logoutBtn" class="logout-btn ml-4 text-sm">Logout</button>
+        </div>
+    </header>
+
+        <!-- SUMMARY SECTION -->
+        <div id="summarySection" class="mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6" id="summaryCards"></div>
+            <div id="categoryCard" class="card bg-white rounded-2xl shadow-lg p-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4"><center>Category Breakdown</center></h2>
+                <div id="categoryBreakdown" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"></div>
+            </div>
+        </div>
+
+        <!-- EXPENSES SECTION -->
+        <section class="card bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl shadow-xl p-6 md:p-8 mb-8 text-white">
+            <div class="text-center mb-6">
+                <h2 class="text-2xl md:text-3xl font-bold mb-2">Expense Records</h2>
+                <p class="text-blue-100">Your complete financial history</p>
+            </div>
+            
+            <!-- Enhanced Filter Section -->
+            <div class="bg-white/10 backdrop-blur-sm rounded-xl p-4 mb-6">
+                <!-- Text Search -->
+                <div class="mb-4">
+                    <label class="block text-blue-100 mb-2 font-medium">
+                        <i class="fas fa-search mr-2"></i>Search Expenses
+                    </label>
+                    <input 
+                        type="text" 
+                        id="filterSearch" 
+                        placeholder="Search by description, recipient, or category..."
+                        class="w-full rounded-lg border border-white/30 bg-white/10 text-white placeholder-blue-200 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-white/60"
+                    >
+                    <p class="text-xs text-blue-200 mt-1">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Press Enter or wait to search automatically
+                    </p>
+                </div>
+
+                <!-- Filter Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                    <!-- Date Range -->
+                    <div>
+                        <label class="block text-blue-100 mb-1">Start Date</label>
+                        <input 
+                            type="date" 
+                            id="filterStartDate"
+                            class="w-full rounded-lg border border-white/30 bg-white/10 text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/60"
+                        >
+                    </div>
+                    <div>
+                        <label class="block text-blue-100 mb-1">End Date</label>
+                        <input 
+                            type="date" 
+                            id="filterEndDate"
+                            class="w-full rounded-lg border border-white/30 bg-white/10 text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/60"
+                        >
+                    </div>
+
+                    <!-- Amount Range -->
+                    <div>
+                        <label class="block text-blue-100 mb-1">Min Amount (₦)</label>
+                        <input 
+                            type="number" 
+                            id="filterMinAmount"
+                            placeholder="0.00"
+                            step="0.01"
+                            class="w-full rounded-lg border border-white/30 bg-white/10 text-white placeholder-blue-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/60"
+                        >
+                    </div>
+                    <div>
+                        <label class="block text-blue-100 mb-1">Max Amount (₦)</label>
+                        <input 
+                            type="number" 
+                            id="filterMaxAmount"
+                            placeholder="999999.99"
+                            step="0.01"
+                            class="w-full rounded-lg border border-white/30 bg-white/10 text-white placeholder-blue-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/60"
+                        >
+                    </div>
+
+                    <!-- Session/Term -->
+                    <div>
+                        <label class="block text-blue-100 mb-1">Session/Term</label>
+                        <select id="filterTerm" class="w-full rounded-lg border border-white/30 bg-white/10 text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/60">
+                            <option value="">All</option>
+                            <option>First Term</option>
+                            <option>Second Term</option>
+                            <option>Third Term</option>
+                            <option>First Semester</option>
+                            <option>Second Semester</option>
+                        </select>
+                    </div>
+
+                    <!-- Category -->
+                    <div>
+                        <label class="block text-blue-100 mb-1">Category</label>
+                        <select id="filterCategory" class="w-full rounded-lg border border-white/30 bg-white/10 text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/60">
+                            <option value="">All</option>
+                            <option>Home Upkeep</option>
+                            <option>School Upkeep</option>
+                            <option>School Fees</option>
+                            <option>Projects</option>
+                        </select>
+                    </div>
+
+                    <!-- Status -->
+                    <div>
+                        <label class="block text-blue-100 mb-1">Status</label>
+                        <select id="filterStatus" class="w-full rounded-lg border border-white/30 bg-white/10 text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/60">
+                            <option value="">All</option>
+                            <option value="Paid">Paid</option>
+                            <option value="Partial">Partial</option>
+                        </select>
+                    </div>
+
+                    <!-- Sort Options -->
+                    <div>
+                        <label class="block text-blue-100 mb-1">Sort By</label>
+                        <select id="filterSortBy" class="w-full rounded-lg border border-white/30 bg-white/10 text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/60">
+                            <option value="date_desc">Date (Newest First)</option>
+                            <option value="date_asc">Date (Oldest First)</option>
+                            <option value="amount_desc">Amount (High to Low)</option>
+                            <option value="amount_asc">Amount (Low to High)</option>
+                            <option value="category">Category (A-Z)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex flex-wrap gap-3 mt-4">
+                    <button id="applyFiltersBtn" class="flex-1 sm:flex-initial bg-white text-blue-700 px-6 py-2.5 rounded-lg font-semibold hover:bg-blue-50 transition-colors">
+                        <i class="fas fa-filter mr-2"></i>Apply Filters
+                    </button>
+                    <button id="clearFiltersBtn" class="flex-1 sm:flex-initial border border-white/50 px-6 py-2.5 rounded-lg font-semibold text-white hover:bg-white/10 transition-colors">
+                        <i class="fas fa-times mr-2"></i>Clear All
+                    </button>
+                    <button id="saveFilterPresetBtn" class="flex-1 sm:flex-initial bg-amber-500 hover:bg-amber-600 text-white px-6 py-2.5 rounded-lg font-semibold transition-colors">
+                        <i class="fas fa-save mr-2"></i>Save Preset
+                    </button>
+                    <button id="loadFilterPresetBtn" class="flex-1 sm:flex-initial bg-purple-500 hover:bg-purple-600 text-white px-6 py-2.5 rounded-lg font-semibold transition-colors">
+                        <i class="fas fa-folder-open mr-2"></i>Load Preset
+                    </button>
+                </div>
+
+                <!-- Active Filter Chips -->
+                <div id="activeFilterChips" class="flex flex-wrap gap-2 mt-4 empty:hidden"></div>
+                
+                <!-- Filter Summary -->
+                <div class="flex items-center justify-between mt-3">
+                    <span id="activeFilters" class="text-blue-100 text-xs block"></span>
+                    <span id="filterResultCount" class="text-blue-100 text-xs font-semibold"></span>
+                </div>
+            </div>
+            <div class="bg-white/10 backdrop-blur-sm rounded-xl p-4 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm items-end">
+                    <div>
+                        <label class="block text-blue-100 mb-1">Session/Term</label>
+                        <select id="filterTerm" class="w-full rounded-lg border border-white/30 bg-white/10 text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/60">
+                            <option value="">All</option>
+                            <option>First Term</option>
+                            <option>Second Term</option>
+                            <option>Third Term</option>
+                            <option>First Semester</option>
+                            <option>Second Semester</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-blue-100 mb-1">Category</label>
+                        <select id="filterCategory" class="w-full rounded-lg border border-white/30 bg-white/10 text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/60">
+                            <option value="">All</option>
+                            <option>Home Upkeep</option>
+                            <option>School Upkeep</option>
+                            <option>School Fees</option>
+                            <option>Projects</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-blue-100 mb-1">Status</label>
+                        <select id="filterStatus" class="w-full rounded-lg border border-white/30 bg-white/10 text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/60">
+                            <option value="">All</option>
+                            <option value="Paid">Paid</option>
+                            <option value="Partial">Partial</option>
+                        </select>
+                    </div>
+                    <div class="flex flex-wrap w-full gap-3">
+                        <button id="applyFiltersBtn" class="flex-1 bg-white text-blue-700 px-4 py-2 rounded-lg font-semibold hover:bg-blue-50">Apply Filters</button>
+                        <button id="clearFiltersBtn" class="flex-1 border border-white/50 px-4 py-2 rounded-lg font-semibold text-white hover:bg-white/10">Reset</button>
+                    </div>
+                </div>
+                <span id="activeFilters" class="text-blue-100 text-xs block mt-3"></span>
+            </div>
+            <div id="emptyExpenseState" class="text-center py-8">
+                <i class="fas fa-file-invoice text-5xl opacity-80 mb-4"></i>
+                <p class="text-lg mb-4">No expenses yet – add your first expense!</p>
+                <button id="addFirstExpenseBtn" class="btn bg-white text-blue-600 px-6 py-3 rounded-xl font-semibold">Add First Expense</button>
+            </div>
+            <div id="expenseTableContainer" class="hidden">
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                    <table class="w-full text-sm text-gray-800">
+                        <thead>
+                            <tr class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+                                <th class="p-4 text-left">Date/Time</th>
+                                <th class="p-4 text-left">Category</th>
+                                <th class="p-4 text-left">Session/Term</th>
+                                <th class="p-4 text-left">Recipient</th>
+                                <th class="p-4 text-left">Description</th>
+                                <th class="p-4 text-left">Amount Paid</th>
+                                <th class="p-4 text-left">Balance Due</th>
+                                <th class="p-4 text-left">Status</th>
+                                <th class="p-4 text-left">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="expenseTableBody"></tbody>
+                    </table>
+                </div>
+                <div id="expensePagination" class="flex items-center justify-between mt-3 p-4 bg-white rounded-lg shadow hidden">
+                    <button id="expensePrevPage" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50" disabled>
+                        <i class="fas fa-arrow-left mr-2"></i>Previous
+                    </button>
+                    <div class="flex items-center gap-3">
+                        <span id="expensePageInfo" class="text-sm text-gray-800 font-medium">Page 1</span>
+                        <div class="flex items-center gap-2">
+                            <label for="expenseGotoPage" class="text-sm text-gray-800 font-medium">Go to page</label>
+                            <input id="expenseGotoPage" type="number" min="1" class="w-20 px-2 py-1 border rounded" placeholder="1">
+                            <button id="expenseGotoBtn" class="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white font-medium">Go</button>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <label for="expensePageSize" class="text-sm text-gray-800 font-medium">Page size</label>
+                            <select id="expensePageSize" class="px-2 py-1 border rounded">
+                                <option value="10">10</option>
+                                <option value="25">25</option>
+                                <option value="50">50</option>
+                            </select>
+                        </div>
+                        <span id="expenseTotalInfo" class="text-sm text-gray-700 font-medium"></span>
+                    </div>
+                    <button id="expenseNextPage" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+                        Next<i class="fas fa-arrow-right ml-2"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- BLOG SECTION -->
+        <section class="card bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl shadow-xl p-6 md:p-8 mb-8 text-white">
+            <div class="text-center mb-6">
+                <h2 class="text-2xl md:text-3xl font-bold mb-2">Personal Financial Blog</h2>
+                <p class="text-purple-100">Your notes & insights</p>
+            </div>
+            <div id="emptyBlogState" class="text-center py-8">
+                <i class="fas fa-blog text-5xl opacity-80 mb-4"></i>
+                <p class="text-lg mb-2">No blog posts yet.</p>
+                <p class="text-purple-100">Start documenting your journey.</p>
+            </div>
+            <div id="blogPostsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 hidden"></div>
+        </section>
+    </div>
+
+    <script>
+    // Theme toggle: persist in localStorage and apply on load
+    (function() {
+        const root = document.documentElement;
+        const body = document.body;
+        const toggle = document.getElementById('themeToggle');
+        function applyTheme(t) {
+            if (t === 'dark') {
+                body.classList.add('theme-dark');
+                toggle.textContent = '☀️';
+                toggle.title = 'Switch to light theme';
+            } else {
+                body.classList.remove('theme-dark');
+                toggle.textContent = '🌙';
+                toggle.title = 'Switch to dark theme';
+            }
+        }
+
+        // initialize
+        try {
+            const stored = localStorage.getItem('theme') || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            applyTheme(stored);
+        } catch (e) { applyTheme('light'); }
+
+        if (toggle) {
+            toggle.addEventListener('click', () => {
+                const current = body.classList.contains('theme-dark') ? 'dark' : 'light';
+                const next = current === 'dark' ? 'light' : 'dark';
+                try { localStorage.setItem('theme', next); } catch (e) {}
+                applyTheme(next);
+            });
+        }
+    })();
+    </script>
+    <!-- EXPENSE MODAL -->
+    <div id="expenseModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-40 hidden">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 id="expenseModalTitle" class="text-xl font-bold text-gray-800">Add Expense</h2>
+                <button id="closeExpenseModal" class="text-gray-500 hover:text-gray-700 text-2xl"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="expenseForm" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Date & Time</label>
+                        <input type="datetime-local" id="expenseDateTime" required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                        <select id="expenseCategory" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary">
+                            <option>Home Upkeep</option>
+                            <option>School Upkeep</option>
+                            <option>School Fees</option>
+                            <option>Projects</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Session/Term</label>
+                        <select id="expenseSession" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary">
+                            <option value="">Select</option>
+                            <option>First Term</option>
+                            <option>Second Term</option>
+                            <option>Third Term</option>
+			<option>First Semester</option>
+			<option>Second Semester</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Recipient</label>
+                        <input type="text" id="expenseRecipient" placeholder="Recipient name" required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea id="expenseDescription" rows="3" placeholder="Expense details" required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary"></textarea>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Amount Paid (₦)</label>
+                        <input type="number" step="0.01" id="expenseAmountPaid" placeholder="0.00" required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Balance Due (₦)</label>
+                        <input type="number" step="0.01" id="expenseBalanceDue" placeholder="0.00" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary">
+                    </div>
+                </div>
+                <div class="flex gap-3 pt-4">
+                    <button type="submit" class="flex-1 btn-primary text-white py-3 rounded-lg font-medium">Save Expense</button>
+                    <button type="button" id="cancelExpense" class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- BLOG MODAL -->
+    <div id="blogModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-40 hidden">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 id="blogModalTitle" class="text-xl font-bold text-gray-800">Write Blog Post</h2>
+                <button id="closeBlogModal" class="text-gray-500 hover:text-gray-700 text-2xl"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="blogForm" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Date & Time</label>
+                        <input type="datetime-local" id="blogDateTime" required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                        <select id="blogCategory" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                            <option>Financial Insights</option>
+                            <option>Monthly Review</option>
+                            <option>Expense Notes</option>
+                            <option>Budget Planning</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                    <input type="text" id="blogTitle" placeholder="Post title" required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Content</label>
+                    <textarea id="blogContent" rows="8" placeholder="Your thoughts..." required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-500"></textarea>
+                </div>
+                <div class="flex gap-3 pt-4">
+                    <button type="submit" class="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 rounded-lg font-medium">Publish Post</button>
+                    <button type="button" id="cancelBlog" class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- BUDGET MODAL -->
+    <div id="budgetModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-40 hidden">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-800">Budget Thresholds</h2>
+                <button id="closeBudgetModal" class="text-gray-500 hover:text-gray-700 text-2xl"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="budgetForm" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                    <select id="budgetCategory" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-500"></select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Threshold (₦)</label>
+                    <input type="number" id="budgetThreshold" min="0" step="0.01" required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-500" placeholder="0.00">
+                </div>
+                <div class="md:col-span-2 flex gap-3 justify-end">
+                    <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white px-5 py-3 rounded-lg font-semibold">Save Threshold</button>
+                    <button type="button" id="clearBudgetForm" class="border border-gray-300 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-50">Reset</button>
+                </div>
+            </form>
+            <div>
+                <h3 class="text-lg font-semibold text-gray-800 mb-3">Current Budgets</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-gray-700 border rounded-lg">
+                        <thead class="bg-amber-50 text-amber-700">
+                            <tr>
+                                <th class="p-3 text-left">Category</th>
+                                <th class="p-3 text-left">Threshold</th>
+                                <th class="p-3 text-left">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="budgetTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOTIFICATION -->
+    <div id="notification" class="fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg hidden">
+        <i class="fas fa-check-circle mr-2"></i><span id="notificationText"></span>
+    </div>
+
+    <script>
+    // Dynamically determine API base URL (works for both local dev and production)
+    const API_BASE = window.location.origin + '/api';
+    const defaultExpenseCategories = ['Home Upkeep', 'School Upkeep', 'School Fees', 'Projects'];
+
+    function getStoredUser() {
+        try {
+            // Prefer the newer 'appCurrentUser' key; fall back to legacy 'currentUser'
+            const raw = localStorage.getItem('appCurrentUser') ?? localStorage.getItem('currentUser');
+            return JSON.parse(raw || 'null');
+        } catch (err) {
+            console.warn('Stored user data was invalid; clearing entry.', err);
+            try { localStorage.removeItem('currentUser'); localStorage.removeItem('appCurrentUser'); } catch(e){}
+            return null;
+        }
+    }
+
+    let authToken = localStorage.getItem('authToken');
+    // Use a less-generic global name to avoid collisions with other scripts
+    // localStorage key remains 'currentUser' for compatibility with firebase-config.js
+    let appCurrentUser = getStoredUser();
+    let expenses = [];
+    let blogPosts = [];
+    let budgets = [];
+    let budgetAlerts = [];
+    let lastAlertSignature = '';
+    let storageInfo = { storageMode: 'sqlite', libsqlUrl: null };
+    const filters = { session_term: '', category: '', status: '' };
+
+    const ensureFirebaseReady = async (timeoutMs = 5000) => {
+        if (window.firebaseInitPromise) {
+            try {
+                // Fail fast if initialization doesn't complete in reasonable time
+                await Promise.race([
+                    window.firebaseInitPromise,
+                    new Promise((_, rej) => setTimeout(() => rej(new Error('Firebase init timeout')), timeoutMs))
+                ]);
+            } catch (err) {
+                console.error('Firebase init failed or timed out:', err);
+                throw err;
+            }
+        }
+
+        if (typeof window.firebaseLogin !== 'function' || typeof window.firebaseRegister !== 'function') {
+            throw new Error('Firebase functions not available. Please refresh the page.');
+        }
+    };
+
+    const serializeUser = (user) => {
+        if (!user) return null;
+        const source = user.user ? user.user : user;
+        if (!source) return null;
+        return {
+            uid: source.uid || null,
+            email: source.email || null
+        };
+    };
+
+    const applyAuthenticatedState = async (userDetail) => {
+        if (document.readyState === 'loading') {
+            await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve, { once: true }));
+        }
+
+        await ensureFirebaseReady();
+    const snapshot = serializeUser(userDetail) || getStoredUser();
+    if (!snapshot) return;
+
+    appCurrentUser = snapshot;
+
+        const authScreen = document.querySelector('#authScreen');
+        const app = document.querySelector('#app');
+        const usernameDisplay = document.querySelector('#usernameDisplay');
+
+        if (authScreen) authScreen.classList.add('hidden');
+        if (app) app.classList.remove('hidden');
+        if (usernameDisplay) {
+            usernameDisplay.textContent = snapshot.email || snapshot.uid || '';
+        }
+
+        try {
+            const latestToken = await getIdToken();
+            if (latestToken) {
+                authToken = latestToken;
+                localStorage.setItem('authToken', latestToken);
+            }
+        } catch (err) {
+            console.error('Unable to refresh auth token:', err);
+        }
+
+        try {
+            localStorage.setItem('currentUser', JSON.stringify(snapshot));
+        } catch (err) {
+            console.warn('Unable to persist user snapshot:', err);
+        }
+
+        try {
+            await loadData();
+        } catch (error) {
+            console.error('Failed to hydrate data after auth:', error);
+        }
+    };
+
+    window.addEventListener('auth:ready', (event) => {
+        applyAuthenticatedState(event.detail?.user);
+    });
+
+    window.addEventListener('auth:cleared', () => {
+        appCurrentUser = null;
+        authToken = null;
+        expenses = [];
+        blogPosts = [];
+        budgets = [];
+        budgetAlerts = [];
+        lastAlertSignature = '';
+        try {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('currentUser');
+        } catch (err) {
+            console.warn('Unable to clear stored auth state:', err);
+        }
+
+        const authScreen = document.querySelector('#authScreen');
+        const app = document.querySelector('#app');
+        if (authScreen) authScreen.classList.remove('hidden');
+        if (app) app.classList.add('hidden');
+
+        renderExpenses();
+        renderBlogPosts();
+        renderBudgetsTable();
+    });
+
+    // UI Helpers
+    const $ = q => document.querySelector(q);
+    const notify = (msg, err = false) => {
+        const box = $("#notification");
+        box.className = `fixed bottom-4 right-4 ${err ? "bg-red-500" : "bg-green-500"} text-white px-6 py-3 rounded-lg shadow-lg`;
+        $("#notificationText").textContent = msg;
+        box.classList.remove("hidden");
+        setTimeout(() => box.classList.add("hidden"), 3000);
+    };
+
+    const fmtMoney = n => new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(n || 0);
+
+    const updateStorageBadge = info => {
+        storageInfo = { ...storageInfo, ...info };
+        const badge = $("#storageBadge");
+        if (!badge) return;
+        const label = storageInfo.storageMode === 'libsql' ? 'Synced via Turso' : 'Local SQLite';
+        badge.textContent = storageInfo.libsqlUrl ? `${label}` : label;
+        badge.classList.remove("hidden");
+    };
+
+    const buildExpenseQuery = () => {
+        const params = new URLSearchParams();
+        if (filters.session_term) params.append('session_term', filters.session_term);
+        if (filters.category) params.append('category', filters.category);
+        if (filters.status) params.append('status', filters.status);
+        const qs = params.toString();
+        console.log('buildExpenseQuery - filters:', filters);
+        console.log('buildExpenseQuery - query string:', qs);
+        return qs ? `?${qs}` : '';
+    };
+
+    const updateActiveFiltersLabel = () => {
+        const label = $("#activeFilters");
+        if (!label) return;
+        const active = Object.entries(filters)
+            .filter(([_, value]) => Boolean(value))
+            .map(([key, value]) => `${key}: ${value}`);
+        label.textContent = active.length ? `Active filters → ${active.join(', ')}` : '';
+    };
+
+    const syncFilterInputs = () => {
+        const term = $("#filterTerm");
+        const category = $("#filterCategory");
+        const status = $("#filterStatus");
+        if (term) term.value = filters.session_term;
+        if (category) category.value = filters.category;
+        if (status) status.value = filters.status;
+    };
+
+    const toNumber = value => {
+        const num = Number(value);
+        return Number.isFinite(num) ? num : 0;
+    };
+
+    const normalizeImportDate = value => {
+        if (!value) return new Date().toISOString().slice(0, 16).replace('T', ' ');
+        const str = value.toString().trim();
+        if (!str) return new Date().toISOString().slice(0, 16).replace('T', ' ');
+        if (str.includes('T')) return str.replace('T', ' ').slice(0, 16);
+        if (str.length === 10) return `${str} 00:00`;
+        return str.slice(0, 16);
+    };
+
+    // API Helper
+    const apiCall = async (endpoint, options = {}) => {
+        await ensureFirebaseReady();
+        const token = await getIdToken();
+        const config = {
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+            ...options
+        };
+
+        if (options.body) {
+            config.body = JSON.stringify(options.body);
+        }
+
+        try {
+            // If running in local-only mode, the client uses mocked tokens that the server may not accept.
+            // In that case do not send Authorization header; server's dev-auth toggle will accept requests.
+            if (!window.appLocalOnly && token) {
+                config.headers['Authorization'] = `Bearer ${token}`;
+            }
+            const response = await fetch(`${API_BASE}${endpoint}`, config);
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.error || 'Request failed');
+            }
+            
+            return data;
+        } catch (error) {
+            console.error('API Error:', error);
+            throw error;
+        }
+    };
+
+    async function hydrateStorageInfo() {
+        try {
+            const response = await fetch(`${API_BASE}/status`);
+            if (!response.ok) return;
+            const info = await response.json();
+            updateStorageBadge(info);
+        } catch (error) {
+            console.warn('Status check failed:', error);
+        }
+    }
+
+    // Authentication
+    async function login(email, password) {
+        try {
+            await ensureFirebaseReady();
+            const result = await firebaseLogin(email, password);
+            const idToken = await getIdToken();
+            const snapshot = serializeUser(result.user);
+            appCurrentUser = snapshot;
+            authToken = idToken;
+            if (snapshot) {
+                localStorage.setItem('currentUser', JSON.stringify(snapshot));
+            }
+            if (idToken) {
+                localStorage.setItem('authToken', idToken);
+            }
+            return { token: idToken, user: snapshot };
+        } catch (error) {
+            throw new Error(error.message);
+        }
+    }
+
+    async function register(email, password) {
+        try {
+            await ensureFirebaseReady();
+            const result = await firebaseRegister(email, password);
+            const idToken = await getIdToken();
+            const snapshot = serializeUser(result.user);
+            appCurrentUser = snapshot;
+            authToken = idToken;
+            if (snapshot) {
+                localStorage.setItem('currentUser', JSON.stringify(snapshot));
+            }
+            if (idToken) {
+                localStorage.setItem('authToken', idToken);
+            }
+            return { token: idToken, user: snapshot };
+        } catch (error) {
+            throw new Error(error.message);
+        }
+    }
+
+    function logout() {
+        if (typeof firebaseLogout === 'function') {
+            firebaseLogout();
+        }
+        appCurrentUser = null;
+        authToken = null;
+        localStorage.removeItem('currentUser');
+        localStorage.removeItem('authToken');
+        $("#authScreen").classList.remove("hidden");
+        $("#app").classList.add("hidden");
+    }
+
+    // Data Management
+    async function loadData() {
+        try {
+            console.log('=== loadData START ===');
+            console.log('Current filters:', filters);
+            
+            // Pagination-aware fetch for expenses (page-based)
+            const pageSize = window.expensePageSize && Number.isFinite(window.expensePageSize) ? window.expensePageSize : 10;
+            const qs = new URLSearchParams();
+            const filterQs = buildExpenseQuery().replace(/^\?/, '');
+            console.log('loadData - filterQs:', filterQs);
+            if (filterQs) {
+                filterQs.split('&').filter(Boolean).forEach(kv => {
+                    const [k, v] = kv.split('=');
+                    if (k) qs.append(k, decodeURIComponent(v || ''));
+                });
+            }
+            const currentPage = window.expensePage && window.expensePage > 0 ? window.expensePage : 1;
+            qs.set('pageSize', String(pageSize));
+            qs.set('page', String(currentPage));
+            console.log('loadData - final query params:', qs.toString());
+            
+            // Fetch total count for UI
+            const countUrl = `/expenses/count?${qs.toString()}`.replace(/&page=\d+/, '');
+            console.log('Fetching count from:', countUrl);
+            const countResp = await apiCall(countUrl);
+            console.log('Count response:', countResp);
+            window.expenseTotal = countResp && typeof countResp.total === 'number' ? countResp.total : null;
+            window.expenseTotalPages = window.expenseTotal != null ? Math.max(Math.ceil(window.expenseTotal / pageSize), 1) : null;
+            
+            const expUrl = `/expenses?${qs.toString()}`;
+            console.log('Fetching expenses from:', expUrl);
+            const expResp = await apiCall(expUrl);
+            console.log('Expenses response:', expResp);
+            console.log('Expenses response type:', Array.isArray(expResp) ? 'array' : 'object');
+            
+            expenses = Array.isArray(expResp) ? expResp : (expResp.items || []);
+            console.log('Parsed expenses count:', expenses.length);
+            console.log('First 3 expenses:', expenses.slice(0, 3));
+            
+            window.expenseHasMore = Array.isArray(expResp) ? false : Boolean(expResp.hasMore);
+            window.expenseNextCursor = Array.isArray(expResp) ? null : (expResp.nextCursor || null);
+            blogPosts = await apiCall('/blog-posts');
+            const dashboard = await apiCall('/dashboard');
+            budgets = dashboard.budgets || [];
+            budgetAlerts = dashboard.alerts || [];
+            updateStorageBadge({ storageMode: dashboard.storageMode, libsqlUrl: storageInfo.libsqlUrl });
+            
+            console.log('=== Rendering ===');
+            renderExpenses();
+            renderBlogPosts();
+            renderDashboard(dashboard);
+            renderBudgetsTable();
+            fillBudgetCategoryOptions();
+            announceBudgetAlerts();
+            updateActiveFiltersLabel();
+            syncFilterInputs();
+            updateExpensePaginationUI();
+            console.log('=== loadData END ===');
+        } catch (error) {
+            console.error('Error loading data:', error);
+            console.error('Error stack:', error.stack);
+        }
+    }
+
+    function renderBudgetsTable() {
+        const tbody = document.querySelector("#budgetTableBody");
+        if (!tbody) return;
+        if (!budgets.length) {
+            tbody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-gray-500">No budgets defined yet.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = budgets
+            .map((item) => `
+                <tr class="border-b last:border-0">
+                    <td class="p-3 font-medium">${item.category}</td>
+                    <td class="p-3">${fmtMoney(item.threshold)}</td>
+                    <td class="p-3">
+                        <button data-category="${item.category}" class="text-red-600 hover:text-red-800 delete-budget">Remove</button>
+                    </td>
+                </tr>
+            `)
+            .join('');
+    }
+
+    function syncBudgetThresholdInput() {
+        const select = document.querySelector("#budgetCategory");
+        const input = document.querySelector("#budgetThreshold");
+        if (!select || !input) return;
+        const match = budgets.find(b => b.category === select.value);
+        input.value = match ? match.threshold : '';
+    }
+
+    function fillBudgetCategoryOptions() {
+        const select = document.querySelector("#budgetCategory");
+        if (!select) return;
+        const categories = new Set([...defaultExpenseCategories, ...expenses.map(e => e.category), ...budgets.map(b => b.category)]);
+        const current = select.value;
+        select.innerHTML = Array.from(categories)
+            .sort()
+            .map((cat) => `<option value="${cat}">${cat}</option>`)
+            .join('');
+        if (current && categories.has(current)) {
+            select.value = current;
+        }
+        syncBudgetThresholdInput();
+    }
+
+    function announceBudgetAlerts() {
+        if (!budgetAlerts.length) {
+            lastAlertSignature = '';
+            return;
+        }
+        const signature = JSON.stringify(budgetAlerts.map(a => `${a.category}:${a.total}:${a.threshold}`));
+        if (signature === lastAlertSignature) return;
+        budgetAlerts.forEach((alert) => {
+            notify(`Budget alert: ${alert.category} reached ${fmtMoney(alert.total)} of ${fmtMoney(alert.threshold)}`, true);
+        });
+        lastAlertSignature = signature;
+    }
+
+    const parseCsv = (text) => {
+        const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+        if (!lines.length) return [];
+        const headers = lines[0].split(',').map(h => h.trim());
+        return lines.slice(1).map(line => {
+            const values = line.split(',');
+            const row = {};
+            headers.forEach((header, idx) => {
+                row[header] = (values[idx] || '').trim();
+            });
+            return row;
+        });
+    };
+
+    async function processImportedData(data) {
+        const result = { expenses: 0, blogPosts: 0 };
+
+        if (Array.isArray(data.expenses)) {
+            for (const entry of data.expenses) {
+                try {
+                    const payload = {
+                        date_time: normalizeImportDate(entry.date_time || entry.dateTime),
+                        category: entry.category || 'General',
+                        session_term: entry.session_term || entry.sessionTerm || '',
+                        recipient: entry.recipient || 'Unknown',
+                        description: entry.description || 'Imported expense',
+                        amount_paid: toNumber(entry.amount_paid ?? entry.amountPaid),
+                        balance_due: toNumber(entry.balance_due ?? entry.balanceDue)
+                    };
+                    await apiCall('/expenses', { method: 'POST', body: payload });
+                    result.expenses += 1;
+                } catch (error) {
+                    console.error('Import expense error:', error);
+                }
+            }
+        }
+
+        if (Array.isArray(data.blogPosts)) {
+            for (const entry of data.blogPosts) {
+                try {
+                    const payload = {
+                        date_time: normalizeImportDate(entry.date_time || entry.dateTime),
+                        category: entry.category || 'Financial Insights',
+                        title: entry.title || 'Imported Post',
+                        content: entry.content || ''
+                    };
+                    await apiCall('/blog-posts', { method: 'POST', body: payload });
+                    result.blogPosts += 1;
+                } catch (error) {
+                    console.error('Import blog error:', error);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    async function handleImportFile(file) {
+        if (!file) return;
+        try {
+            const text = await file.text();
+            let payload;
+            const name = file.name.toLowerCase();
+
+            if (name.endsWith('.json')) {
+                const parsed = JSON.parse(text);
+                payload = Array.isArray(parsed)
+                    ? {
+                        expenses: parsed.filter(item => item.type === 'expense'),
+                        blogPosts: parsed.filter(item => item.type === 'blog')
+                    }
+                    : parsed;
+            } else if (name.endsWith('.csv')) {
+                const rows = parseCsv(text);
+                const expensesRows = [];
+                const postRows = [];
+                rows.forEach((row) => {
+                    const type = (row.type || '').toLowerCase();
+                    if (type === 'blog' || type === 'post') {
+                        postRows.push(row);
+                    } else {
+                        expensesRows.push(row);
+                    }
+                });
+                payload = { expenses: expensesRows, blogPosts: postRows };
+            } else {
+                throw new Error('Unsupported file type. Use JSON or CSV.');
+            }
+
+            const summary = await processImportedData(payload);
+            notify(`Import complete: ${summary.expenses} expenses, ${summary.blogPosts} posts.`);
+            await loadData();
+        } catch (error) {
+            console.error('Import failed:', error);
+            notify(error.message || 'Import failed', true);
+        } finally {
+            const input = document.querySelector('#importFile');
+            if (input) input.value = '';
+        }
+    }
+
+    function renderExpenses() {
+        const emptyExp = $("#emptyExpenseState");
+        const tblCont = $("#expenseTableContainer");
+        const tbody = $("#expenseTableBody");
+
+        if (expenses.length > 0) {
+            emptyExp.classList.add("hidden");
+            tblCont.classList.remove("hidden");
+            
+            tbody.innerHTML = expenses.map(expense => `
+                <tr class="border-b border-gray-100 hover:bg-gray-50">
+                    <td class="p-4 text-gray-600">${new Date(expense.date_time).toLocaleDateString()}<br>
+                        <span class="text-xs text-gray-400">${new Date(expense.date_time).toLocaleTimeString()}</span>
+                    </td>
+                    <td class="p-4"><span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">${expense.category}</span></td>
+                    <td class="p-4">${expense.session_term || "-"}</td>
+                    <td class="p-4">${expense.recipient}</td>
+                    <td class="p-4 max-w-xs" title="${expense.description}">${expense.description.substring(0, 50)}${expense.description.length > 50 ? '...' : ''}</td>
+                    <td class="p-4 font-medium text-green-600">${fmtMoney(expense.amount_paid)}</td>
+                    <td class="p-4 font-medium text-orange-600">${fmtMoney(expense.balance_due)}</td>
+                    <td class="p-4">${expense.balance_due > 0 ? 
+                        '<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Partial</span>' : 
+                        '<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Paid</span>'}</td>
+                    <td class="p-4 flex gap-2">
+                        <button class="text-indigo-600 hover:text-indigo-800 edit-expense" data-id="${String(expense.id)}"><i class="fas fa-edit"></i></button>
+                        <button class="text-red-600 hover:text-red-800 delete-expense" data-id="${String(expense.id)}"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+        } else {
+            emptyExp.classList.remove("hidden");
+            tblCont.classList.add("hidden");
+        }
+    }
+
+    // Pagination state and helpers for expenses
+    window.expensePage = 1;                // current page number (1-based)
+    window.expensePageSize = (() => { try { return parseInt(localStorage.getItem('expensePageSize'), 10) || 10; } catch { return 10; } })();
+    window.expenseTotal = null;            // total items (from count)
+    window.expenseTotalPages = null;       // derived from total and page size
+    window.expenseCursor = null;           // retained for compatibility (not used for go-to)
+    window.expenseNextCursor = null;       // next cursor from last fetch
+    window.expenseHasMore = false;         // server reported more pages
+    window.expensePrevCursors = [];        // retained for compatibility
+
+    function resetExpensePagination() {
+        window.expensePage = 1;
+        window.expenseCursor = null;
+        window.expenseNextCursor = null;
+        window.expenseHasMore = false;
+        window.expensePrevCursors = [];
+    }
+
+    function updateExpensePaginationUI() {
+        const pager = document.querySelector('#expensePagination');
+        if (!pager) return;
+        const hasData = (expenses && expenses.length > 0);
+        pager.classList.toggle('hidden', !hasData);
+        const prevBtn = document.querySelector('#expensePrevPage');
+        const nextBtn = document.querySelector('#expenseNextPage');
+        const info = document.querySelector('#expensePageInfo');
+        const totalInfo = document.querySelector('#expenseTotalInfo');
+        const sizeSel = document.querySelector('#expensePageSize');
+        const pageNum = window.expensePage || 1;
+        const totalPages = window.expenseTotalPages || 1;
+        if (info) info.textContent = `Page ${pageNum} of ${totalPages}`;
+        if (totalInfo) {
+            const total = window.expenseTotal;
+            totalInfo.textContent = (typeof total === 'number') ? `(Total ${total})` : '';
+        }
+        if (sizeSel) {
+            sizeSel.value = String(window.expensePageSize || 10);
+        }
+        if (prevBtn) prevBtn.disabled = pageNum <= 1;
+        if (nextBtn) nextBtn.disabled = (window.expenseTotalPages != null) ? (pageNum >= window.expenseTotalPages) : !window.expenseHasMore;
+    }
+
+    async function goNextExpensesPage() {
+        // page-based navigation
+        window.expensePage = (window.expensePage || 1) + 1;
+        await loadData();
+    }
+
+    async function goPrevExpensesPage() {
+        const page = window.expensePage || 1;
+        if (page <= 1) return;
+        window.expensePage = page - 1;
+        await loadData();
+    }
+
+    function renderBlogPosts() {
+        const emptyBlog = $("#emptyBlogState");
+        const blogCont = $("#blogPostsContainer");
+
+        if (blogPosts.length > 0) {
+            emptyBlog.classList.add("hidden");
+            blogCont.classList.remove("hidden");
+            
+            blogCont.innerHTML = blogPosts.map(post => `
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex justify-between items-start mb-3">
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">${post.category}</span>
+                        <div class="flex gap-1">
+                            <button class="text-purple-600 hover:text-purple-800 edit-post" data-id="${String(post.id)}"><i class="fas fa-edit"></i></button>
+                            <button class="text-red-600 hover:text-red-800 delete-post" data-id="${String(post.id)}"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-800 mb-2">${post.title}</h3>
+                    <p class="text-gray-600 text-sm mb-3">${post.content.substring(0, 120)}${post.content.length > 120 ? '...' : ''}</p>
+                    <div class="text-xs text-gray-400">${new Date(post.date_time).toLocaleDateString()}</div>
+                </div>
+            `).join('');
+        } else {
+            emptyBlog.classList.remove("hidden");
+            blogCont.classList.add("hidden");
+        }
+    }
+
+    function renderDashboard(dashboard) {
+        const { statistics, categories } = dashboard;
+        const budgetMap = budgets.reduce((acc, item) => {
+            acc[item.category] = item.threshold;
+            return acc;
+        }, {});
+        const alertSet = new Set((dashboard.alerts || []).map(alert => alert.category));
+        
+        $("#summaryCards").innerHTML = `
+            <div class="card bg-gradient-to-br from-green-500 to-emerald-600 text-white rounded-2xl p-6 shadow-lg">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <p class="text-green-100 text-sm">Total Paid</p>
+                        <p class="text-3xl font-bold">${fmtMoney(statistics.total_paid)}</p>
+                    </div>
+                    <i class="fas fa-money-bill-wave text-4xl text-green-200"></i>
+                </div>
+            </div>
+            <div class="card bg-gradient-to-br from-orange-500 to-red-600 text-white rounded-2xl p-6 shadow-lg">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <p class="text-orange-100 text-sm">Total Balance Due</p>
+                        <p class="text-3xl font-bold">${fmtMoney(statistics.total_balance)}</p>
+                    </div>
+                    <i class="fas fa-calendar-minus text-4xl text-orange-200"></i>
+                </div>
+            </div>
+            <div class="card bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-2xl p-6 shadow-lg">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <p class="text-blue-100 text-sm">Total Expenses</p>
+                        <p class="text-3xl font-bold">${statistics.total_expenses}</p>
+                    </div>
+                    <i class="fas fa-file-invoice-dollar text-4xl text-blue-200"></i>
+                </div>
+            </div>
+        `;
+
+        $("#categoryBreakdown").innerHTML = categories.map(cat => `
+            <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4 border ${alertSet.has(cat.category) ? 'border-red-400 shadow-md' : 'border-gray-200'}">
+                <div class="flex justify-between items-start mb-2">
+                    <h3 class="font-semibold text-gray-800">${cat.category}</h3>
+                    ${budgetMap[cat.category] ? `<span class="text-xs font-semibold ${alertSet.has(cat.category) ? 'text-red-600' : 'text-amber-600'}">Limit ${fmtMoney(budgetMap[cat.category])}</span>` : ''}
+                </div>
+                <p class="text-sm text-gray-600">Entries: ${cat.count}</p>
+                <p class="text-sm text-green-600 font-medium">Paid: ${fmtMoney(cat.total_paid)}</p>
+                <p class="text-sm text-orange-600 font-medium">Balance: ${fmtMoney(cat.total_balance)}</p>
+                ${alertSet.has(cat.category) ? `<p class="text-sm text-red-600 font-semibold mt-2"><i class="fas fa-exclamation-triangle mr-1"></i>Over budget</p>` : ''}
+            </div>
+        `).join('');
+    }
+
+    // Expense Functions
+    window.editExpense = async (id) => {
+        const idStr = String(id);
+        const expense = expenses.find(e => String(e.id) === idStr);
+        if (!expense) return;
+        
+        $("#expenseDateTime").value = expense.date_time.replace(' ', 'T').substring(0, 16);
+        $("#expenseCategory").value = expense.category;
+        $("#expenseSession").value = expense.session_term || "";
+        $("#expenseRecipient").value = expense.recipient;
+        $("#expenseDescription").value = expense.description;
+        $("#expenseAmountPaid").value = expense.amount_paid;
+        $("#expenseBalanceDue").value = expense.balance_due;
+        
+        $("#expenseModalTitle").textContent = "Edit Expense";
+        $("#expenseModal").classList.remove("hidden");
+        window.editingExpenseId = id;
+    };
+
+    window.deleteExpense = async (id) => {
+        if (!confirm("Are you sure you want to delete this expense?")) return;
+        
+        try {
+            const idStr = String(id);
+            await apiCall(`/expenses/${encodeURIComponent(idStr)}`, { method: 'DELETE' });
+            expenses = expenses.filter(e => String(e.id) !== idStr);
+            renderExpenses();
+            await loadData(); // Reload dashboard stats
+            notify("Expense deleted successfully!");
+        } catch (error) {
+            notify(error?.message || "Error deleting expense", true);
+        }
+    };
+
+    // Blog Post Functions
+    window.editBlogPost = async (id) => {
+        const idStr = String(id);
+        const post = blogPosts.find(p => String(p.id) === idStr);
+        if (!post) return;
+        
+        $("#blogDateTime").value = post.date_time.replace(' ', 'T').substring(0, 16);
+        $("#blogCategory").value = post.category;
+        $("#blogTitle").value = post.title;
+        $("#blogContent").value = post.content;
+        
+        $("#blogModalTitle").textContent = "Edit Blog Post";
+        $("#blogModal").classList.remove("hidden");
+        window.editingBlogPostId = id;
+    };
+
+    window.deleteBlogPost = async (id) => {
+        if (!confirm("Are you sure you want to delete this blog post?")) return;
+        
+        try {
+            const idStr = String(id);
+            await apiCall(`/blog-posts/${encodeURIComponent(idStr)}`, { method: 'DELETE' });
+            blogPosts = blogPosts.filter(p => String(p.id) !== idStr);
+            renderBlogPosts();
+            notify("Blog post deleted successfully!");
+        } catch (error) {
+            notify(error?.message || "Error deleting blog post", true);
+        }
+    };
+
+    // Event Listeners
+    document.addEventListener('DOMContentLoaded', async function() {
+        hydrateStorageInfo();
+        fillBudgetCategoryOptions();
+        syncFilterInputs();
+
+        if (authToken && appCurrentUser) {
+            await applyAuthenticatedState(appCurrentUser);
+        }
+
+        // Authentication: call Firebase helpers and rely on auth:ready/auth:cleared events
+        $("#loginBtn").addEventListener('click', async () => {
+            const email = $("#loginUsername").value.trim();
+            const password = $("#loginPassword").value.trim();
+
+            if (!email || !password) {
+                $("#authError").textContent = "Please enter email and password";
+                $("#authError").classList.remove("hidden");
+                return;
+            }
+
+            try {
+                await ensureFirebaseReady();
+                await login(email, password);
+                // UI will update via auth:ready event
+            } catch (error) {
+                $("#authError").textContent = error.message || 'Login failed';
+                $("#authError").classList.remove("hidden");
+            }
+        });
+
+        $("#registerBtn").addEventListener('click', async () => {
+            const email = $("#registerUsername").value.trim();
+            const password = $("#registerPassword").value.trim();
+
+            if (!email || !password) {
+                $("#authError").textContent = "Please enter email and password";
+                $("#authError").classList.remove("hidden");
+                return;
+            }
+
+            try {
+                await ensureFirebaseReady();
+                await register(email, password);
+                // UI will update via auth:ready event
+            } catch (error) {
+                $("#authError").textContent = error.message || 'Registration failed';
+                $("#authError").classList.remove("hidden");
+            }
+        });
+
+        $("#showRegister").addEventListener('click', () => {
+            $("#loginForm").classList.add("hidden");
+            $("#registerForm").classList.remove("hidden");
+            $("#authError").classList.add("hidden");
+        });
+
+        $("#showLogin").addEventListener('click', () => {
+            $("#registerForm").classList.add("hidden");
+            $("#loginForm").classList.remove("hidden");
+            $("#authError").classList.add("hidden");
+        });
+
+        $("#logoutBtn").addEventListener('click', logout);
+
+        // Filters
+        $("#applyFiltersBtn").addEventListener('click', () => {
+            filters.session_term = $("#filterTerm").value;
+            filters.category = $("#filterCategory").value;
+            filters.status = $("#filterStatus").value;
+            console.log('Apply Filters clicked - filters:', filters);
+            resetExpensePagination();
+            updateActiveFiltersLabel();
+            loadData();
+        });
+
+        $("#clearFiltersBtn").addEventListener('click', () => {
+            Object.keys(filters).forEach(key => filters[key] = '');
+            syncFilterInputs();
+            resetExpensePagination();
+            updateActiveFiltersLabel();
+            loadData();
+        });
+
+        // Import/Export
+        $("#importBtn").addEventListener('click', () => {
+            const input = document.querySelector('#importFile');
+            if (input) input.click();
+        });
+
+        $("#importFile").addEventListener('change', (e) => {
+            const file = e.target.files?.[0];
+            handleImportFile(file);
+        });
+
+        // Expense Form
+        $("#expenseForm").addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const expenseData = {
+                date_time: $("#expenseDateTime").value.replace('T', ' '),
+                category: $("#expenseCategory").value,
+                session_term: $("#expenseSession").value,
+                recipient: $("#expenseRecipient").value,
+                description: $("#expenseDescription").value,
+                amount_paid: parseFloat($("#expenseAmountPaid").value),
+                balance_due: parseFloat($("#expenseBalanceDue").value) || 0
+            };
+
+            try {
+                if (window.editingExpenseId) {
+                    await apiCall(`/expenses/${window.editingExpenseId}`, {
+                        method: 'PUT',
+                        body: expenseData
+                    });
+                    notify("Expense updated successfully!");
+                } else {
+                    await apiCall('/expenses', {
+                        method: 'POST',
+                        body: expenseData
+                    });
+                    notify("Expense added successfully!");
+                }
+                
+                $("#expenseModal").classList.add("hidden");
+                loadData();
+                window.editingExpenseId = null;
+            } catch (error) {
+                notify("Error saving expense", true);
+            }
+        });
+
+        // Blog Form
+        $("#blogForm").addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const postData = {
+                date_time: $("#blogDateTime").value.replace('T', ' '),
+                category: $("#blogCategory").value,
+                title: $("#blogTitle").value,
+                content: $("#blogContent").value
+            };
+
+            try {
+                if (window.editingBlogPostId) {
+                    await apiCall(`/blog-posts/${window.editingBlogPostId}`, {
+                        method: 'PUT',
+                        body: postData
+                    });
+                    notify("Blog post updated successfully!");
+                } else {
+                    await apiCall('/blog-posts', {
+                        method: 'POST',
+                        body: postData
+                    });
+                    notify("Blog post published successfully!");
+                }
+                
+                $("#blogModal").classList.add("hidden");
+                loadData();
+                window.editingBlogPostId = null;
+            } catch (error) {
+                notify("Error saving blog post", true);
+            }
+        });
+
+        // Modal Controls
+        $("#addExpenseBtn").addEventListener('click', () => {
+            window.editingExpenseId = null;
+            $("#expenseForm").reset();
+            $("#expenseDateTime").value = new Date().toISOString().slice(0, 16);
+            $("#expenseModalTitle").textContent = "Add Expense";
+            $("#expenseModal").classList.remove("hidden");
+        });
+
+        $("#addFirstExpenseBtn").addEventListener('click', () => {
+            $("#addExpenseBtn").click();
+        });
+
+        // Hook up pagination controls
+        const prevBtn = document.querySelector('#expensePrevPage');
+        const nextBtn = document.querySelector('#expenseNextPage');
+        if (prevBtn) prevBtn.addEventListener('click', () => { goPrevExpensesPage(); });
+        if (nextBtn) nextBtn.addEventListener('click', () => { goNextExpensesPage(); });
+        const gotoBtn = document.querySelector('#expenseGotoBtn');
+        const gotoInput = document.querySelector('#expenseGotoPage');
+        const sizeSel = document.querySelector('#expensePageSize');
+        if (gotoBtn && gotoInput) {
+            gotoBtn.addEventListener('click', () => {
+                const raw = parseInt(gotoInput.value, 10);
+                const totalPages = window.expenseTotalPages || 1;
+                if (!raw || raw < 1) return;
+                const target = Math.min(Math.max(raw, 1), totalPages);
+                window.expensePage = target;
+                loadData();
+            });
+            gotoInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    gotoBtn.click();
+                }
+            });
+        }
+        if (sizeSel) {
+            sizeSel.addEventListener('change', () => {
+                const v = parseInt(sizeSel.value, 10) || 10;
+                window.expensePageSize = v;
+                try { localStorage.setItem('expensePageSize', String(v)); } catch {}
+                window.expensePage = 1;
+                loadData();
+            });
+        }
+
+        $("#addBlogPostBtn").addEventListener('click', () => {
+            window.editingBlogPostId = null;
+            $("#blogForm").reset();
+            $("#blogDateTime").value = new Date().toISOString().slice(0, 16);
+            $("#blogModalTitle").textContent = "Write New Post";
+            $("#blogModal").classList.remove("hidden");
+        });
+
+        // Close modals
+        $("#closeExpenseModal").addEventListener('click', () => $("#expenseModal").classList.add("hidden"));
+        $("#closeBlogModal").addEventListener('click', () => $("#blogModal").classList.add("hidden"));
+        $("#cancelExpense").addEventListener('click', () => $("#expenseModal").classList.add("hidden"));
+        $("#cancelBlog").addEventListener('click', () => $("#blogModal").classList.add("hidden"));
+
+        // Budget modal controls
+        $("#manageBudgetsBtn").addEventListener('click', () => {
+            renderBudgetsTable();
+            fillBudgetCategoryOptions();
+            $("#budgetModal").classList.remove("hidden");
+        });
+
+        $("#closeBudgetModal").addEventListener('click', () => $("#budgetModal").classList.add("hidden"));
+        $("#clearBudgetForm").addEventListener('click', () => {
+            $("#budgetForm").reset();
+            fillBudgetCategoryOptions();
+        });
+
+        $("#budgetCategory").addEventListener('change', syncBudgetThresholdInput);
+
+        $("#budgetForm").addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const category = $("#budgetCategory").value;
+            const threshold = toNumber($("#budgetThreshold").value);
+            try {
+                await apiCall('/budgets', { method: 'PUT', body: { category, threshold } });
+                notify('Budget saved successfully!');
+                await loadData();
+                $("#budgetThreshold").value = '';
+            } catch (error) {
+                notify('Error saving budget', true);
+            }
+        });
+
+        $("#budgetTableBody").addEventListener('click', async (e) => {
+            if (e.target.matches('.delete-budget')) {
+                const category = e.target.dataset.category;
+                if (!category) return;
+                if (!confirm(`Remove budget for ${category}?`)) return;
+                try {
+                    await apiCall(`/budgets/${encodeURIComponent(category)}`, { method: 'DELETE' });
+                    notify('Budget removed');
+                    await loadData();
+                } catch (error) {
+                    notify('Error removing budget', true);
+                }
+            }
+        });
+
+        // Delegated actions for expenses (edit/delete)
+        const expenseTBody = document.querySelector('#expenseTableBody');
+        if (expenseTBody) {
+            expenseTBody.addEventListener('click', (e) => {
+                const btn = e.target.closest('.edit-expense, .delete-expense');
+                if (!btn) return;
+                const id = btn.dataset.id;
+                if (!id) return;
+                if (btn.classList.contains('edit-expense')) {
+                    window.editExpense(id);
+                } else if (btn.classList.contains('delete-expense')) {
+                    window.deleteExpense(id);
+                }
+            });
+        }
+
+        // Delegated actions for blog posts (edit/delete)
+        const blogContainer = document.querySelector('#blogPostsContainer');
+        if (blogContainer) {
+            blogContainer.addEventListener('click', (e) => {
+                const btn = e.target.closest('.edit-post, .delete-post');
+                if (!btn) return;
+                const id = btn.dataset.id;
+                if (!id) return;
+                if (btn.classList.contains('edit-post')) {
+                    window.editBlogPost(id);
+                } else if (btn.classList.contains('delete-post')) {
+                    window.deleteBlogPost(id);
+                }
+            });
+        }
+
+        // Export functionality
+        $("#exportBtn").addEventListener('click', () => {
+            const data = {
+                expenses: expenses,
+                blogPosts: blogPosts,
+                exportedAt: new Date().toISOString(),
+                user: appCurrentUser ? appCurrentUser.email || appCurrentUser.uid : 'anonymous'
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `expense-tracker-export-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            notify("Data exported successfully!");
+        });
+    });
+    </script>
+</body>
+</html>
