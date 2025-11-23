@@ -1,0 +1,71 @@
+/* Base font + background (kept from original for compatibility) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+:root{
+    /* Design tokens (colors, spacing, radii) */
+    --bg-0: #ffffff;
+    --bg-1: #f8fafc;
+    --accent-500: #4f46e5;
+    --accent-600: #4338ca;
+    --muted: #6b7280;
+    --card-radius: 1rem;
+    --card-shadow: 0 10px 30px rgba(2,6,23,0.08);
+    --glass: rgba(255,255,255,0.6);
+    --glass-plate: rgba(255,255,255,0.06);
+    --max-content-width: 1200px;
+}
+
+/* Responsive typographic scale using clamp() */
+html { font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
+body { font-size: clamp(0.95rem, 0.9rem + 0.4vw, 1.05rem); line-height: 1.45; background: linear-gradient(135deg, #e6eef8 0%, #d7e7fb 100%); min-height:100vh; }
+
+/* Reusable card pattern */
+.card { background: var(--glass-plate); border-radius: var(--card-radius); box-shadow: var(--card-shadow); transition: transform .22s ease, box-shadow .22s ease; }
+.card:hover { transform: translateY(-6px); box-shadow: 0 20px 40px rgba(2,6,23,0.12); }
+
+/* Buttons: keep original gradients but more consistent spacing */
+.btn-primary { background: linear-gradient(135deg, var(--accent-500) 0%, #7c3aed 100%); color: white; padding: .6rem 1rem; border-radius: .6rem; }
+.btn-primary:hover { background: linear-gradient(135deg, var(--accent-600) 0%, #6d28d9 100%); transform: translateY(-2px); }
+
+/* Header hero tweaks (kept) */
+.header-hero { position: relative; overflow: hidden; color: white; }
+.header-hero::after { content: ""; position: absolute; inset: 0; background: rgba(0,0,0,0.06); pointer-events: none; }
+
+/* Logout button accessibility (kept) */
+.logout-btn { background: rgba(255,255,255,0.95); color: #0f172a; padding: .35rem .9rem; border-radius: .5rem; font-weight:600; box-shadow:0 6px 18px -10px rgba(2,6,23,0.4); border:none; }
+
+/* Empty state improvements */
+.empty-state { text-align:center; padding: clamp(2rem, 2rem + 2vw, 4rem) 1rem; }
+.empty-state i { font-size: clamp(2.5rem, 3.5vw, 4rem); opacity:.55; margin-bottom: 1rem; display:block; }
+.empty-state h3 { font-size: clamp(1.25rem, 1.5vw, 1.6rem); font-weight:600; color: #111827; margin-bottom:.5rem; }
+.empty-state p { color: var(--muted); margin-bottom:1.25rem; }
+
+/* Expense filters container helper — small, responsive grid using calc() and min() */
+.filters { display:grid; gap: .75rem; grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); }
+@media (min-width: 768px){ .filters { grid-template-columns: repeat(4, 1fr); } }
+
+/* Table / data display improvements */
+#expenseTableContainer .data-table-wrap { overflow:auto; }
+#expenseTableContainer table { width:100%; border-collapse:separate; border-spacing:0; background: white; }
+#expenseTableContainer thead th { position: sticky; top:0; z-index:5; background: linear-gradient(90deg, #2563eb, #6366f1); color:#fff; padding: .9rem .75rem; text-align:left; font-weight:600; }
+#expenseTableContainer tbody td { padding: .75rem; border-top:1px solid rgba(15,23,42,0.04); color:#0f172a; }
+#expenseTableContainer tbody tr:hover td { background: linear-gradient(90deg, rgba(99,102,241,0.03), rgba(99,102,241,0.01)); }
+
+/* Compact mode for dense tables */
+.compact td, .compact th { padding: .45rem .5rem; font-size: .94rem; }
+
+/* Muted inline text and keyboard hint */
+.muted { color: var(--muted); }
+.kbd { background:#111827; color:#fff; padding:.12rem .4rem; border-radius:.35rem; font-size:.78rem; }
+
+/* Small helpers for better responsive containers */
+.mx-auto-max { max-width: calc(min(var(--max-content-width), 100% - 2rem)); margin-left:auto; margin-right:auto; }
+
+/* Dark mode tweaks (keeps parity with original theme-dark rules) */
+body.theme-dark { background: linear-gradient(135deg,#071025 0%, #071825 100%); color: #e6eef8; }
+body.theme-dark .card, body.theme-dark .bg-white { background-color: rgba(255,255,255,0.03) !important; color: #e6eef8 !important; }
+
+/* Accessibility: reduce motion preference respect */
+@media (prefers-reduced-motion: reduce) { .card, .btn-primary { transition: none; transform: none; } }
+
+/* Keep a last-resort mobile overflow rule to avoid layout breaking */
+@media (max-width: 640px) { #expenseTableContainer table { font-size: .92rem; } }

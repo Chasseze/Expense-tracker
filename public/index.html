@@ -9,126 +9,79 @@
     <link rel="stylesheet" href="/styles/tailwind.css?v=1">
     <script>const APP_VERSION = '1';</script>
     <script src="firebase-config.js?v=1" defer></script>
-    <style>
+    <link rel="stylesheet" href="/styles/app.css?v=1">
+        /* Base font + background (kept from original for compatibility) */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        body {
-            font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #f0f9ff 0%, #fdf2ff 100%);
-            min-height: 100vh;
-        }
-        .card { transition: transform .3s, box-shadow .3s; }
-        .card:hover { transform: translateY(-5px); }
-        .btn-primary {
-            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-        }
-        .btn-primary:hover {
-            background: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%);
-            transform: translateY(-2px);
-        }
-        .notification { animation: slideIn .3s ease; }
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        .expense-table th { background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%); }
-        /* Header hero gradient: regular blue -> soft blue midpoint -> orange + subtle overlay */
-        .header-hero {
-            position: relative;
-            overflow: hidden;
-            background: linear-gradient(90deg, #2563eb 0%, #60a5fa 50%, #f97316 100%);
-            color: white;
+        :root{
+            /* Design tokens (colors, spacing, radii) */
+            --bg-0: #ffffff;
+            --bg-1: #f8fafc;
+            --accent-500: #4f46e5;
+            --accent-600: #4338ca;
+            --muted: #6b7280;
+            --card-radius: 1rem;
+            --card-shadow: 0 10px 30px rgba(2,6,23,0.08);
+            --glass: rgba(255,255,255,0.6);
+            --glass-plate: rgba(255,255,255,0.06);
+            --max-content-width: 1200px;
         }
 
-        /* subtle dark overlay to improve text contrast without changing colors */
-        .header-hero::after {
-            content: "";
-            position: absolute;
-            inset: 0;
-            background: rgba(0,0,0,0.05);
-            pointer-events: none;
-        }
-        /* Accessible logout button styles */
-        .logout-btn {
-            background: rgba(255,255,255,0.95); /* nearly white to stand out */
-            color: #0f172a; /* slate-900 for strong contrast */
-            padding: .35rem .9rem;
-            border-radius: .5rem;
-            font-weight: 600;
-            box-shadow: 0 6px 18px -10px rgba(2,6,23,0.4);
-            border: none;
-            transition: background .15s ease, transform .08s ease;
-        }
-        .logout-btn:hover { background: rgba(0,0,0,0.04); transform: translateY(-1px); }
-        .logout-btn:focus { outline: 3px solid rgba(37,99,235,0.22); outline-offset: 2px; }
-        @media (max-width: 1200px) { .expense-table { display: block; overflow-x: auto; } }
-        /* Theme variables and dark theme overrides */
-        :root {
-            /* Light background is a soft, desaturated blue (light-dark-blue feel) */
-            --page-bg-light: linear-gradient(135deg, #e6eef8 0%, #d7e7fb 100%);
-            --page-bg-dark: linear-gradient(135deg, #071025 0%, #071825 100%);
-            --header-bg-light: linear-gradient(90deg, #2563eb 0%, #60a5fa 50%, #f97316 100%);
-            --header-bg-dark: linear-gradient(90deg, #0b3d91 0%, #0f172a 60%, #7c2d00 100%);
-        }
+        /* Responsive typographic scale using clamp() */
+        html { font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
+        body { font-size: clamp(0.95rem, 0.9rem + 0.4vw, 1.05rem); line-height: 1.45; background: linear-gradient(135deg, #e6eef8 0%, #d7e7fb 100%); min-height:100vh; }
 
-        /* light default background uses the soft 'light dark blue' gradient */
-        body {
-            background: var(--page-bg-light);
-        }
+        /* Reusable card pattern */
+        .card { background: var(--glass-plate); border-radius: var(--card-radius); box-shadow: var(--card-shadow); transition: transform .22s ease, box-shadow .22s ease; }
+        .card:hover { transform: translateY(-6px); box-shadow: 0 20px 40px rgba(2,6,23,0.12); }
 
-        body.theme-dark {
-            background: var(--page-bg-dark);
-            color: #e6eef8;
-        }
+        /* Buttons: keep original gradients but more consistent spacing */
+        .btn-primary { background: linear-gradient(135deg, var(--accent-500) 0%, #7c3aed 100%); color: white; padding: .6rem 1rem; border-radius: .6rem; }
+        .btn-primary:hover { background: linear-gradient(135deg, var(--accent-600) 0%, #6d28d9 100%); transform: translateY(-2px); }
 
-        body.theme-dark .header-hero {
-            background: var(--header-bg-dark);
-        }
+        /* Header hero tweaks (kept) */
+        .header-hero { position: relative; overflow: hidden; color: white; }
+        .header-hero::after { content: ""; position: absolute; inset: 0; background: rgba(0,0,0,0.06); pointer-events: none; }
 
-        /* Slight adjustments for cards in dark mode */
-        body.theme-dark .card,
-        body.theme-dark .bg-white {
-            background-color: rgba(255,255,255,0.03) !important;
-            color: #e6eef8 !important;
-        }
-        /* Category card tint - subtle light dark-blue */
-        #categoryCard {
-            background: linear-gradient(180deg, rgba(38,99,235,0.06) 0%, rgba(96,165,250,0.03) 100%);
-        }
-        body.theme-dark #categoryCard {
-            background: linear-gradient(180deg, rgba(3,37,76,0.45) 0%, rgba(3,37,76,0.25) 100%);
-        }
-        /* Loading cursor */
-        body[style*="cursor: wait"] * {
-            cursor: wait !important;
-        }
-        /* Better empty states */
-        .empty-state {
-            text-align: center;
-            padding: 3rem 1rem;
-        }
-        .empty-state i {
-            font-size: 4rem;
-            opacity: 0.5;
-            margin-bottom: 1rem;
-            display: block;
-        }
-        .empty-state h3 {
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: #1f2937;
-            margin-bottom: 0.5rem;
-        }
-        body.theme-dark .empty-state h3 {
-            color: #e6eef8;
-        }
-        .empty-state p {
-            color: #6b7280;
-            margin-bottom: 1.5rem;
-        }
-        body.theme-dark .empty-state p {
-            color: #9ca3af;
-        }
-    </style>
+        /* Logout button accessibility (kept) */
+        .logout-btn { background: rgba(255,255,255,0.95); color: #0f172a; padding: .35rem .9rem; border-radius: .5rem; font-weight:600; box-shadow:0 6px 18px -10px rgba(2,6,23,0.4); border:none; }
+
+        /* Empty state improvements */
+        .empty-state { text-align:center; padding: clamp(2rem, 2rem + 2vw, 4rem) 1rem; }
+        .empty-state i { font-size: clamp(2.5rem, 3.5vw, 4rem); opacity:.55; margin-bottom: 1rem; display:block; }
+        .empty-state h3 { font-size: clamp(1.25rem, 1.5vw, 1.6rem); font-weight:600; color: #111827; margin-bottom:.5rem; }
+        .empty-state p { color: var(--muted); margin-bottom:1.25rem; }
+
+        /* Expense filters container helper — small, responsive grid using calc() and min() */
+        .filters { display:grid; gap: .75rem; grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); }
+        @media (min-width: 768px){ .filters { grid-template-columns: repeat(4, 1fr); } }
+
+        /* Table / data display improvements */
+        #expenseTableContainer .data-table-wrap { overflow:auto; }
+        #expenseTableContainer table { width:100%; border-collapse:separate; border-spacing:0; background: white; }
+        #expenseTableContainer thead th { position: sticky; top:0; z-index:5; background: linear-gradient(90deg, #2563eb, #6366f1); color:#fff; padding: .9rem .75rem; text-align:left; font-weight:600; }
+        #expenseTableContainer tbody td { padding: .75rem; border-top:1px solid rgba(15,23,42,0.04); color:#0f172a; }
+        #expenseTableContainer tbody tr:hover td { background: linear-gradient(90deg, rgba(99,102,241,0.03), rgba(99,102,241,0.01)); }
+
+        /* Compact mode for dense tables */
+        .compact td, .compact th { padding: .45rem .5rem; font-size: .94rem; }
+
+        /* Muted inline text and keyboard hint */
+        .muted { color: var(--muted); }
+        .kbd { background:#111827; color:#fff; padding:.12rem .4rem; border-radius:.35rem; font-size:.78rem; }
+
+        /* Small helpers for better responsive containers */
+        .mx-auto-max { max-width: calc(min(var(--max-content-width), 100% - 2rem)); margin-left:auto; margin-right:auto; }
+
+        /* Dark mode tweaks (keeps parity with original theme-dark rules) */
+        body.theme-dark { background: linear-gradient(135deg,#071025 0%, #071825 100%); color: #e6eef8; }
+        body.theme-dark .card, body.theme-dark .bg-white { background-color: rgba(255,255,255,0.03) !important; color: #e6eef8 !important; }
+
+        /* Accessibility: reduce motion preference respect */
+        @media (prefers-reduced-motion: reduce) { .card, .btn-primary { transition: none; transform: none; } }
+
+        /* Keep a last-resort mobile overflow rule to avoid layout breaking */
+        @media (max-width: 640px) { #expenseTableContainer table { font-size: .92rem; } }
+    
 
 </head>
 <body class="p-4 md:p-6">
