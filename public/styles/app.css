@@ -55,6 +55,16 @@ body { font-size: clamp(0.95rem, 0.9rem + 0.4vw, 1.05rem); line-height: 1.45; ba
 
 /* Muted inline text and keyboard hint */
 .muted { color: var(--muted); }
+
+/* Summary cards: distinct variants for quick stats */
+.summary-card { padding: 1rem; border-radius: 1rem; color: #fff; display:flex; align-items:center; justify-content:space-between; box-shadow: 0 10px 30px rgba(2,6,23,0.06); }
+.summary-card .meta { display:flex; flex-direction:column; }
+.summary-paid { background: linear-gradient(90deg,#10b981,#059669); }
+.summary-balance { background: linear-gradient(90deg,#f97316,#f43f5e); }
+.summary-total { background: linear-gradient(90deg,#3b82f6,#6366f1); }
+.summary-card i { font-size: 1.9rem; opacity: 0.9; }
+.summary-card p.label { opacity: 0.9; font-size: .875rem; margin:0 0 .25rem 0; }
+.summary-card p.value { font-weight:800; font-size:1.6rem; margin:0; }
 .kbd { background:#111827; color:#fff; padding:.12rem .4rem; border-radius:.35rem; font-size:.78rem; }
 
 /* Small helpers for better responsive containers */
