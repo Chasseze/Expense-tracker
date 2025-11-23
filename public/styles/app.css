@@ -83,19 +83,19 @@ body.theme-dark .card, body.theme-dark .bg-white { background-color: rgba(255,25
 
 @media (min-width: 1024px) { .hero-actions .hero-btn { min-width: 210px; } }
 
-/* Expense Records: lighter card-style background with dark text for improved readability */
-#expensesSection { background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%) !important; color: #0f172a !important; }
-#expensesSection h2, #expensesSection p, #expensesSection label { color: #0f172a !important; }
-#expensesSection .bg-white\/10 { background: rgba(255,255,255,0.85) !important; color: #0f172a !important; }
+/* Expense Records: dark blue background with light text for stronger contrast */
+#expensesSection { background: linear-gradient(180deg, #0b3d91 0%, #071739 100%) !important; color: #e6eef8 !important; }
+#expensesSection h2, #expensesSection p, #expensesSection label { color: #e6eef8 !important; }
+#expensesSection .bg-white\/10 { background: rgba(255,255,255,0.04) !important; color: #e6eef8 !important; }
 
-/* Blog section: soft pastel card matching purple theme but lighter */
-#blogSection { background: linear-gradient(180deg, #fff7fb 0%, #f3e8ff 100%) !important; color: #2c0652 !important; }
-#blogSection h2, #blogSection p { color: #2c0652 !important; }
+/* Blog section: richer purple card with white text */
+#blogSection { background: linear-gradient(180deg, #7c3aed 0%, #5b21b6 100%) !important; color: #ffffff !important; }
+#blogSection h2, #blogSection p { color: #ffffff !important; }
 
 /* Reduce heavy shadows on these large content areas for a flatter look */
 #expensesSection, #blogSection { box-shadow: 0 8px 24px rgba(2,6,23,0.06); }
 
-/* Buttons inside these sections should keep their original styles, but ensure text remains readable */
+/* Buttons inside these sections keep their original styles; ensure text remains readable */
 #expensesSection .hero-btn, #blogSection .hero-btn, #expensesSection .btn, #blogSection .btn { color: inherit; }
 
 /* Make the blog button magenta (overrides utility classes) */
