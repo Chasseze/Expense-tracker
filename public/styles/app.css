@@ -72,13 +72,13 @@ body.theme-dark .card, body.theme-dark .bg-white { background-color: rgba(255,25
 
 /* --- Hero / header layout to match requested design --- */
 .header-hero.card { border-radius: 1.5rem; padding: clamp(2rem, 4vw, 3.5rem); overflow: hidden; background: linear-gradient(90deg, #2563eb 0%, #5aa0ff 40%, #f97316 100%); }
-.hero-inner { max-width: var(--max-content-width); margin: 0 auto; display:flex; flex-direction:column; gap:1rem; align-items:center; }
-.hero-title { font-weight:800; font-size: clamp(1.8rem, 3.2vw + 1rem, 3.6rem); line-height:1.02; margin:0; text-align:center; text-shadow:0 2px 0 rgba(0,0,0,0.08); }
-.hero-sub { color: rgba(255,255,255,0.9); margin:0; font-size: clamp(1rem, 1.1vw + 0.6rem, 1.25rem); }
-.hero-actions { display:flex; gap:1rem; flex-wrap:wrap; justify-content:center; align-items:center; margin-top:1rem; }
+.hero-inner { max-width: var(--max-content-width); margin: 0 auto; display:flex; flex-direction:row; gap:1rem; align-items:center; justify-content:space-between; white-space:nowrap; overflow-x:auto; padding: .25rem 0; }
+.hero-title { font-weight:800; font-size: clamp(1.25rem, 1.6vw + 0.6rem, 2.2rem); line-height:1.02; margin:0; text-align:left; text-shadow:0 2px 0 rgba(0,0,0,0.08); flex:0 0 auto; }
+.hero-sub { color: rgba(255,255,255,0.9); margin:0; font-size: clamp(.9rem, .9vw + .4rem, 1rem); }
+.hero-actions { display:flex; gap:1rem; flex-wrap:nowrap; justify-content:center; align-items:center; margin-top:0; overflow:auto; -webkit-overflow-scrolling:touch; }
 .hero-actions .hero-btn { min-width: 170px; padding: .85rem 1.1rem; border-radius: .9rem; font-weight:700; box-shadow: 0 12px 30px rgba(2,6,23,0.12); display:inline-flex; align-items:center; gap:.7rem; }
 .hero-actions .hero-btn i { font-size: 1.05rem; }
-.hero-username { margin-top:.6rem; color: rgba(255,255,255,0.95); display:flex; gap:.6rem; align-items:center; }
+.hero-username { margin:0; color: rgba(255,255,255,0.95); display:flex; gap:.6rem; align-items:center; flex:0 0 auto; }
 .hero-username .avatar-btn { background: rgba(255,255,255,0.15); padding:.45rem .6rem; border-radius:.6rem; }
 
 @media (min-width: 1024px) { .hero-actions .hero-btn { min-width: 210px; } }
