@@ -180,36 +180,41 @@
 
     <!-- MAIN APP -->
 <div id="app" class="max-w-7xl mx-auto hidden">
-    <header class="header-hero rounded-2xl shadow-xl p-6 md:p-8 mb-8 text-white">
-        <div class="flex justify-end mb-2">
-            <span id="storageBadge" class="hidden px-4 py-1 rounded-full bg-white/20 text-white text-xs font-semibold tracking-wide shadow-inner"></span>
-        </div>
-        <div class="text-center mb-6">
-            <h1 class="text-3xl md:text-4xl font-bold mb-3">Secure Expense Tracker & Blog</h1>
-            <p class="text-indigo-100 mb-6">Track payments, manage balances, jot down thoughts – all securely stored</p>
-        </div>
-        <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
-            <button id="addExpenseBtn" aria-label="Add expense" title="Add a new expense" class="btn btn-primary flex items-center gap-2 px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all">
-                <i class="fas fa-plus"></i> Add Expense
-            </button>
-            <button id="addBlogPostBtn" aria-label="Write blog post" title="Write a personal financial blog post" class="btn bg-white text-purple-600 hover:bg-gray-100 flex items-center gap-2 px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all">
-                <i class="fas fa-plus"></i> Write Blog Post
-            </button>
-            <button id="exportBtn" aria-label="Export data" title="Export your expenses and posts as JSON" class="btn bg-emerald-500 hover:bg-emerald-600 flex items-center gap-2 px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all">
-                <i class="fas fa-download"></i> Export Data
-            </button>
-            <button id="importBtn" aria-label="Import data" title="Import expenses or posts from JSON/CSV" class="btn bg-sky-500 hover:bg-sky-600 flex items-center gap-2 px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all">
-                <i class="fas fa-upload"></i> Import Data
-            </button>
-            <button id="manageBudgetsBtn" aria-label="Manage budgets" title="Set or edit budget thresholds" class="btn bg-amber-400 hover:bg-amber-500 text-amber-900 flex items-center gap-2 px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all">
-                <i class="fas fa-bullseye"></i> Manage Budgets
-            </button>
-        </div>
-        <input id="importFile" type="file" accept=".json,.csv" class="hidden">
-        <div class="text-center mt-4 flex items-center justify-center gap-3">
-            <span id="usernameDisplay" class="text-indigo-200 font-medium"></span>
-            <button id="themeToggle" aria-label="Toggle theme" title="Toggle light/dark theme" class="ml-2 px-3 py-1 rounded-md bg-white/10 text-white">🌙</button>
-            <button id="logoutBtn" class="logout-btn ml-4 text-sm">Logout</button>
+    <header class="header-hero card mx-auto-max mb-8 text-white">
+        <div class="hero-inner">
+            <div style="width:100%; display:flex; justify-content:flex-end;">
+                <span id="storageBadge" class="hidden px-4 py-1 rounded-full bg-white/20 text-white text-xs font-semibold tracking-wide shadow-inner"></span>
+            </div>
+            <div class="text-center">
+                <h1 class="hero-title">Secure Expense Tracker & Blog</h1>
+                <p class="hero-sub">Track payments, manage balances, jot down thoughts – all securely stored</p>
+            </div>
+
+            <div class="hero-actions" role="toolbar" aria-label="Primary actions">
+                <button id="addExpenseBtn" aria-label="Add expense" title="Add a new expense" class="hero-btn btn-primary">
+                    <i class="fas fa-plus"></i> Add Expense
+                </button>
+                <button id="addBlogPostBtn" aria-label="Write blog post" title="Write a personal financial blog post" class="hero-btn bg-white text-purple-700">
+                    <i class="fas fa-plus"></i> Write Blog Post
+                </button>
+                <button id="exportBtn" aria-label="Export data" title="Export your expenses and posts as JSON" class="hero-btn" style="background:linear-gradient(135deg,#10b981,#059669); color:white;">
+                    <i class="fas fa-download"></i> Export Data
+                </button>
+                <button id="importBtn" aria-label="Import data" title="Import expenses or posts from JSON/CSV" class="hero-btn" style="background:linear-gradient(135deg,#06b6d4,#0ea5e9); color:white;">
+                    <i class="fas fa-upload"></i> Import Data
+                </button>
+                <button id="manageBudgetsBtn" aria-label="Manage budgets" title="Set or edit budget thresholds" class="hero-btn" style="background:linear-gradient(135deg,#f59e0b,#f97316); color:#622a00;">
+                    <i class="fas fa-bullseye"></i> Manage Budgets
+                </button>
+            </div>
+
+            <div class="hero-username">
+                <span id="usernameDisplay" class="text-white font-medium"></span>
+                <button id="themeToggle" aria-label="Toggle theme" title="Toggle light/dark theme" class="avatar-btn">🌙</button>
+                <button id="logoutBtn" class="logout-btn text-sm">Logout</button>
+            </div>
+
+            <input id="importFile" type="file" accept=".json,.csv" class="hidden">
         </div>
     </header>
 
