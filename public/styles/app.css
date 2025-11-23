@@ -77,7 +77,7 @@ body.theme-dark .card, body.theme-dark .bg-white { background-color: rgba(255,25
 /* Title box to match other content widths and feel like a card */
 .hero-title-box {
     width: 100%;
-    max-width: var(--max-content-width);
+    max-width: 100%; /* fill the header width so it lines up with other sections */
     background: rgba(255,255,255,0.06);
     padding: 1.25rem 1.5rem;
     border-radius: 1rem;
