@@ -110,19 +110,21 @@
 <div id="app" class="max-w-7xl mx-auto hidden">
     <header class="header-hero card mx-auto-max mb-8 text-white">
         <div class="hero-inner">
-            <div style="width:100%; display:flex; justify-content:flex-end;">
-                <span id="storageBadge" class="hidden px-4 py-1 rounded-full bg-white/20 text-white text-xs font-semibold tracking-wide shadow-inner"></span>
-            </div>
-            <div class="text-center">
-                <h1 class="hero-title">Secure Expense Tracker & Blog</h1>
-                <p class="hero-sub">Track payments, manage balances, jot down thoughts – all securely stored</p>
+            <div class="hero-left">
+                <div style="display:flex; justify-content:flex-start;">
+                    <span id="storageBadge" class="hidden px-4 py-1 rounded-full bg-white/20 text-white text-xs font-semibold tracking-wide shadow-inner"></span>
+                </div>
+                <div>
+                    <h1 class="hero-title">Secure Expense Tracker & Blog</h1>
+                    <p class="hero-sub">Track payments, manage balances, jot down thoughts – all securely stored</p>
+                </div>
             </div>
 
             <div class="hero-actions" role="toolbar" aria-label="Primary actions">
                 <button id="addExpenseBtn" aria-label="Add expense" title="Add a new expense" class="hero-btn btn-primary">
                     <i class="fas fa-plus"></i> Add Expense
                 </button>
-                <button id="addBlogPostBtn" aria-label="Write blog post" title="Write a personal financial blog post" class="hero-btn bg-white text-purple-700">
+                <button id="addBlogPostBtn" aria-label="Write blog post" title="Write a personal financial blog post" class="hero-btn" style="background:#c026d3; color:white;">
                     <i class="fas fa-plus"></i> Write Blog Post
                 </button>
                 <button id="exportBtn" aria-label="Export data" title="Export your expenses and posts as JSON" class="hero-btn" style="background:linear-gradient(135deg,#10b981,#059669); color:white;">
@@ -136,13 +138,12 @@
                 </button>
             </div>
 
-            <div class="hero-username">
+            <div class="hero-right">
                 <span id="usernameDisplay" class="text-white font-medium"></span>
                 <button id="themeToggle" aria-label="Toggle theme" title="Toggle light/dark theme" class="avatar-btn">🌙</button>
                 <button id="logoutBtn" class="logout-btn text-sm">Logout</button>
+                <input id="importFile" type="file" accept=".json,.csv" class="hidden">
             </div>
-
-            <input id="importFile" type="file" accept=".json,.csv" class="hidden">
         </div>
     </header>
 
