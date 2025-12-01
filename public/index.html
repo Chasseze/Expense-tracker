@@ -172,6 +172,9 @@
                 <button id="manageBudgetsBtn" aria-label="Manage budgets" title="Set or edit budget thresholds" class="hero-btn" style="background:linear-gradient(135deg,#f59e0b,#f97316); color:#622a00;">
                     <i class="fas fa-bullseye"></i> Manage Budgets
                 </button>
+                <button id="manageCategoriesBtn" aria-label="Manage categories" title="Add or remove expense categories" class="hero-btn" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed); color:white;">
+                    <i class="fas fa-tags"></i> Categories
+                </button>
             </div>
 
             <div class="hero-username">
@@ -255,19 +258,19 @@
                 <div class="flex flex-row gap-2 md:gap-3 text-sm items-end">
                     <div class="flex-1 min-w-0">
                         <label class="block text-blue-100 mb-1 text-xs md:text-sm">Start Date</label>
-                        <input type="date" id="filterStartDate" class="w-full rounded-lg border border-white/30 bg-white/10 text-white px-1 md:px-3 py-2 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-white/60">
+                        <input type="date" id="filterStartDate" class="w-full h-[34px] md:h-[38px] rounded-lg border border-white/30 bg-white/10 text-white px-1 md:px-3 py-2 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-white/60">
                     </div>
                     <div class="flex-1 min-w-0">
                         <label class="block text-blue-100 mb-1 text-xs md:text-sm">End Date</label>
-                        <input type="date" id="filterEndDate" class="w-full rounded-lg border border-white/30 bg-white/10 text-white px-1 md:px-3 py-2 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-white/60">
+                        <input type="date" id="filterEndDate" class="w-full h-[34px] md:h-[38px] rounded-lg border border-white/30 bg-white/10 text-white px-1 md:px-3 py-2 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-white/60">
                     </div>
                     <div class="flex-1 min-w-0">
                         <label class="block text-blue-100 mb-1 text-xs md:text-sm">&nbsp;</label>
-                        <button id="applyFiltersBtn" class="w-full bg-white text-blue-700 px-1 md:px-3 py-2 rounded-lg font-semibold text-xs md:text-sm hover:bg-blue-50">Apply</button>
+                        <button id="applyFiltersBtn" class="w-full h-[34px] md:h-[38px] bg-white text-blue-700 px-1 md:px-3 py-2 rounded-lg font-semibold text-xs md:text-sm hover:bg-blue-50">Apply</button>
                     </div>
                     <div class="flex-1 min-w-0">
                         <label class="block text-blue-100 mb-1 text-xs md:text-sm">&nbsp;</label>
-                        <button id="clearFiltersBtn" class="w-full border border-white/50 px-1 md:px-3 py-2 rounded-lg font-semibold text-white text-xs md:text-sm hover:bg-white/10">Reset</button>
+                        <button id="clearFiltersBtn" class="w-full h-[34px] md:h-[38px] border border-white/50 px-1 md:px-3 py-2 rounded-lg font-semibold text-white text-xs md:text-sm hover:bg-white/10">Reset</button>
                     </div>
                 </div>
                 <span id="activeFilters" class="text-blue-100 text-xs block mt-3"></span>
@@ -514,6 +517,26 @@
         </div>
     </div>
 
+    <!-- CATEGORIES MODAL -->
+    <div id="categoriesModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-40 hidden">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-800">Manage Categories</h2>
+                <button id="closeCategoriesModal" class="text-gray-500 hover:text-gray-700 text-2xl"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="categoryForm" class="flex gap-3 mb-6">
+                <input type="text" id="newCategoryName" placeholder="New category name..." required class="flex-1 p-3 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white px-5 py-3 rounded-lg font-semibold">
+                    <i class="fas fa-plus"></i> Add
+                </button>
+            </form>
+            <div>
+                <h3 class="text-lg font-semibold text-gray-800 mb-3">Your Categories</h3>
+                <div id="categoriesList" class="space-y-2"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- NOTIFICATION -->
     <div id="notification" class="fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg hidden">
         <i class="fas fa-check-circle mr-2"></i><span id="notificationText"></span>
@@ -523,6 +546,7 @@
     // Dynamically determine API base URL (works for both local dev and production)
     const API_BASE = window.location.origin + '/api';
     const defaultExpenseCategories = ['Home Upkeep', 'School Upkeep', 'School Fees', 'Projects'];
+    let customCategories = [];
 
     function getStoredUser() {
         try {
@@ -825,6 +849,12 @@
         try {
             // Show loading state
             document.body.style.cursor = 'wait';
+            // Load custom categories first
+            try {
+                customCategories = await apiCall('/categories');
+            } catch (e) {
+                customCategories = [];
+            }
             // Pagination-aware fetch for expenses (page-based)
             const pageSize = window.expensePageSize && Number.isFinite(window.expensePageSize) ? window.expensePageSize : 10;
             const qs = new URLSearchParams();
@@ -857,6 +887,9 @@
             renderDashboard(dashboard);
             renderBudgetsTable();
             fillBudgetCategoryOptions();
+            fillExpenseCategoryOptions();
+            fillFilterCategoryOptions();
+            renderCategoriesList();
             announceBudgetAlerts();
             updateActiveFiltersLabel();
             syncFilterInputs();
@@ -902,7 +935,7 @@
     function fillBudgetCategoryOptions() {
         const select = document.querySelector("#budgetCategory");
         if (!select) return;
-        const categories = new Set([...defaultExpenseCategories, ...expenses.map(e => e.category), ...budgets.map(b => b.category)]);
+        const categories = new Set([...defaultExpenseCategories, ...customCategories, ...expenses.map(e => e.category), ...budgets.map(b => b.category)]);
         const current = select.value;
         select.innerHTML = Array.from(categories)
             .sort()
@@ -912,6 +945,87 @@
             select.value = current;
         }
         syncBudgetThresholdInput();
+    }
+
+    function getAllCategories() {
+        return Array.from(new Set([...defaultExpenseCategories, ...customCategories, ...expenses.map(e => e.category)])).sort();
+    }
+
+    function fillExpenseCategoryOptions() {
+        const select = document.querySelector("#expenseCategory");
+        if (!select) return;
+        const categories = getAllCategories();
+        const current = select.value;
+        select.innerHTML = categories.map((cat) => `<option value="${cat}">${cat}</option>`).join('');
+        if (current && categories.includes(current)) {
+            select.value = current;
+        }
+    }
+
+    function fillFilterCategoryOptions() {
+        const select = document.querySelector("#filterCategory");
+        if (!select) return;
+        const categories = getAllCategories();
+        const current = select.value;
+        select.innerHTML = '<option value="">All</option>' + categories.map((cat) => `<option value="${cat}">${cat}</option>`).join('');
+        if (current) {
+            select.value = current;
+        }
+    }
+
+    function renderCategoriesList() {
+        const container = document.querySelector("#categoriesList");
+        if (!container) return;
+        const allCats = getAllCategories();
+        if (!allCats.length) {
+            container.innerHTML = '<p class="text-gray-500 text-sm">No categories yet.</p>';
+            return;
+        }
+        container.innerHTML = allCats.map(cat => {
+            const isDefault = defaultExpenseCategories.includes(cat);
+            const isCustom = customCategories.includes(cat);
+            return `
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span class="font-medium text-gray-800">${cat}</span>
+                    <div class="flex items-center gap-2">
+                        ${isDefault ? '<span class="text-xs text-gray-400">Default</span>' : ''}
+                        ${isCustom ? `<button data-category="${cat}" class="text-red-500 hover:text-red-700 delete-category text-sm"><i class="fas fa-trash"></i></button>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    async function addCategory(name) {
+        try {
+            const resp = await apiCall('/categories', {
+                method: 'POST',
+                body: { name }
+            });
+            customCategories = resp.categories || [];
+            fillBudgetCategoryOptions();
+            fillExpenseCategoryOptions();
+            fillFilterCategoryOptions();
+            renderCategoriesList();
+            notify('Category added successfully!');
+        } catch (error) {
+            notify(error?.message || 'Failed to add category', true);
+        }
+    }
+
+    async function deleteCategory(name) {
+        if (!confirm(`Delete category "${name}"? This won't remove existing expenses in this category.`)) return;
+        try {
+            const resp = await apiCall(`/categories/${encodeURIComponent(name)}`, { method: 'DELETE' });
+            customCategories = resp.categories || [];
+            fillBudgetCategoryOptions();
+            fillExpenseCategoryOptions();
+            fillFilterCategoryOptions();
+            renderCategoriesList();
+            notify('Category removed successfully!');
+        } catch (error) {
+            notify(error?.message || 'Failed to remove category', true);
+        }
     }
 
     function announceBudgetAlerts() {
@@ -1447,6 +1561,7 @@
                 const expenseModal = $("#expenseModal");
                 const blogModal = $("#blogModal");
                 const budgetModal = $("#budgetModal");
+                const categoriesModal = $("#categoriesModal");
                 if (!expenseModal.classList.contains('hidden')) {
                     expenseModal.classList.add('hidden');
                 }
@@ -1455,6 +1570,9 @@
                 }
                 if (!budgetModal.classList.contains('hidden')) {
                     budgetModal.classList.add('hidden');
+                }
+                if (!categoriesModal.classList.contains('hidden')) {
+                    categoriesModal.classList.add('hidden');
                 }
             }
             // Ctrl/Cmd + F: Focus filter
@@ -1692,6 +1810,29 @@
                     notify('Error removing budget', true);
                 }
             }
+        });
+
+        // Categories modal controls
+        $("#manageCategoriesBtn").addEventListener('click', () => {
+            renderCategoriesList();
+            $("#categoriesModal").classList.remove("hidden");
+        });
+
+        $("#closeCategoriesModal").addEventListener('click', () => $("#categoriesModal").classList.add("hidden"));
+
+        $("#categoryForm").addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = $("#newCategoryName").value.trim();
+            if (!name) return;
+            await addCategory(name);
+            $("#newCategoryName").value = '';
+        });
+
+        $("#categoriesList").addEventListener('click', async (e) => {
+            const btn = e.target.closest('.delete-category');
+            if (!btn) return;
+            const category = btn.dataset.category;
+            if (category) await deleteCategory(category);
         });
 
         // Delegated actions for expenses (edit/delete)

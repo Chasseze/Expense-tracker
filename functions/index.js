@@ -423,6 +423,63 @@ app.delete('/api/budgets/:category', verifyToken, async (req, res) => {
   }
 });
 
+// Get custom categories
+app.get('/api/categories', verifyToken, async (req, res) => {
+  try {
+    const doc = await db.collection('users').doc(req.user.uid).collection('settings').doc('categories').get();
+    const categories = doc.exists ? doc.data().list || [] : [];
+    res.json(categories);
+  } catch (error) {
+    console.error('Get categories error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Add custom category
+app.post('/api/categories', verifyToken, async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ error: 'Category name is required' });
+    }
+    const categoryName = name.trim();
+    
+    const settingsRef = db.collection('users').doc(req.user.uid).collection('settings').doc('categories');
+    const doc = await settingsRef.get();
+    const existing = doc.exists ? (doc.data().list || []) : [];
+    
+    if (existing.includes(categoryName)) {
+      return res.status(400).json({ error: 'Category already exists' });
+    }
+    
+    existing.push(categoryName);
+    existing.sort();
+    await settingsRef.set({ list: existing });
+    
+    res.json({ message: 'Category added successfully', categories: existing });
+  } catch (error) {
+    console.error('Add category error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete custom category
+app.delete('/api/categories/:name', verifyToken, async (req, res) => {
+  try {
+    const categoryName = decodeURIComponent(req.params.name);
+    const settingsRef = db.collection('users').doc(req.user.uid).collection('settings').doc('categories');
+    const doc = await settingsRef.get();
+    const existing = doc.exists ? (doc.data().list || []) : [];
+    const updated = existing.filter(c => c !== categoryName);
+    
+    await settingsRef.set({ list: updated });
+    res.json({ message: 'Category removed successfully', categories: updated });
+  } catch (error) {
+    console.error('Delete category error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Dashboard statistics
 app.get('/api/dashboard', verifyToken, async (req, res) => {
   try {
