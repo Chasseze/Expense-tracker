@@ -48,13 +48,13 @@ h1, h2, h3, .hero-title, .summary-card p.value { color: #111827; }
     color: #fbbf24;
 }
 
-/* Reusable card pattern */
-.card { background: var(--glass-plate); border-radius: var(--card-radius); box-shadow: var(--card-shadow); transition: transform .22s ease, box-shadow .22s ease; }
-.card:hover { transform: translateY(-6px); box-shadow: 0 20px 40px rgba(2,6,23,0.12); }
+/* Reusable card pattern - shadow only, no transform */
+.card { background: var(--glass-plate); border-radius: var(--card-radius); box-shadow: var(--card-shadow); transition: box-shadow .22s ease; }
+.card:hover { box-shadow: 0 20px 40px rgba(2,6,23,0.12); }
 
-/* Buttons: keep original gradients but more consistent spacing */
-.btn-primary { background: linear-gradient(135deg, var(--accent-500) 0%, #7c3aed 100%); color: white; padding: .6rem 1rem; border-radius: .6rem; }
-.btn-primary:hover { background: linear-gradient(135deg, var(--accent-600) 0%, #6d28d9 100%); transform: translateY(-2px); }
+/* Buttons: keep original gradients, no transform */
+.btn-primary { background: linear-gradient(135deg, var(--accent-500) 0%, #7c3aed 100%); color: white; padding: .6rem 1rem; border-radius: .6rem; transition: background .2s ease, box-shadow .2s ease; }
+.btn-primary:hover { background: linear-gradient(135deg, var(--accent-600) 0%, #6d28d9 100%); box-shadow: 0 4px 12px rgba(79,70,229,0.3); }
 
 /* Header hero tweaks (kept) */
 .header-hero { position: relative; overflow: hidden; color: white; }
@@ -82,15 +82,10 @@ h1, h2, h3, .hero-title, .summary-card p.value { color: #111827; }
 #expenseTableContainer tbody tr:hover td { background: linear-gradient(90deg, rgba(99,102,241,0.08), rgba(99,102,241,0.03)); box-shadow: 0 2px 12px rgba(99,102,241,0.08); }
 #expenseTableContainer tbody tr:active td { background: #e0e7ff; }
 
-/* Card and summary card enhancements */
-.card, .summary-card { box-shadow: 0 10px 30px rgba(2,6,23,0.10); border-radius: 1.2rem; transition: transform .22s cubic-bezier(.4,0,.2,1), box-shadow .22s cubic-bezier(.4,0,.2,1); }
-.card:hover, .summary-card:hover { transform: translateY(-8px) scale(1.02); box-shadow: 0 24px 48px rgba(2,6,23,0.16); }
-.card:active, .summary-card:active { transform: scale(0.98); box-shadow: 0 6px 18px rgba(2,6,23,0.18); }
-
-/* Disable transform effects on large content sections to prevent shaking */
-#expensesSection.card, #expensesSection.card:hover, #expensesSection.card:active,
-#blogSection.card, #blogSection.card:hover, #blogSection.card:active,
-#categoryCard:hover, #categoryCard:active { transform: none; }
+/* Card and summary card enhancements - shadow only, no transform/scale */
+.card, .summary-card { box-shadow: 0 10px 30px rgba(2,6,23,0.10); border-radius: 1.2rem; transition: box-shadow .22s ease; }
+.card:hover, .summary-card:hover { box-shadow: 0 16px 40px rgba(2,6,23,0.14); }
+.card:active, .summary-card:active { box-shadow: 0 6px 18px rgba(2,6,23,0.12); }
 
 /* Sticky header for tables */
 #expenseTableContainer thead th { position: sticky; top:0; z-index:10; }

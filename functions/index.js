@@ -84,9 +84,12 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
     const filterCategory = category ? category.toLowerCase().trim() : null;
     const filterStatus = status ? status.toLowerCase().trim() : null;
 
+    console.log('Filter values:', { filterSessionTerm, filterCategory, filterStatus, searchTerm });
+
     // Helper function to apply client-side filters
     const applyFilters = (items) => {
-      return items.filter(item => {
+      console.log('Applying filters to', items.length, 'items');
+      const filtered = items.filter(item => {
         // Search filter
         if (searchTerm) {
           const matchesSearch = 
@@ -96,20 +99,31 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
             (item.session_term && item.session_term.toLowerCase().includes(searchTerm));
           if (!matchesSearch) return false;
         }
-        // Session/Term filter (case-insensitive)
-        if (filterSessionTerm && (!item.session_term || !item.session_term.toLowerCase().includes(filterSessionTerm))) {
-          return false;
+        // Session/Term filter (case-insensitive, trim both sides)
+        if (filterSessionTerm) {
+          const itemSessionTerm = item.session_term ? item.session_term.toLowerCase().trim() : '';
+          if (!itemSessionTerm || !itemSessionTerm.includes(filterSessionTerm)) {
+            return false;
+          }
         }
-        // Category filter (case-insensitive)
-        if (filterCategory && (!item.category || !item.category.toLowerCase().includes(filterCategory))) {
-          return false;
+        // Category filter (case-insensitive, trim both sides)
+        if (filterCategory) {
+          const itemCategory = item.category ? item.category.toLowerCase().trim() : '';
+          if (!itemCategory || !itemCategory.includes(filterCategory)) {
+            return false;
+          }
         }
         // Status filter (case-insensitive)
-        if (filterStatus && (!item.status || !item.status.toLowerCase().includes(filterStatus))) {
+        if (filterStatus && (!item.status || !item.status.toLowerCase().trim().includes(filterStatus))) {
           return false;
         }
         return true;
       });
+      console.log('After filtering:', filtered.length, 'items');
+      if (items.length > 0) {
+        console.log('Sample item session_term:', items[0].session_term, 'category:', items[0].category);
+      }
+      return filtered;
     };
 
     // Check if any client-side filters are active
