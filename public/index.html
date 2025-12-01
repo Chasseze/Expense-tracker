@@ -13,32 +13,69 @@
 
 </head>
 <body class="p-4 md:p-6">
+    <button class="dark-toggle-btn" id="darkModeToggle" title="Toggle dark mode">🌙 Dark Mode</button>
     <script>
-    // Unregister any service workers and clear Cache API entries on page load.
-    // This helps prevent stale assets during rapid deploys or E2E tests.
-    (async function unregisterSWsAndClearCaches() {
-        try {
-            if ('serviceWorker' in navigator) {
-                const regs = await navigator.serviceWorker.getRegistrations();
-                for (const r of regs) {
-                    try { await r.unregister(); } catch (e) { console.warn('SW unregister failed', e); }
-                }
-            }
-        } catch (err) {
-            console.warn('Service worker cleanup failed', err);
-        }
-
-        try {
-            if (window.caches && caches.keys) {
-                const keys = await caches.keys();
-                for (const k of keys) {
-                    try { await caches.delete(k); } catch (e) { console.warn('Cache delete failed', e); }
-                }
-            }
-        } catch (err) {
-            console.warn('Cache cleanup failed', err);
+    // Dark mode toggle logic with persistence
+    (function() {
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
+            document.body.classList.add('theme-dark');
         }
     })();
+    document.addEventListener('DOMContentLoaded', function() {
+        const btn = document.getElementById('darkModeToggle');
+        // Restore button label on load
+        if (document.body.classList.contains('theme-dark')) {
+            btn.textContent = '☀️ Light Mode';
+        }
+        btn.addEventListener('click', function() {
+            document.body.classList.toggle('theme-dark');
+            if(document.body.classList.contains('theme-dark')) {
+                btn.textContent = '☀️ Light Mode';
+                localStorage.setItem('theme', 'dark');
+            } else {
+                btn.textContent = '🌙 Dark Mode';
+                localStorage.setItem('theme', 'light');
+            }
+        });
+    });
+        // Unregister any service workers and clear Cache API entries on page load.
+        // This helps prevent stale assets during rapid deploys or E2E tests.
+        (async function unregisterSWsAndClearCaches() {
+            try {
+                if ('serviceWorker' in navigator) {
+                    const regs = await navigator.serviceWorker.getRegistrations();
+                    for (const r of regs) {
+                        try { await r.unregister(); } catch (e) { console.warn('SW unregister failed', e); }
+                    }
+                }
+            } catch (err) {
+                console.warn('Service worker cleanup failed', err);
+            }
+
+            try {
+                if (window.caches && caches.keys) {
+                    const keys = await caches.keys();
+                    for (const k of keys) {
+                        try { await caches.delete(k); } catch (e) { console.warn('Cache delete failed', e); }
+                    }
+                }
+            } catch (err) {
+                console.warn('Cache cleanup failed', err);
+            }
+        })();
+
+        // Defer non-critical JS: modals, blog features, etc.
+        document.addEventListener('DOMContentLoaded', function() {
+            // Modal initialization
+            if (window.initExpenseModal) window.initExpenseModal();
+            if (window.initBlogModal) window.initBlogModal();
+            if (window.initBudgetModal) window.initBudgetModal();
+            // Blog features (future: use dynamic import)
+            if (window.initBlogFeatures) window.initBlogFeatures();
+            // Add other non-critical initializations here
+        });
+        // For future: use dynamic import() for large modules
     </script>
     <!-- AUTH SCREEN -->
     <div id="authScreen" class="fixed inset-0 bg-gradient-to-br from-primary to-secondary flex items-center justify-center p-4 z-50">

@@ -21,6 +21,7 @@ const useLibsql = Boolean(process.env.LIBSQL_URL);
 const storageMode = useLibsql ? 'libsql' : 'sqlite';
 const dbPath = process.env.NODE_ENV === 'production' ? '/tmp/expense_tracker.db' : './expense_tracker.db';
 let db;
+let ftsHasBm25 = false;
 
 // Development auth toggle: set DISABLE_AUTH=1 to disable auth checks globally.
 // Additionally, when not in production we expose small routes to enable/disable auth at runtime:
@@ -121,6 +122,39 @@ async function initializeDatabase() {
 
     for (const statement of statements) {
         await dbRun(statement);
+    }
+
+    // If using local SQLite, create an FTS5 virtual table and triggers for fast text search
+    if (!useLibsql) {
+        try {
+            // Create FTS5 virtual table that indexes description and recipient and links to expenses
+            await dbRun(`CREATE VIRTUAL TABLE IF NOT EXISTS expenses_fts USING fts5(description, recipient, content='expenses', content_rowid='id')`);
+
+            // Triggers to keep the FTS table in sync with the expenses table
+            await dbRun(`CREATE TRIGGER IF NOT EXISTS expenses_ai AFTER INSERT ON expenses BEGIN
+                INSERT INTO expenses_fts(rowid, description, recipient) VALUES (new.id, new.description, new.recipient);
+            END;`);
+
+            await dbRun(`CREATE TRIGGER IF NOT EXISTS expenses_ad AFTER DELETE ON expenses BEGIN
+                DELETE FROM expenses_fts WHERE rowid = old.id;
+            END;`);
+
+            await dbRun(`CREATE TRIGGER IF NOT EXISTS expenses_au AFTER UPDATE ON expenses BEGIN
+                DELETE FROM expenses_fts WHERE rowid = old.id;
+                INSERT INTO expenses_fts(rowid, description, recipient) VALUES (new.id, new.description, new.recipient);
+            END;`);
+            // Test for bm25 support (FTS5 ranking) — set flag for optimized queries
+            try {
+                await dbAll(`SELECT bm25(expenses_fts) as r FROM expenses_fts LIMIT 0`);
+                ftsHasBm25 = true;
+                console.log('FTS bm25 ranking is available.');
+            } catch (err) {
+                ftsHasBm25 = false;
+                console.log('FTS bm25 not available; falling back to simpler ranking.');
+            }
+        } catch (err) {
+            console.warn('FTS setup failed or not available:', err && err.message ? err.message : err);
+        }
     }
 }
 
@@ -342,9 +376,97 @@ app.get('/api/expenses', authenticateToken, async (req, res) => {
             params.push(formatDateTimeBoundary(startDate, 'start'));
         }
 
+
         if (endDate) {
             conditions.push('date_time <= ?');
             params.push(formatDateTimeBoundary(endDate, 'end'));
+        }
+
+        // Optional advanced text search: support qMode (phrase|all|any|prefix) and qFields (csv)
+        if (req.query.q) {
+            const rawQ = String(req.query.q || '').trim();
+            const qMode = String(req.query.qMode || 'any').toLowerCase();
+            const qFields = (String(req.query.qFields || 'description,recipient').split(',').map(s => s.trim()).filter(Boolean));
+
+            if (!useLibsql) {
+                // Build an FTS5 MATCH expression safely from tokens and fields
+                const escapeForFts = (s) => s.replace(/"/g, '');
+                const tokens = rawQ.split(/\s+/).map(t => escapeForFts(t)).filter(Boolean);
+                let perFieldExpr = qFields.map((f) => {
+                    if (qMode === 'phrase') {
+                        return `${f}:"${escapeForFts(rawQ)}"`;
+                    }
+                    if (qMode === 'prefix') {
+                        return tokens.map(t => `${f}:${t}*`).join(' OR ');
+                    }
+                    if (qMode === 'all') {
+                        return tokens.map(t => `${f}:${t}`).join(' AND ');
+                    }
+                    // default 'any'
+                    return tokens.map(t => `${f}:${t}`).join(' OR ');
+                }).filter(Boolean);
+
+                const matchExpr = perFieldExpr.join(' OR ');
+                if (matchExpr) {
+                    conditions.push('id IN (SELECT rowid FROM expenses_fts WHERE expenses_fts MATCH ?)');
+                    params.push(matchExpr);
+                }
+            } else {
+                // Fallback for non-SQLite backends: use LIKE clauses
+                const tokens = rawQ.split(/\s+/).filter(Boolean).map(t => t.toLowerCase());
+                if (tokens.length) {
+                    const clauses = [];
+                    const fieldList = qFields.length ? qFields : ['description','recipient'];
+                    if (qMode === 'phrase') {
+                        const p = `%${rawQ.toLowerCase()}%`;
+                        clauses.push(`(${fieldList.map(() => 'LOWER(' + '??' + ') LIKE ?').join(' OR ')})`);
+                        // We'll push fields and params below in a safe order
+                        // But since parameterized column names aren't supported, fall back to simple OR across known columns
+                        conditions.push('(' + fieldList.map(f => `LOWER(${f}) LIKE ?`).join(' OR ') + ')');
+                        for (const f of fieldList) params.push(`%${rawQ.toLowerCase()}%`);
+                    } else {
+                        // For 'all' and 'any' and 'prefix', build combined conditions
+                        if (qMode === 'all') {
+                            // Every token must be present in at least one of the fields
+                            tokens.forEach((tok) => {
+                                const sub = '(' + fieldList.map(f => `LOWER(${f}) LIKE ?`).join(' OR ') + ')';
+                                clauses.push(sub);
+                                for (let i = 0; i < fieldList.length; i++) params.push(`%${tok}%`);
+                            });
+                            conditions.push(clauses.join(' AND '));
+                        } else if (qMode === 'prefix') {
+                            // Any token prefix in any field
+                            const sub = '(' + fieldList.map(f => tokens.map(() => `LOWER(${f}) LIKE ?`).join(' OR ')).join(' OR ') + ')';
+                            conditions.push(sub);
+                            for (const f of fieldList) tokens.forEach(tok => params.push(`${tok}%`));
+                        } else {
+                            // 'any' - any token in any field
+                            const parts = [];
+                            tokens.forEach((tok) => {
+                                parts.push('(' + fieldList.map(f => `LOWER(${f}) LIKE ?`).join(' OR ') + ')');
+                                for (let i = 0; i < fieldList.length; i++) params.push(`%${tok}%`);
+                            });
+                            conditions.push('(' + parts.join(' OR ') + ')');
+                        }
+                    }
+                }
+            }
+        }
+
+        // Optional text search: prefer SQLite FTS when available, otherwise fallback to case-insensitive LIKE
+        if (req.query.q) {
+            if (!useLibsql) {
+                if (!ftsHasBm25) {
+                    // Use FTS index when running on local SQLite (simple path)
+                    conditions.push('id IN (SELECT rowid FROM expenses_fts WHERE expenses_fts MATCH ?)');
+                    params.push(String(req.query.q));
+                }
+                // If bm25 is available we'll route to a different query path below that joins against the FTS table
+            } else {
+                const q = String(req.query.q).toLowerCase();
+                conditions.push('(LOWER(description) LIKE ? OR LOWER(recipient) LIKE ?)');
+                params.push(`%${q}%`, `%${q}%`);
+            }
         }
 
         const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -353,7 +475,78 @@ app.get('/api/expenses', authenticateToken, async (req, res) => {
         const pageSizeNum = Math.min(Math.max(parseInt(pageSize) || 0, 0), 100);
         const pageNum = Math.max(parseInt(page) || 0, 0);
         
-        let sql = `SELECT * FROM expenses ${whereClause} ORDER BY date_time DESC`;
+        // If bm25 is available and a search term was provided, use an optimized JOIN query
+        if (req.query.q && !useLibsql && ftsHasBm25) {
+            const rawQ = String(req.query.q || '').trim();
+            const escapeForFts = (s) => s.replace(/"/g, '');
+            const tokens = rawQ.split(/\s+/).map(t => escapeForFts(t)).filter(Boolean);
+            const qMode = String(req.query.qMode || 'any').toLowerCase();
+
+            // Build per-field FTS match expression (search across description and recipient by default)
+            const fields = ['description', 'recipient'];
+            const perFieldExpr = fields.map((f) => {
+                if (qMode === 'phrase') return `${f}:"${escapeForFts(rawQ)}"`;
+                if (qMode === 'prefix') return tokens.map(t => `${f}:${t}*`).join(' OR ');
+                if (qMode === 'all') return tokens.map(t => `${f}:${t}`).join(' AND ');
+                return tokens.map(t => `${f}:${t}`).join(' OR ');
+            }).filter(Boolean);
+
+            const matchExpr = perFieldExpr.join(' OR ');
+
+            // Rebuild base WHERE conditions excluding the FTS id-IN subquery
+            const baseConds = ['e.user_id = ?'];
+            const baseParams = [req.user.userId];
+            if (sessionTermValue) { baseConds.push('e.session_term = ?'); baseParams.push(sessionTermValue); }
+            if (category) { baseConds.push('e.category = ?'); baseParams.push(category); }
+            if (status) { baseConds.push('e.status = ?'); baseParams.push(status); }
+            if (startDate) { baseConds.push('e.date_time >= ?'); baseParams.push(formatDateTimeBoundary(startDate, 'start')); }
+            if (endDate) { baseConds.push('e.date_time <= ?'); baseParams.push(formatDateTimeBoundary(endDate, 'end')); }
+
+            const baseWhere = baseConds.length ? `WHERE ${baseConds.join(' AND ')}` : '';
+
+            // Use bm25 for relevance and order by relevance (ascending is typically more relevant in some builds)
+            let sql = `SELECT e.*, bm25(f) AS relevance FROM expenses e JOIN expenses_fts f ON f.rowid = e.id ${baseWhere} AND f MATCH ? ORDER BY relevance ASC, e.date_time DESC`;
+
+            if (pageSizeNum > 0 && pageNum > 0) {
+                const offset = Math.max((pageNum - 1) * pageSizeNum, 0);
+                sql += ` LIMIT ${pageSizeNum} OFFSET ${offset}`;
+                const expenses = await dbAll(sql, [...baseParams, matchExpr]);
+                return res.json({ items: expenses, hasMore: expenses.length === pageSizeNum });
+            }
+
+            const expenses = await dbAll(sql, [...baseParams, matchExpr]);
+            return res.json(expenses);
+        }
+
+        // Fallback ordering when no bm25 available: preserve date ordering and previously applied simple heuristics
+        let orderClause = 'ORDER BY date_time DESC';
+        if (req.query.q && !useLibsql) {
+            // Prioritize rows where description matches, then recipient, then others (simple heuristic)
+            orderClause = `ORDER BY (CASE WHEN id IN (SELECT rowid FROM expenses_fts WHERE description MATCH ?) THEN 0 WHEN id IN (SELECT rowid FROM expenses_fts WHERE recipient MATCH ?) THEN 1 ELSE 2 END), date_time DESC`;
+            const rawQ2 = String(req.query.q || '').trim();
+            const escapeForFts2 = (s) => s.replace(/"/g, '');
+            const tokens2 = rawQ2.split(/\s+/).map(t => escapeForFts2(t)).filter(Boolean);
+            const qMode2 = String(req.query.qMode || 'any').toLowerCase();
+            let descExpr = '';
+            let recipExpr = '';
+            if (qMode2 === 'phrase') {
+                descExpr = `description:"${escapeForFts2(rawQ2)}"`;
+                recipExpr = `recipient:"${escapeForFts2(rawQ2)}"`;
+            } else if (qMode2 === 'prefix') {
+                descExpr = tokens2.map(t => `description:${t}*`).join(' OR ');
+                recipExpr = tokens2.map(t => `recipient:${t}*`).join(' OR ');
+            } else if (qMode2 === 'all') {
+                descExpr = tokens2.map(t => `description:${t}`).join(' AND ');
+                recipExpr = tokens2.map(t => `recipient:${t}`).join(' AND ');
+            } else {
+                descExpr = tokens2.map(t => `description:${t}`).join(' OR ');
+                recipExpr = tokens2.map(t => `recipient:${t}`).join(' OR ');
+            }
+            params.push(descExpr);
+            params.push(recipExpr);
+        }
+
+        let sql = `SELECT * FROM expenses ${whereClause} ${orderClause}`;
         
         if (pageSizeNum > 0 && pageNum > 0) {
             const offset = Math.max((pageNum - 1) * pageSizeNum, 0);

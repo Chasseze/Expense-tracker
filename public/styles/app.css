@@ -16,7 +16,37 @@
 
 /* Responsive typographic scale using clamp() */
 html { font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
-body { font-size: clamp(0.95rem, 0.9rem + 0.4vw, 1.05rem); line-height: 1.45; background: linear-gradient(135deg, #e6eef8 0%, #d7e7fb 100%); min-height:100vh; }
+body { font-size: clamp(0.95rem, 0.9rem + 0.4vw, 1.05rem); line-height: 1.45; background: linear-gradient(135deg, #e6eef8 0%, #d7e7fb 100%); min-height:100vh; color: #1a202c; }
+
+/* Headings and stats: higher contrast */
+h1, h2, h3, .hero-title, .summary-card p.value { color: #111827; }
+.summary-card p.value { font-size: 1.8rem; letter-spacing: 0.01em; }
+.summary-card p.label { color: #374151; }
+
+/* Accent color harmonization */
+.btn-primary, .summary-paid, .summary-balance, .summary-total {
+    box-shadow: 0 2px 8px rgba(79,70,229,0.08);
+}
+
+/* Dark mode toggle button */
+.dark-toggle-btn {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 100;
+    background: #111827;
+    color: #fff;
+    border-radius: 2rem;
+    padding: .5rem 1.2rem;
+    font-weight: 600;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+    cursor: pointer;
+    transition: background .2s, color .2s;
+}
+.dark-toggle-btn:hover {
+    background: #374151;
+    color: #fbbf24;
+}
 
 /* Reusable card pattern */
 .card { background: var(--glass-plate); border-radius: var(--card-radius); box-shadow: var(--card-shadow); transition: transform .22s ease, box-shadow .22s ease; }
@@ -48,8 +78,17 @@ body { font-size: clamp(0.95rem, 0.9rem + 0.4vw, 1.05rem); line-height: 1.45; ba
 #expenseTableContainer table { width:100%; border-collapse:separate; border-spacing:0; background: white; }
 #expenseTableContainer thead th { position: sticky; top:0; z-index:5; background: linear-gradient(90deg, #2563eb, #6366f1); color:#fff; padding: .9rem .75rem; text-align:left; font-weight:600; }
 #expenseTableContainer tbody td { padding: .75rem; border-top:1px solid rgba(15,23,42,0.04); color:#0f172a; }
-#expenseTableContainer tbody tr:hover td { background: linear-gradient(90deg, rgba(99,102,241,0.03), rgba(99,102,241,0.01)); }
+#expenseTableContainer tbody tr:nth-child(even) td { background: #f3f4f6; }
+#expenseTableContainer tbody tr:hover td { background: linear-gradient(90deg, rgba(99,102,241,0.08), rgba(99,102,241,0.03)); box-shadow: 0 2px 12px rgba(99,102,241,0.08); }
+#expenseTableContainer tbody tr:active td { background: #e0e7ff; }
 
+/* Card and summary card enhancements */
+.card, .summary-card { box-shadow: 0 10px 30px rgba(2,6,23,0.10); border-radius: 1.2rem; transition: transform .22s cubic-bezier(.4,0,.2,1), box-shadow .22s cubic-bezier(.4,0,.2,1); }
+.card:hover, .summary-card:hover { transform: translateY(-8px) scale(1.02); box-shadow: 0 24px 48px rgba(2,6,23,0.16); }
+.card:active, .summary-card:active { transform: scale(0.98); box-shadow: 0 6px 18px rgba(2,6,23,0.18); }
+
+/* Sticky header for tables */
+#expenseTableContainer thead th { position: sticky; top:0; z-index:10; }
 /* Compact mode for dense tables */
 .compact td, .compact th { padding: .45rem .5rem; font-size: .94rem; }
 
@@ -79,6 +118,35 @@ body.theme-dark .card, body.theme-dark .bg-white { background-color: rgba(255,25
 
 /* Keep a last-resort mobile overflow rule to avoid layout breaking */
 @media (max-width: 640px) { #expenseTableContainer table { font-size: .92rem; } }
+
+/* Skeleton loader styles */
+.skeleton {
+    background: linear-gradient(90deg, #e0e7ef 25%, #f3f4f6 50%, #e0e7ef 75%);
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.2s infinite;
+    border-radius: 0.5rem;
+    color: transparent !important;
+    pointer-events: none;
+    user-select: none;
+}
+.skeleton-card {
+    min-height: 80px;
+    width: 100%;
+    border-radius: 1rem;
+}
+.skeleton-row {
+    height: 2.5rem;
+    margin-bottom: 0.5rem;
+    border-radius: 0.4rem;
+}
+@keyframes skeleton-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+body.theme-dark .skeleton {
+    background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+    background-size: 200% 100%;
+}
 
 /* --- Hero / header layout to match requested design --- */
 .header-hero.card { border-radius: 1.5rem; padding: clamp(2rem, 4vw, 3.5rem); overflow: hidden; background: linear-gradient(90deg, #2563eb 0%, #5aa0ff 40%, #f97316 100%); }
