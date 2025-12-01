@@ -87,6 +87,11 @@ h1, h2, h3, .hero-title, .summary-card p.value { color: #111827; }
 .card:hover, .summary-card:hover { transform: translateY(-8px) scale(1.02); box-shadow: 0 24px 48px rgba(2,6,23,0.16); }
 .card:active, .summary-card:active { transform: scale(0.98); box-shadow: 0 6px 18px rgba(2,6,23,0.18); }
 
+/* Disable transform effects on large content sections to prevent shaking */
+#expensesSection.card, #expensesSection.card:hover, #expensesSection.card:active,
+#blogSection.card, #blogSection.card:hover, #blogSection.card:active,
+#categoryCard:hover, #categoryCard:active { transform: none; }
+
 /* Sticky header for tables */
 #expenseTableContainer thead th { position: sticky; top:0; z-index:10; }
 /* Compact mode for dense tables */

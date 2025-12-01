@@ -68,15 +68,7 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
 
     let query = db.collection('users').doc(req.user.uid).collection('expenses');
 
-    if (session_term) {
-      query = query.where('session_term', '==', session_term);
-    }
-    if (category) {
-      query = query.where('category', '==', category);
-    }
-    if (status) {
-      query = query.where('status', '==', status);
-    }
+    // Date range filters can stay as Firestore queries
     if (startDate) {
       query = query.where('date_time', '>=', startDate);
     }
@@ -86,23 +78,51 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
 
   query = query.orderBy('date_time', 'desc').orderBy(FieldPath.documentId(), 'desc');
 
-    // Text search: Firestore doesn't support full-text search natively, so we fetch and filter client-side
-    // For large datasets, consider Algolia or similar
+    // Text search and other filters: fetch all then filter client-side for flexibility
     const searchTerm = search ? search.toLowerCase().trim() : null;
+    const filterSessionTerm = session_term ? session_term.toLowerCase().trim() : null;
+    const filterCategory = category ? category.toLowerCase().trim() : null;
+    const filterStatus = status ? status.toLowerCase().trim() : null;
+
+    // Helper function to apply client-side filters
+    const applyFilters = (items) => {
+      return items.filter(item => {
+        // Search filter
+        if (searchTerm) {
+          const matchesSearch = 
+            (item.description && item.description.toLowerCase().includes(searchTerm)) ||
+            (item.recipient && item.recipient.toLowerCase().includes(searchTerm)) ||
+            (item.category && item.category.toLowerCase().includes(searchTerm)) ||
+            (item.session_term && item.session_term.toLowerCase().includes(searchTerm));
+          if (!matchesSearch) return false;
+        }
+        // Session/Term filter (case-insensitive)
+        if (filterSessionTerm && (!item.session_term || !item.session_term.toLowerCase().includes(filterSessionTerm))) {
+          return false;
+        }
+        // Category filter (case-insensitive)
+        if (filterCategory && (!item.category || !item.category.toLowerCase().includes(filterCategory))) {
+          return false;
+        }
+        // Status filter (case-insensitive)
+        if (filterStatus && (!item.status || !item.status.toLowerCase().includes(filterStatus))) {
+          return false;
+        }
+        return true;
+      });
+    };
+
+    // Check if any client-side filters are active
+    const hasClientFilters = searchTerm || filterSessionTerm || filterCategory || filterStatus;
 
     // If explicit page number provided, prefer offset-based pagination for direct jumps
     if (pageSize > 0 && page > 0) {
       const pageNum = page; // 1-based expected from client
-      // For search, we need to fetch all and filter, then paginate manually
-      if (searchTerm) {
+      // For filters, we need to fetch all and filter, then paginate manually
+      if (hasClientFilters) {
         const snapshot = await query.get();
         let allItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        allItems = allItems.filter(item =>
-          (item.description && item.description.toLowerCase().includes(searchTerm)) ||
-          (item.recipient && item.recipient.toLowerCase().includes(searchTerm)) ||
-          (item.category && item.category.toLowerCase().includes(searchTerm)) ||
-          (item.session_term && item.session_term.toLowerCase().includes(searchTerm))
-        );
+        allItems = applyFilters(allItems);
         const offset = Math.max((pageNum - 1) * pageSize, 0);
         const items = allItems.slice(offset, offset + pageSize);
         return res.json({ items, nextCursor: null, hasMore: offset + pageSize < allItems.length, total: allItems.length });
@@ -118,6 +138,14 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
 
     // If pageSize is provided (>0), use cursor-based pagination
     if (pageSize > 0) {
+      // For filters, fetch all and filter
+      if (hasClientFilters) {
+        const snapshot = await query.get();
+        let allItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        allItems = applyFilters(allItems);
+        const items = allItems.slice(0, pageSize);
+        return res.json({ items, nextCursor: null, hasMore: allItems.length > pageSize, total: allItems.length });
+      }
       let pagedQuery = query;
       if (cursor) {
         // Support composite cursor: "date_time|docId"
@@ -141,7 +169,10 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
 
     // No pagination requested: return full list (legacy behavior)
     const snapshot = await query.get();
-    const expenses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    let expenses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    if (hasClientFilters) {
+      expenses = applyFilters(expenses);
+    }
     res.json(expenses);
   } catch (error) {
     console.error('Get expenses error:', error);
@@ -156,15 +187,7 @@ app.get('/api/expenses/count', verifyToken, async (req, res) => {
     const { session_term, category, status, startDate, endDate, search } = req.query;
     let query = db.collection('users').doc(req.user.uid).collection('expenses');
 
-    if (session_term) {
-      query = query.where('session_term', '==', session_term);
-    }
-    if (category) {
-      query = query.where('category', '==', category);
-    }
-    if (status) {
-      query = query.where('status', '==', status);
-    }
+    // Date range filters can stay as Firestore queries
     if (startDate) {
       query = query.where('date_time', '>=', startDate);
     }
@@ -172,17 +195,37 @@ app.get('/api/expenses/count', verifyToken, async (req, res) => {
       query = query.where('date_time', '<=', endDate);
     }
 
-    // Text search requires fetching all and filtering
+    // Client-side filters for flexibility
     const searchTerm = search ? search.toLowerCase().trim() : null;
-    if (searchTerm) {
+    const filterSessionTerm = session_term ? session_term.toLowerCase().trim() : null;
+    const filterCategory = category ? category.toLowerCase().trim() : null;
+    const filterStatus = status ? status.toLowerCase().trim() : null;
+
+    const hasClientFilters = searchTerm || filterSessionTerm || filterCategory || filterStatus;
+
+    if (hasClientFilters) {
       const snapshot = await query.get();
       let allItems = snapshot.docs.map(doc => doc.data());
-      allItems = allItems.filter(item =>
-        (item.description && item.description.toLowerCase().includes(searchTerm)) ||
-        (item.recipient && item.recipient.toLowerCase().includes(searchTerm)) ||
-        (item.category && item.category.toLowerCase().includes(searchTerm)) ||
-        (item.session_term && item.session_term.toLowerCase().includes(searchTerm))
-      );
+      allItems = allItems.filter(item => {
+        if (searchTerm) {
+          const matchesSearch = 
+            (item.description && item.description.toLowerCase().includes(searchTerm)) ||
+            (item.recipient && item.recipient.toLowerCase().includes(searchTerm)) ||
+            (item.category && item.category.toLowerCase().includes(searchTerm)) ||
+            (item.session_term && item.session_term.toLowerCase().includes(searchTerm));
+          if (!matchesSearch) return false;
+        }
+        if (filterSessionTerm && (!item.session_term || !item.session_term.toLowerCase().includes(filterSessionTerm))) {
+          return false;
+        }
+        if (filterCategory && (!item.category || !item.category.toLowerCase().includes(filterCategory))) {
+          return false;
+        }
+        if (filterStatus && (!item.status || !item.status.toLowerCase().includes(filterStatus))) {
+          return false;
+        }
+        return true;
+      });
       return res.json({ total: allItems.length });
     }
 
