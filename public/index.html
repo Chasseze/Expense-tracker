@@ -185,7 +185,7 @@
 
         <!-- SUMMARY SECTION -->
         <div id="summarySection" class="mb-8">
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-6" id="summaryCards"></div>
+            <div class="grid grid-cols-3 gap-4 md:gap-6 mb-6" id="summaryCards"></div>
             <div id="categoryCard" class="card bg-white rounded-2xl shadow-lg p-6">
                 <h2 class="text-2xl font-bold text-gray-800 mb-4"><center>Category Breakdown</center></h2>
                 <div id="categoryBreakdown" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"></div>
@@ -199,7 +199,11 @@
                 <p class="text-blue-100">Your complete financial history</p>
             </div>
             <div class="bg-white/10 backdrop-blur-sm rounded-xl p-4 mb-6">
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm items-end">
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-4 text-sm items-end">
+                    <div>
+                        <label class="block text-blue-100 mb-1">Search</label>
+                        <input type="text" id="filterSearch" placeholder="Search expenses..." class="w-full rounded-lg border border-white/30 bg-white/10 text-white placeholder-blue-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/60">
+                    </div>
                     <div>
                         <label class="block text-blue-100 mb-1">Session/Term</label>
                         <select id="filterTerm" class="w-full rounded-lg border border-white/30 bg-white/10 text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/60">
@@ -510,7 +514,7 @@
     let budgetAlerts = [];
     let lastAlertSignature = '';
     let storageInfo = { storageMode: 'sqlite', libsqlUrl: null };
-    const filters = { session_term: '', category: '', status: '' };
+    const filters = { session_term: '', category: '', status: '', search: '' };
 
     const ensureFirebaseReady = async (timeoutMs = 5000) => {
         if (window.firebaseInitPromise) {
@@ -637,6 +641,7 @@
 
     const buildExpenseQuery = () => {
         const params = new URLSearchParams();
+        if (filters.search) params.append('search', filters.search);
         if (filters.session_term) params.append('session_term', filters.session_term);
         if (filters.category) params.append('category', filters.category);
         if (filters.status) params.append('status', filters.status);
@@ -654,9 +659,11 @@
     };
 
     const syncFilterInputs = () => {
+        const search = $("#filterSearch");
         const term = $("#filterTerm");
         const category = $("#filterCategory");
         const status = $("#filterStatus");
+        if (search) search.value = filters.search;
         if (term) term.value = filters.session_term;
         if (category) category.value = filters.category;
         if (status) status.value = filters.status;
@@ -1308,12 +1315,21 @@
 
         // Filters
         $("#applyFiltersBtn").addEventListener('click', () => {
+            filters.search = $("#filterSearch").value.trim();
             filters.session_term = $("#filterTerm").value;
             filters.category = $("#filterCategory").value;
             filters.status = $("#filterStatus").value;
             resetExpensePagination();
             updateActiveFiltersLabel();
             loadData();
+        });
+
+        // Allow Enter key in search to trigger filter
+        $("#filterSearch").addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                $("#applyFiltersBtn").click();
+            }
         });
 
         $("#clearFiltersBtn").addEventListener('click', () => {

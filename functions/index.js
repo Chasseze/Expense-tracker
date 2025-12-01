@@ -60,7 +60,7 @@ app.get('/api/status', async (req, res) => {
 app.get('/api/expenses', verifyToken, async (req, res) => {
   try {
     console.log('Expense filter query:', req.query); // Debug log
-    const { session_term, category, status, startDate, endDate } = req.query;
+    const { session_term, category, status, startDate, endDate, search } = req.query;
     // Pagination params
     const pageSize = Math.min(Math.max(parseInt(req.query.pageSize, 10) || 0, 0), 100); // 0 (no paging) to 100 max
     const page = Math.max(parseInt(req.query.page, 10) || 0, 0); // 0 means not provided
@@ -86,9 +86,27 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
 
   query = query.orderBy('date_time', 'desc').orderBy(FieldPath.documentId(), 'desc');
 
+    // Text search: Firestore doesn't support full-text search natively, so we fetch and filter client-side
+    // For large datasets, consider Algolia or similar
+    const searchTerm = search ? search.toLowerCase().trim() : null;
+
     // If explicit page number provided, prefer offset-based pagination for direct jumps
     if (pageSize > 0 && page > 0) {
       const pageNum = page; // 1-based expected from client
+      // For search, we need to fetch all and filter, then paginate manually
+      if (searchTerm) {
+        const snapshot = await query.get();
+        let allItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        allItems = allItems.filter(item =>
+          (item.description && item.description.toLowerCase().includes(searchTerm)) ||
+          (item.recipient && item.recipient.toLowerCase().includes(searchTerm)) ||
+          (item.category && item.category.toLowerCase().includes(searchTerm)) ||
+          (item.session_term && item.session_term.toLowerCase().includes(searchTerm))
+        );
+        const offset = Math.max((pageNum - 1) * pageSize, 0);
+        const items = allItems.slice(offset, offset + pageSize);
+        return res.json({ items, nextCursor: null, hasMore: offset + pageSize < allItems.length, total: allItems.length });
+      }
       const offset = Math.max((pageNum - 1) * pageSize, 0);
       const snapshot = await query.offset(offset).limit(pageSize).get();
       const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -135,7 +153,7 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
 app.get('/api/expenses/count', verifyToken, async (req, res) => {
   try {
     console.log('Expense count filter query:', req.query); // Debug log
-    const { session_term, category, status, startDate, endDate } = req.query;
+    const { session_term, category, status, startDate, endDate, search } = req.query;
     let query = db.collection('users').doc(req.user.uid).collection('expenses');
 
     if (session_term) {
@@ -152,6 +170,20 @@ app.get('/api/expenses/count', verifyToken, async (req, res) => {
     }
     if (endDate) {
       query = query.where('date_time', '<=', endDate);
+    }
+
+    // Text search requires fetching all and filtering
+    const searchTerm = search ? search.toLowerCase().trim() : null;
+    if (searchTerm) {
+      const snapshot = await query.get();
+      let allItems = snapshot.docs.map(doc => doc.data());
+      allItems = allItems.filter(item =>
+        (item.description && item.description.toLowerCase().includes(searchTerm)) ||
+        (item.recipient && item.recipient.toLowerCase().includes(searchTerm)) ||
+        (item.category && item.category.toLowerCase().includes(searchTerm)) ||
+        (item.session_term && item.session_term.toLowerCase().includes(searchTerm))
+      );
+      return res.json({ total: allItems.length });
     }
 
     // Use aggregate count if available (Admin SDK >= 12)
