@@ -59,7 +59,6 @@ app.get('/api/status', async (req, res) => {
 // Get expenses
 app.get('/api/expenses', verifyToken, async (req, res) => {
   try {
-    console.log('Expense filter query:', req.query); // Debug log
     const { session_term, category, status, startDate, endDate, search } = req.query;
     // Pagination params
     const pageSize = Math.min(Math.max(parseInt(req.query.pageSize, 10) || 0, 0), 100); // 0 (no paging) to 100 max
@@ -79,16 +78,17 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
   query = query.orderBy('date_time', 'desc').orderBy(FieldPath.documentId(), 'desc');
 
     // Text search and other filters: fetch all then filter client-side for flexibility
-    const searchTerm = search ? search.toLowerCase().trim() : null;
-    const filterSessionTerm = session_term ? session_term.toLowerCase().trim() : null;
-    const filterCategory = category ? category.toLowerCase().trim() : null;
-    const filterStatus = status ? status.toLowerCase().trim() : null;
-
-    console.log('Filter values:', { filterSessionTerm, filterCategory, filterStatus, searchTerm });
+    // Note: URLSearchParams encodes spaces as '+', but Express doesn't always decode them
+    // So we manually replace '+' with spaces before processing
+    const decodeParam = (val) => val ? decodeURIComponent(val.replace(/\+/g, ' ')).toLowerCase().trim() : null;
+    
+    const searchTerm = decodeParam(search);
+    const filterSessionTerm = decodeParam(session_term);
+    const filterCategory = decodeParam(category);
+    const filterStatus = decodeParam(status);
 
     // Helper function to apply client-side filters
     const applyFilters = (items) => {
-      console.log('Applying filters to', items.length, 'items');
       const filtered = items.filter(item => {
         // Search filter
         if (searchTerm) {
@@ -99,30 +99,23 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
             (item.session_term && item.session_term.toLowerCase().includes(searchTerm));
           if (!matchesSearch) return false;
         }
-        // Session/Term filter (case-insensitive, trim both sides)
+        // Session/Term filter (case-insensitive)
         if (filterSessionTerm) {
           const itemSessionTerm = item.session_term ? item.session_term.toLowerCase().trim() : '';
-          if (!itemSessionTerm || !itemSessionTerm.includes(filterSessionTerm)) {
-            return false;
-          }
+          if (!itemSessionTerm || !itemSessionTerm.includes(filterSessionTerm)) return false;
         }
-        // Category filter (case-insensitive, trim both sides)
+        // Category filter (case-insensitive)
         if (filterCategory) {
           const itemCategory = item.category ? item.category.toLowerCase().trim() : '';
-          if (!itemCategory || !itemCategory.includes(filterCategory)) {
-            return false;
-          }
+          if (!itemCategory || !itemCategory.includes(filterCategory)) return false;
         }
+        // Status filter (case-insensitive)
         // Status filter (case-insensitive)
         if (filterStatus && (!item.status || !item.status.toLowerCase().trim().includes(filterStatus))) {
           return false;
         }
         return true;
       });
-      console.log('After filtering:', filtered.length, 'items');
-      if (items.length > 0) {
-        console.log('Sample item session_term:', items[0].session_term, 'category:', items[0].category);
-      }
       return filtered;
     };
 
@@ -197,7 +190,6 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
 // Count expenses (for pagination UI)
 app.get('/api/expenses/count', verifyToken, async (req, res) => {
   try {
-    console.log('Expense count filter query:', req.query); // Debug log
     const { session_term, category, status, startDate, endDate, search } = req.query;
     let query = db.collection('users').doc(req.user.uid).collection('expenses');
 

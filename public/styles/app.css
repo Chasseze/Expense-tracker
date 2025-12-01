@@ -149,15 +149,15 @@ body.theme-dark .skeleton {
 }
 
 /* --- Hero / header layout to match requested design --- */
-.header-hero.card { border-radius: 1.5rem; padding: clamp(2rem, 4vw, 3.5rem); overflow: hidden; background: linear-gradient(90deg, #2563eb 0%, #5aa0ff 40%, #f97316 100%); }
-.hero-inner { max-width: var(--max-content-width); margin: 0 auto; display:flex; flex-direction:column; gap:1rem; align-items:center; }
+.header-hero.card { border-radius: 1.5rem; padding: clamp(1rem, 2vw, 2rem); overflow: hidden; background: linear-gradient(90deg, #2563eb 0%, #5aa0ff 40%, #f97316 100%); }
+.hero-inner { max-width: var(--max-content-width); margin: 0 auto; display:flex; flex-direction:column; gap:0.5rem; align-items:center; }
 .hero-title { font-weight:800; font-size: clamp(1.8rem, 3.2vw + 1rem, 3.6rem); line-height:1.02; margin:0; text-align:center; text-shadow:0 2px 0 rgba(0,0,0,0.08); }
 /* Title box to match other content widths and feel like a card */
 .hero-title-box {
     width: 100%;
     max-width: 100%; /* fill the header width so it lines up with other sections */
     background: rgba(255,255,255,0.06);
-    padding: 1.25rem 1.5rem;
+    padding: 0.75rem 1rem;
     border-radius: 1rem;
     margin: 0 auto;
     text-align: center;

@@ -5,6 +5,7 @@
    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Secure Expense Tracker & Blog</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <!-- Use built Tailwind CSS for production instead of the CDN. Bump APP_VERSION to force cache refresh. -->
     <link rel="stylesheet" href="/styles/tailwind.css?v=1">
     <script>const APP_VERSION = '1';</script>
@@ -145,7 +146,7 @@
 
     <!-- MAIN APP -->
 <div id="app" class="max-w-7xl mx-auto hidden">
-    <header class="header-hero card w-full rounded-2xl shadow-xl p-6 md:p-8 mb-8 text-white">
+    <header class="header-hero card w-full rounded-2xl shadow-xl p-4 md:p-5 mb-6 text-white">
         <div class="hero-inner">
             <div style="width:100%; display:flex; justify-content:flex-end;">
                 <span id="storageBadge" class="hidden px-4 py-1 rounded-full bg-white/20 text-white text-xs font-semibold tracking-wide shadow-inner"></span>
@@ -186,6 +187,21 @@
         <!-- SUMMARY SECTION -->
         <div id="summarySection" class="mb-8">
             <div class="grid grid-cols-3 gap-4 md:gap-6 mb-6" id="summaryCards"></div>
+            <!-- Charts Section - always side by side using flex -->
+            <div class="flex flex-row gap-3 md:gap-6 mb-6">
+                <div class="card bg-white rounded-2xl shadow-lg p-3 md:p-6 flex-1 min-w-0">
+                    <h2 class="text-xs md:text-lg font-bold text-gray-800 mb-2 md:mb-3 text-center">Spending by Category</h2>
+                    <div class="relative" style="height: 200px;">
+                        <canvas id="categoryPieChart"></canvas>
+                    </div>
+                </div>
+                <div class="card bg-white rounded-2xl shadow-lg p-3 md:p-6 flex-1 min-w-0">
+                    <h2 class="text-xs md:text-lg font-bold text-gray-800 mb-2 md:mb-3 text-center">Monthly Spending Trend</h2>
+                    <div class="relative" style="height: 200px;">
+                        <canvas id="monthlyBarChart"></canvas>
+                    </div>
+                </div>
+            </div>
             <div id="categoryCard" class="card bg-white rounded-2xl shadow-lg p-6">
                 <h2 class="text-2xl font-bold text-gray-800 mb-4"><center>Category Breakdown</center></h2>
                 <div id="categoryBreakdown" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"></div>
@@ -199,14 +215,15 @@
                 <p class="text-blue-100">Your complete financial history</p>
             </div>
             <div class="bg-white/10 backdrop-blur-sm rounded-xl p-4 mb-6">
-                <div class="grid grid-cols-1 md:grid-cols-5 gap-4 text-sm items-end">
-                    <div>
-                        <label class="block text-blue-100 mb-1">Search</label>
-                        <input type="text" id="filterSearch" placeholder="Search expenses..." class="w-full rounded-lg border border-white/30 bg-white/10 text-white placeholder-blue-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/60">
+                <!-- Row 1: Search and dropdown filters - always 4 columns using flex -->
+                <div class="flex flex-row gap-2 md:gap-3 text-sm items-end mb-3">
+                    <div class="flex-1 min-w-0">
+                        <label class="block text-blue-100 mb-1 text-xs md:text-sm">Search</label>
+                        <input type="text" id="filterSearch" placeholder="Search..." class="w-full rounded-lg border border-white/30 bg-white/10 text-white placeholder-blue-200 px-2 md:px-3 py-2 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-white/60">
                     </div>
-                    <div>
-                        <label class="block text-blue-100 mb-1">Session/Term</label>
-                        <select id="filterTerm" class="w-full rounded-lg border border-white/30 bg-white/10 text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/60">
+                    <div class="flex-1 min-w-0">
+                        <label class="block text-blue-100 mb-1 text-xs md:text-sm">Session/Term</label>
+                        <select id="filterTerm" class="w-full rounded-lg border border-white/30 bg-white/10 text-white px-1 md:px-3 py-2 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-white/60">
                             <option value="">All</option>
                             <option value="First Term">First Term</option>
                             <option value="Second Term">Second Term</option>
@@ -215,9 +232,9 @@
                             <option value="Second Semester">Second Semester</option>
                         </select>
                     </div>
-                    <div>
-                        <label class="block text-blue-100 mb-1">Category</label>
-                        <select id="filterCategory" class="w-full rounded-lg border border-white/30 bg-white/10 text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/60">
+                    <div class="flex-1 min-w-0">
+                        <label class="block text-blue-100 mb-1 text-xs md:text-sm">Category</label>
+                        <select id="filterCategory" class="w-full rounded-lg border border-white/30 bg-white/10 text-white px-1 md:px-3 py-2 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-white/60">
                             <option value="">All</option>
                             <option value="Home Upkeep">Home Upkeep</option>
                             <option value="School Upkeep">School Upkeep</option>
@@ -225,17 +242,32 @@
                             <option value="Projects">Projects</option>
                         </select>
                     </div>
-                    <div>
-                        <label class="block text-blue-100 mb-1">Status</label>
-                        <select id="filterStatus" class="w-full rounded-lg border border-white/30 bg-white/10 text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/60">
+                    <div class="flex-1 min-w-0">
+                        <label class="block text-blue-100 mb-1 text-xs md:text-sm">Status</label>
+                        <select id="filterStatus" class="w-full rounded-lg border border-white/30 bg-white/10 text-white px-1 md:px-3 py-2 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-white/60">
                             <option value="">All</option>
                             <option value="Paid">Paid</option>
                             <option value="Partial">Partial</option>
                         </select>
                     </div>
-                    <div class="flex flex-wrap w-full gap-3">
-                        <button id="applyFiltersBtn" class="flex-1 bg-white text-blue-700 px-4 py-2 rounded-lg font-semibold hover:bg-blue-50">Apply Filters</button>
-                        <button id="clearFiltersBtn" class="flex-1 border border-white/50 px-4 py-2 rounded-lg font-semibold text-white hover:bg-white/10">Reset</button>
+                </div>
+                <!-- Row 2: Date range and action buttons - always 4 columns using flex -->
+                <div class="flex flex-row gap-2 md:gap-3 text-sm items-end">
+                    <div class="flex-1 min-w-0">
+                        <label class="block text-blue-100 mb-1 text-xs md:text-sm">Start Date</label>
+                        <input type="date" id="filterStartDate" class="w-full rounded-lg border border-white/30 bg-white/10 text-white px-1 md:px-3 py-2 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-white/60">
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <label class="block text-blue-100 mb-1 text-xs md:text-sm">End Date</label>
+                        <input type="date" id="filterEndDate" class="w-full rounded-lg border border-white/30 bg-white/10 text-white px-1 md:px-3 py-2 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-white/60">
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <label class="block text-blue-100 mb-1 text-xs md:text-sm">&nbsp;</label>
+                        <button id="applyFiltersBtn" class="w-full bg-white text-blue-700 px-1 md:px-3 py-2 rounded-lg font-semibold text-xs md:text-sm hover:bg-blue-50">Apply</button>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <label class="block text-blue-100 mb-1 text-xs md:text-sm">&nbsp;</label>
+                        <button id="clearFiltersBtn" class="w-full border border-white/50 px-1 md:px-3 py-2 rounded-lg font-semibold text-white text-xs md:text-sm hover:bg-white/10">Reset</button>
                     </div>
                 </div>
                 <span id="activeFilters" class="text-blue-100 text-xs block mt-3"></span>
@@ -514,7 +546,7 @@
     let budgetAlerts = [];
     let lastAlertSignature = '';
     let storageInfo = { storageMode: 'sqlite', libsqlUrl: null };
-    const filters = { session_term: '', category: '', status: '', search: '' };
+    const filters = { session_term: '', category: '', status: '', search: '', startDate: '', endDate: '' };
 
     const ensureFirebaseReady = async (timeoutMs = 5000) => {
         if (window.firebaseInitPromise) {
@@ -645,6 +677,8 @@
         if (filters.session_term) params.append('session_term', filters.session_term);
         if (filters.category) params.append('category', filters.category);
         if (filters.status) params.append('status', filters.status);
+        if (filters.startDate) params.append('startDate', filters.startDate);
+        if (filters.endDate) params.append('endDate', filters.endDate);
         const qs = params.toString();
         return qs ? `?${qs}` : '';
     };
@@ -663,10 +697,14 @@
         const term = $("#filterTerm");
         const category = $("#filterCategory");
         const status = $("#filterStatus");
+        const startDate = $("#filterStartDate");
+        const endDate = $("#filterEndDate");
         if (search) search.value = filters.search;
         if (term) term.value = filters.session_term;
         if (category) category.value = filters.category;
         if (status) status.value = filters.status;
+        if (startDate) startDate.value = filters.startDate;
+        if (endDate) endDate.value = filters.endDate;
     };
 
     const toNumber = value => {
@@ -1152,6 +1190,120 @@
                 ${alertSet.has(cat.category) ? `<p class="text-sm text-red-600 font-semibold mt-2"><i class="fas fa-exclamation-triangle mr-1"></i>Over budget</p>` : ''}
             </div>
         `).join('');
+
+        // Render charts
+        renderCharts(categories, expenses);
+    }
+
+    // Chart instances
+    let categoryPieChart = null;
+    let monthlyBarChart = null;
+
+    function renderCharts(categories, expenseData) {
+        const chartColors = [
+            'rgba(59, 130, 246, 0.8)',   // blue
+            'rgba(16, 185, 129, 0.8)',   // green
+            'rgba(249, 115, 22, 0.8)',   // orange
+            'rgba(139, 92, 246, 0.8)',   // purple
+            'rgba(236, 72, 153, 0.8)',   // pink
+            'rgba(20, 184, 166, 0.8)',   // teal
+            'rgba(245, 158, 11, 0.8)',   // amber
+            'rgba(239, 68, 68, 0.8)'     // red
+        ];
+
+        // Category Pie Chart
+        const pieCtx = document.getElementById('categoryPieChart');
+        if (pieCtx && categories.length > 0) {
+            if (categoryPieChart) categoryPieChart.destroy();
+            categoryPieChart = new Chart(pieCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: categories.map(c => c.category),
+                    datasets: [{
+                        data: categories.map(c => c.total_paid + c.total_balance),
+                        backgroundColor: chartColors.slice(0, categories.length),
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { padding: 15, usePointStyle: true }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => `${ctx.label}: ${fmtMoney(ctx.raw)}`
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Monthly Bar Chart - aggregate by month
+        const barCtx = document.getElementById('monthlyBarChart');
+        if (barCtx && expenseData.length > 0) {
+            const monthlyData = {};
+            expenseData.forEach(exp => {
+                const date = new Date(exp.date_time);
+                const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                if (!monthlyData[key]) monthlyData[key] = { paid: 0, balance: 0 };
+                monthlyData[key].paid += exp.amount_paid || 0;
+                monthlyData[key].balance += exp.balance_due || 0;
+            });
+
+            const sortedMonths = Object.keys(monthlyData).sort().slice(-6); // Last 6 months
+            const monthLabels = sortedMonths.map(m => {
+                const [y, mo] = m.split('-');
+                return new Date(y, mo - 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+            });
+
+            if (monthlyBarChart) monthlyBarChart.destroy();
+            monthlyBarChart = new Chart(barCtx, {
+                type: 'bar',
+                data: {
+                    labels: monthLabels,
+                    datasets: [
+                        {
+                            label: 'Paid',
+                            data: sortedMonths.map(m => monthlyData[m].paid),
+                            backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                            borderRadius: 4
+                        },
+                        {
+                            label: 'Balance Due',
+                            data: sortedMonths.map(m => monthlyData[m].balance),
+                            backgroundColor: 'rgba(249, 115, 22, 0.8)',
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: (val) => '₦' + (val >= 1000 ? (val/1000).toFixed(0) + 'k' : val)
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => `${ctx.dataset.label}: ${fmtMoney(ctx.raw)}`
+                            }
+                        }
+                    }
+                }
+            });
+        }
     }
 
     // Expense Functions
@@ -1319,6 +1471,8 @@
             filters.session_term = $("#filterTerm").value;
             filters.category = $("#filterCategory").value;
             filters.status = $("#filterStatus").value;
+            filters.startDate = $("#filterStartDate").value;
+            filters.endDate = $("#filterEndDate").value;
             resetExpensePagination();
             updateActiveFiltersLabel();
             loadData();
@@ -1572,12 +1726,30 @@
             });
         }
 
-        // Export functionality
+        // Export functionality - with option to export filtered data
         $("#exportBtn").addEventListener('click', () => {
+            const hasActiveFilters = Object.values(filters).some(v => v);
+            let dataToExport = expenses;
+            let exportType = 'all';
+
+            if (hasActiveFilters) {
+                const choice = confirm(
+                    "You have active filters.\n\n" +
+                    "Click OK to export only filtered expenses.\n" +
+                    "Click Cancel to export ALL expenses."
+                );
+                if (choice) {
+                    exportType = 'filtered';
+                    // The 'expenses' array already contains filtered results from the API
+                }
+            }
+
             const data = {
-                expenses: expenses,
+                expenses: dataToExport,
                 blogPosts: blogPosts,
                 exportedAt: new Date().toISOString(),
+                exportType: exportType,
+                appliedFilters: hasActiveFilters ? filters : null,
                 user: appCurrentUser ? appCurrentUser.email || appCurrentUser.uid : 'anonymous'
             };
             
@@ -1585,9 +1757,10 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `expense-tracker-export-${new Date().toISOString().split('T')[0]}.json`;
+            const suffix = exportType === 'filtered' ? '-filtered' : '';
+            a.download = `expense-tracker-export${suffix}-${new Date().toISOString().split('T')[0]}.json`;
             a.click();
-            notify("Data exported successfully!");
+            notify(`${exportType === 'filtered' ? 'Filtered' : 'All'} data exported successfully!`);
         });
     });
     </script>
