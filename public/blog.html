@@ -1,0 +1,688 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Financial Journal — Expense Tracker</title>
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+        />
+        <link rel="stylesheet" href="/styles/tailwind.css?v=1" />
+        <link rel="stylesheet" href="/styles/app.css?v=1" />
+        <script src="firebase-config.js?v=1" defer></script>
+        <style>
+            :root {
+                --sidebar-width: 340px;
+            }
+            body.blog-body {
+                background: #f1f5f9;
+                min-height: 100vh;
+                margin: 0;
+                padding: 0;
+            }
+            /* ── Header ── */
+            .blog-header {
+                background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+                color: #fff;
+                padding: 1.25rem 1.5rem;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                flex-wrap: wrap;
+                gap: 1rem;
+                position: sticky;
+                top: 0;
+                z-index: 30;
+            }
+            .blog-header-left {
+                display: flex;
+                align-items: center;
+                gap: 1.25rem;
+            }
+            .blog-header h1 {
+                font-size: 1.35rem;
+                font-weight: 800;
+                letter-spacing: -0.02em;
+                margin: 0;
+            }
+            .blog-back-link {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.4rem;
+                color: rgba(255,255,255,0.85);
+                font-weight: 600;
+                font-size: 0.85rem;
+                text-decoration: none;
+                transition: color 0.2s;
+                background: rgba(255,255,255,0.1);
+                padding: 0.5rem 0.85rem;
+                border-radius: 0.5rem;
+            }
+            .blog-back-link:hover { color: #fff; background: rgba(255,255,255,0.2); }
+            .blog-compose-btn {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.5rem;
+                background: rgba(255,255,255,0.2);
+                backdrop-filter: blur(6px);
+                color: #fff;
+                font-weight: 700;
+                padding: 0.6rem 1.2rem;
+                border-radius: 0.65rem;
+                border: 1px solid rgba(255,255,255,0.3);
+                cursor: pointer;
+                font-size: 0.9rem;
+                transition: background 0.2s;
+            }
+            .blog-compose-btn:hover { background: rgba(255,255,255,0.35); }
+
+            /* ── Layout Container ── */
+            .blog-layout {
+                display: flex;
+                min-height: calc(100vh - 70px);
+            }
+
+            /* ── Sidebar ── */
+            .blog-sidebar {
+                width: var(--sidebar-width);
+                background: #fff;
+                border-right: 1px solid #e2e8f0;
+                overflow-y: auto;
+                flex-shrink: 0;
+                position: sticky;
+                top: 70px;
+                height: calc(100vh - 70px);
+            }
+            .sidebar-header {
+                padding: 1rem 1.25rem;
+                border-bottom: 1px solid #e2e8f0;
+                background: #fafbfc;
+                font-weight: 700;
+                color: #475569;
+                font-size: 0.8rem;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            }
+            .sidebar-list {
+                list-style: none;
+                margin: 0;
+                padding: 0;
+            }
+            .sidebar-item {
+                padding: 1rem 1.25rem;
+                border-bottom: 1px solid #f1f5f9;
+                cursor: pointer;
+                transition: background 0.15s;
+            }
+            .sidebar-item:hover { background: #f8fafc; }
+            .sidebar-item.active {
+                background: linear-gradient(90deg, #ede9fe 0%, #f8fafc 100%);
+                border-left: 3px solid #8b5cf6;
+            }
+            .sidebar-item-category {
+                display: inline-block;
+                background: #e0e7ff;
+                color: #4f46e5;
+                font-weight: 600;
+                font-size: 0.65rem;
+                padding: 0.15rem 0.5rem;
+                border-radius: 9999px;
+                text-transform: uppercase;
+                letter-spacing: 0.03em;
+                margin-bottom: 0.4rem;
+            }
+            .sidebar-item-title {
+                font-weight: 700;
+                color: #1e293b;
+                font-size: 0.95rem;
+                line-height: 1.35;
+                margin-bottom: 0.35rem;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+            }
+            .sidebar-item-excerpt {
+                color: #64748b;
+                font-size: 0.8rem;
+                line-height: 1.45;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+            }
+            .sidebar-item-date {
+                color: #94a3b8;
+                font-size: 0.72rem;
+                margin-top: 0.5rem;
+            }
+            .sidebar-empty {
+                padding: 2rem 1.25rem;
+                text-align: center;
+                color: #94a3b8;
+            }
+            .sidebar-empty i { font-size: 2rem; margin-bottom: 0.75rem; opacity: 0.4; }
+
+            /* ── Main Content Area ── */
+            .blog-main {
+                flex: 1;
+                padding: 2rem;
+                overflow-y: auto;
+            }
+            .article-container {
+                max-width: 800px;
+                margin: 0 auto;
+            }
+            .article-welcome {
+                text-align: center;
+                padding: 4rem 2rem;
+                color: #64748b;
+            }
+            .article-welcome i { font-size: 4rem; margin-bottom: 1.5rem; opacity: 0.25; color: #8b5cf6; }
+            .article-welcome h2 { font-size: 1.5rem; color: #475569; margin-bottom: 0.5rem; }
+
+            /* ── Article View ── */
+            .article-card {
+                background: #fff;
+                border-radius: 1rem;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.06);
+                overflow: hidden;
+            }
+            .article-header {
+                padding: 2rem 2rem 1.5rem;
+                border-bottom: 1px solid #f1f5f9;
+            }
+            .article-category {
+                display: inline-block;
+                background: linear-gradient(135deg, #ede9fe, #e0e7ff);
+                color: #4f46e5;
+                font-weight: 600;
+                font-size: 0.75rem;
+                padding: 0.25rem 0.75rem;
+                border-radius: 9999px;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+                margin-bottom: 0.75rem;
+            }
+            .article-title {
+                font-size: 1.75rem;
+                font-weight: 800;
+                color: #1e1b4b;
+                line-height: 1.3;
+                margin-bottom: 0.75rem;
+            }
+            .article-meta {
+                display: flex;
+                align-items: center;
+                gap: 1.5rem;
+                color: #64748b;
+                font-size: 0.85rem;
+            }
+            .article-meta i { margin-right: 0.35rem; opacity: 0.7; }
+            .article-body {
+                padding: 2rem;
+                font-size: 1.05rem;
+                line-height: 1.8;
+                color: #334155;
+                white-space: pre-wrap;
+            }
+            .article-footer {
+                padding: 1.25rem 2rem;
+                background: #fafbfc;
+                border-top: 1px solid #f1f5f9;
+                display: flex;
+                justify-content: flex-end;
+                gap: 0.75rem;
+            }
+            .article-action-btn {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.4rem;
+                padding: 0.55rem 1rem;
+                border-radius: 0.5rem;
+                font-size: 0.85rem;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.15s;
+                border: 1px solid #e2e8f0;
+                background: #fff;
+                color: #475569;
+            }
+            .article-action-btn:hover { background: #f1f5f9; color: #1e293b; }
+            .article-action-btn.edit-btn:hover { color: #4f46e5; border-color: #c7d2fe; }
+            .article-action-btn.delete-btn:hover { color: #ef4444; border-color: #fca5a5; background: #fef2f2; }
+
+            /* ── Modal ── */
+            .blog-modal-overlay {
+                position: fixed;
+                inset: 0;
+                background: rgba(0,0,0,0.5);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 1rem;
+                z-index: 50;
+            }
+            .blog-modal-box {
+                background: #fff;
+                border-radius: 1.25rem;
+                box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+                width: 100%;
+                max-width: 720px;
+                max-height: 90vh;
+                overflow-y: auto;
+                padding: 2rem;
+            }
+
+            /* ── Mobile Toggle ── */
+            .mobile-sidebar-toggle {
+                display: none;
+                position: fixed;
+                bottom: 1.5rem;
+                left: 1.5rem;
+                z-index: 40;
+                background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+                color: #fff;
+                border: none;
+                border-radius: 50%;
+                width: 56px;
+                height: 56px;
+                font-size: 1.25rem;
+                cursor: pointer;
+                box-shadow: 0 4px 15px rgba(99,102,241,0.4);
+            }
+
+            /* ── Responsive ── */
+            @media (max-width: 900px) {
+                .blog-sidebar {
+                    position: fixed;
+                    left: 0;
+                    top: 0;
+                    height: 100vh;
+                    z-index: 45;
+                    transform: translateX(-100%);
+                    transition: transform 0.3s ease;
+                }
+                .blog-sidebar.open { transform: translateX(0); }
+                .mobile-sidebar-toggle { display: flex; align-items: center; justify-content: center; }
+                .sidebar-overlay {
+                    position: fixed;
+                    inset: 0;
+                    background: rgba(0,0,0,0.4);
+                    z-index: 44;
+                    display: none;
+                }
+                .sidebar-overlay.open { display: block; }
+                .blog-main { padding: 1.25rem; }
+                .article-header { padding: 1.5rem; }
+                .article-body { padding: 1.5rem; font-size: 1rem; }
+                .article-footer { padding: 1rem 1.5rem; flex-wrap: wrap; }
+                .article-title { font-size: 1.4rem; }
+            }
+        </style>
+    </head>
+    <body class="blog-body">
+        <!-- HEADER -->
+        <header class="blog-header">
+            <div class="blog-header-left">
+                <a href="/index.html" class="blog-back-link"><i class="fas fa-arrow-left"></i> Dashboard</a>
+                <h1><i class="fas fa-feather-alt" style="margin-right:0.4rem;opacity:0.85;"></i>Financial Journal</h1>
+            </div>
+            <button id="composeBtn" class="blog-compose-btn">
+                <i class="fas fa-plus"></i> New Post
+            </button>
+        </header>
+
+        <!-- LAYOUT -->
+        <div class="blog-layout">
+            <!-- Sidebar -->
+            <aside id="blogSidebar" class="blog-sidebar">
+                <div class="sidebar-header">
+                    <i class="fas fa-list"></i> All Posts
+                    <span id="postCount" style="margin-left:auto; color:#8b5cf6;"></span>
+                </div>
+                <ul id="sidebarList" class="sidebar-list"></ul>
+                <div id="sidebarEmpty" class="sidebar-empty" style="display:none;">
+                    <i class="fas fa-inbox"></i>
+                    <p>No posts yet.<br>Click "New Post" to start writing.</p>
+                </div>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="blog-main">
+                <div class="article-container">
+                    <!-- Welcome / Placeholder -->
+                    <div id="articleWelcome" class="article-welcome">
+                        <i class="fas fa-book-reader"></i>
+                        <h2>Welcome to Your Journal</h2>
+                        <p>Select a post from the sidebar to start reading, or create a new one.</p>
+                    </div>
+
+                    <!-- Article View (hidden initially) -->
+                    <article id="articleView" class="article-card" style="display:none;">
+                        <div class="article-header">
+                            <span id="articleCategory" class="article-category"></span>
+                            <h1 id="articleTitle" class="article-title"></h1>
+                            <div class="article-meta">
+                                <span><i class="fas fa-calendar-alt"></i> <span id="articleDate"></span></span>
+                            </div>
+                        </div>
+                        <div id="articleBody" class="article-body"></div>
+                        <div class="article-footer">
+                            <button id="editArticleBtn" class="article-action-btn edit-btn">
+                                <i class="fas fa-pen"></i> Edit
+                            </button>
+                            <button id="deleteArticleBtn" class="article-action-btn delete-btn">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                        </div>
+                    </article>
+                </div>
+            </main>
+        </div>
+
+        <!-- Mobile Sidebar Toggle -->
+        <button id="mobileSidebarToggle" class="mobile-sidebar-toggle">
+            <i class="fas fa-bars"></i>
+        </button>
+        <div id="sidebarOverlay" class="sidebar-overlay"></div>
+
+        <!-- COMPOSE / EDIT MODAL -->
+        <div id="blogModal" class="blog-modal-overlay" style="display:none;">
+            <div class="blog-modal-box">
+                <div class="flex justify-between items-center mb-5">
+                    <h2 id="modalTitle" class="text-xl font-bold text-gray-800">Write Blog Post</h2>
+                    <button id="closeModal" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+                </div>
+                <form id="blogForm" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Date &amp; Time</label>
+                            <input type="datetime-local" id="blogDateTime" required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-500" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                            <select id="blogCategory" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                                <option>Financial Insights</option>
+                                <option>Monthly Review</option>
+                                <option>Expense Notes</option>
+                                <option>Budget Planning</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                        <input type="text" id="blogTitle" placeholder="Post title" required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-500" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Content</label>
+                        <textarea id="blogContent" rows="8" placeholder="Your thoughts..." required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-500"></textarea>
+                    </div>
+                    <div class="flex gap-3 pt-4">
+                        <button type="submit" class="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 rounded-lg font-medium hover:opacity-90 transition">
+                            Publish Post
+                        </button>
+                        <button type="button" id="cancelBtn" class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- NOTIFICATION -->
+        <div id="notification" class="fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg hidden">
+            <span id="notificationText"></span>
+        </div>
+
+        <script>
+            const API_BASE = window.location.origin + "/api";
+            const $ = (q) => document.querySelector(q);
+            let blogPosts = [];
+            let selectedPostId = null;
+            let editingId = null;
+
+            // ── Auth helpers ──
+            const ensureFirebaseReady = async (timeoutMs = 5000) => {
+                if (window.firebaseInitPromise) {
+                    try {
+                        await Promise.race([
+                            window.firebaseInitPromise,
+                            new Promise((_, rej) => setTimeout(() => rej(new Error("Firebase init timeout")), timeoutMs)),
+                        ]);
+                    } catch (err) {
+                        console.error("Firebase init failed or timed out:", err);
+                        throw err;
+                    }
+                }
+                if (typeof firebaseReady !== "undefined" && !firebaseReady) {
+                    throw new Error("Firebase not ready");
+                }
+            };
+
+            const apiCall = async (endpoint, options = {}) => {
+                await ensureFirebaseReady();
+                const token = typeof getIdToken === "function" ? await getIdToken() : null;
+                const config = { headers: { "Content-Type": "application/json" }, ...options };
+                if (options.body) config.body = JSON.stringify(options.body);
+                if (!window.appLocalOnly && token) {
+                    config.headers["Authorization"] = `Bearer ${token}`;
+                }
+                const response = await fetch(`${API_BASE}${endpoint}`, config);
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || "Request failed");
+                return data;
+            };
+
+            const notify = (msg, err = false) => {
+                const box = $("#notification");
+                box.className = `fixed bottom-4 right-4 ${err ? "bg-red-500" : "bg-green-500"} text-white px-6 py-3 rounded-lg shadow-lg`;
+                $("#notificationText").textContent = msg;
+                box.classList.remove("hidden");
+                setTimeout(() => box.classList.add("hidden"), 3000);
+            };
+
+            function escapeHtml(str) {
+                const d = document.createElement("div");
+                d.textContent = str || "";
+                return d.innerHTML;
+            }
+
+            function formatDate(dateStr) {
+                return new Date(dateStr).toLocaleDateString(undefined, {
+                    year: "numeric", month: "long", day: "numeric"
+                });
+            }
+
+            // ── Sidebar Rendering ──
+            function renderSidebar() {
+                const list = $("#sidebarList");
+                const empty = $("#sidebarEmpty");
+                const count = $("#postCount");
+
+                count.textContent = blogPosts.length ? `(${blogPosts.length})` : "";
+
+                if (blogPosts.length === 0) {
+                    list.innerHTML = "";
+                    empty.style.display = "block";
+                    return;
+                }
+                empty.style.display = "none";
+
+                list.innerHTML = blogPosts.map(post => `
+                    <li class="sidebar-item ${selectedPostId === post.id ? 'active' : ''}" data-id="${post.id}">
+                        <span class="sidebar-item-category">${escapeHtml(post.category)}</span>
+                        <div class="sidebar-item-title">${escapeHtml(post.title)}</div>
+                        <div class="sidebar-item-excerpt">${escapeHtml(post.content.substring(0, 80))}</div>
+                        <div class="sidebar-item-date"><i class="fas fa-clock" style="margin-right:4px;opacity:0.6;"></i>${formatDate(post.date_time)}</div>
+                    </li>
+                `).join("");
+            }
+
+            // ── Article View ──
+            function showArticle(post) {
+                if (!post) {
+                    $("#articleWelcome").style.display = "block";
+                    $("#articleView").style.display = "none";
+                    selectedPostId = null;
+                    renderSidebar();
+                    return;
+                }
+
+                selectedPostId = post.id;
+                $("#articleWelcome").style.display = "none";
+                $("#articleView").style.display = "block";
+
+                $("#articleCategory").textContent = post.category;
+                $("#articleTitle").textContent = post.title;
+                $("#articleDate").textContent = formatDate(post.date_time);
+                $("#articleBody").textContent = post.content;
+
+                renderSidebar(); // Update active state
+
+                // Close mobile sidebar after selection
+                closeMobileSidebar();
+            }
+
+            // ── Load posts ──
+            async function loadPosts() {
+                try {
+                    blogPosts = await apiCall("/blog-posts");
+                    // Sort by date descending (newest first)
+                    blogPosts.sort((a, b) => new Date(b.date_time) - new Date(a.date_time));
+                    renderSidebar();
+
+                    // If we had a selected post, refresh it; otherwise show welcome
+                    if (selectedPostId) {
+                        const post = blogPosts.find(p => p.id === selectedPostId);
+                        showArticle(post || null);
+                    }
+                } catch (err) {
+                    console.error("Failed to load blog posts:", err);
+                    notify("Failed to load posts. Please log in first.", true);
+                }
+            }
+
+            // ── Modal helpers ──
+            function openModal(post) {
+                editingId = post ? post.id : null;
+                $("#modalTitle").textContent = post ? "Edit Blog Post" : "Write New Post";
+                $("#blogDateTime").value = post
+                    ? post.date_time.replace(" ", "T").substring(0, 16)
+                    : new Date().toISOString().slice(0, 16);
+                $("#blogCategory").value = post ? post.category : "Financial Insights";
+                $("#blogTitle").value = post ? post.title : "";
+                $("#blogContent").value = post ? post.content : "";
+                $("#blogModal").style.display = "flex";
+            }
+
+            function closeModal() {
+                $("#blogModal").style.display = "none";
+                editingId = null;
+            }
+
+            // ── Mobile Sidebar ──
+            function openMobileSidebar() {
+                $("#blogSidebar").classList.add("open");
+                $("#sidebarOverlay").classList.add("open");
+            }
+            function closeMobileSidebar() {
+                $("#blogSidebar").classList.remove("open");
+                $("#sidebarOverlay").classList.remove("open");
+            }
+
+            // ── Init ──
+            document.addEventListener("DOMContentLoaded", async () => {
+                // Event listeners first
+                $("#composeBtn").addEventListener("click", () => openModal(null));
+                $("#closeModal").addEventListener("click", () => closeModal());
+                $("#cancelBtn").addEventListener("click", () => closeModal());
+                $("#blogModal").addEventListener("click", (e) => {
+                    if (e.target === $("#blogModal")) closeModal();
+                });
+                document.addEventListener("keydown", (e) => {
+                    if (e.key === "Escape") closeModal();
+                });
+
+                // Sidebar item click
+                $("#sidebarList").addEventListener("click", (e) => {
+                    const item = e.target.closest(".sidebar-item");
+                    if (!item) return;
+                    const id = item.dataset.id;
+                    const post = blogPosts.find(p => String(p.id) === id);
+                    if (post) showArticle(post);
+                });
+
+                // Article edit/delete
+                $("#editArticleBtn").addEventListener("click", () => {
+                    const post = blogPosts.find(p => p.id === selectedPostId);
+                    if (post) openModal(post);
+                });
+                $("#deleteArticleBtn").addEventListener("click", async () => {
+                    if (!selectedPostId) return;
+                    if (!confirm("Delete this blog post?")) return;
+                    try {
+                        await apiCall(`/blog-posts/${encodeURIComponent(String(selectedPostId))}`, { method: "DELETE" });
+                        notify("Blog post deleted!");
+                        blogPosts = blogPosts.filter(p => p.id !== selectedPostId);
+                        showArticle(null);
+                        renderSidebar();
+                    } catch (err) {
+                        notify(err?.message || "Error deleting post", true);
+                    }
+                });
+
+                // Mobile sidebar toggle
+                $("#mobileSidebarToggle").addEventListener("click", openMobileSidebar);
+                $("#sidebarOverlay").addEventListener("click", closeMobileSidebar);
+
+                // Form submit
+                $("#blogForm").addEventListener("submit", async (e) => {
+                    e.preventDefault();
+                    const postData = {
+                        date_time: $("#blogDateTime").value.replace("T", " "),
+                        category: $("#blogCategory").value,
+                        title: $("#blogTitle").value,
+                        content: $("#blogContent").value,
+                    };
+                    try {
+                        if (editingId) {
+                            await apiCall(`/blog-posts/${encodeURIComponent(String(editingId))}`, { method: "PUT", body: postData });
+                            notify("Blog post updated!");
+                            // Refresh and show updated post
+                            await loadPosts();
+                            const updated = blogPosts.find(p => p.id === editingId);
+                            if (updated) showArticle(updated);
+                        } else {
+                            const result = await apiCall("/blog-posts", { method: "POST", body: postData });
+                            notify("Blog post published!");
+                            await loadPosts();
+                            // Show the newly created post (it will be first after sorting)
+                            if (blogPosts.length > 0) showArticle(blogPosts[0]);
+                        }
+                        closeModal();
+                    } catch (err) {
+                        notify(err?.message || "Error saving post", true);
+                    }
+                });
+
+                // Auth gate
+                try {
+                    await ensureFirebaseReady();
+                } catch (_) {}
+                const hasAuth = localStorage.getItem("authToken") || localStorage.getItem("appCurrentUser") || localStorage.getItem("currentUser");
+                if (!hasAuth) {
+                    window.location.href = "/index.html";
+                    return;
+                }
+
+                // Load posts
+                await loadPosts();
+            });
+        </script>
+    </body>
+</html>
