@@ -755,10 +755,20 @@ body.theme-dark .skeleton {
 }
 .export-dropdown-container {
     position: relative;
+    display: block;
     width: 100%;
+    min-width: 0;
 }
 .export-dropdown-container .nav-tab {
     width: 100%;
+    min-width: 0;
+}
+.nav-container > .export-dropdown-container {
+    width: 100%;
+}
+.export-caret {
+    margin-left: 0.2rem;
+    font-size: 0.8em;
 }
 .export-dropdown.hidden {
     display: none;
