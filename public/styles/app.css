@@ -753,6 +753,13 @@ body.theme-dark .skeleton {
     z-index: 100;
     overflow: hidden;
 }
+.export-dropdown-container {
+    position: relative;
+    width: 100%;
+}
+.export-dropdown-container .nav-tab {
+    width: 100%;
+}
 .export-dropdown.hidden {
     display: none;
 }
