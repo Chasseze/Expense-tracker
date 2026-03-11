@@ -250,10 +250,9 @@
                             ></span>
                             <span class="nav-label">Write Blog Post</span>
                         </button>
-                        <div class="export-dropdown-container">
+                        <div class="export-dropdown-container" style="position: relative; display: inline-block;">
                             <button
                                 id="exportBtn"
-                                type="button"
                                 aria-label="Export data"
                                 title="Export your expenses and posts"
                                 class="nav-tab nav-tab-green"
@@ -264,11 +263,11 @@
                                 <span class="nav-label">Export Data</span>
                                 <i class="fas fa-caret-down" style="margin-left: 4px; font-size: 0.8em;"></i>
                             </button>
-                            <div id="exportDropdown" class="export-dropdown" aria-hidden="true">
-                                <button id="exportJsonBtn" type="button" class="export-dropdown-item">
+                            <div id="exportDropdown" class="export-dropdown hidden">
+                                <button id="exportJsonBtn" class="export-dropdown-item">
                                     <i class="fas fa-file-code"></i> Export as JSON
                                 </button>
-                                <button id="exportCsvBtn" type="button" class="export-dropdown-item">
+                                <button id="exportCsvBtn" class="export-dropdown-item">
                                     <i class="fas fa-file-csv"></i> Export as CSV
                                 </button>
                             </div>
@@ -2452,18 +2451,14 @@
 
                 // Export dropdown toggle
                 const exportDropdown = $("#exportDropdown");
-                const exportBtn = $("#exportBtn");
-                exportBtn.addEventListener("click", (e) => {
-                    e.preventDefault();
+                $("#exportBtn").addEventListener("click", (e) => {
                     e.stopPropagation();
-                    const isOpen = exportDropdown.classList.toggle("show");
-                    exportDropdown.setAttribute("aria-hidden", String(!isOpen));
+                    exportDropdown.classList.toggle("hidden");
                 });
                 // Close dropdown when clicking outside
                 document.addEventListener("click", (e) => {
                     if (!e.target.closest(".export-dropdown-container")) {
-                        exportDropdown.classList.remove("show");
-                        exportDropdown.setAttribute("aria-hidden", "true");
+                        exportDropdown.classList.add("hidden");
                     }
                 });
 
@@ -2516,8 +2511,7 @@
 
                 // JSON Export
                 $("#exportJsonBtn").addEventListener("click", () => {
-                    exportDropdown.classList.remove("show");
-                    exportDropdown.setAttribute("aria-hidden", "true");
+                    exportDropdown.classList.add("hidden");
                     const { dataToExport, exportType, hasActiveFilters } = getExportData();
 
                     const data = {
@@ -2548,8 +2542,7 @@
 
                 // CSV Export
                 $("#exportCsvBtn").addEventListener("click", () => {
-                    exportDropdown.classList.remove("show");
-                    exportDropdown.setAttribute("aria-hidden", "true");
+                    exportDropdown.classList.add("hidden");
                     const { dataToExport, exportType } = getExportData();
 
                     const csvContent = expensesToCsv(dataToExport);

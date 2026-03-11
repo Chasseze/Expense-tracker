@@ -742,12 +742,7 @@ body.theme-dark .skeleton {
 }
 
 /* Export dropdown styles */
-.export-dropdown-container {
-    position: relative;
-    display: inline-block;
-}
 .export-dropdown {
-    display: none;
     position: absolute;
     top: calc(100% + 4px);
     left: 0;
@@ -758,8 +753,8 @@ body.theme-dark .skeleton {
     z-index: 100;
     overflow: hidden;
 }
-.export-dropdown.show {
-    display: block;
+.export-dropdown.hidden {
+    display: none;
 }
 .export-dropdown-item {
     display: flex;
