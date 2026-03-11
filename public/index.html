@@ -250,17 +250,28 @@
                             ></span>
                             <span class="nav-label">Write Blog Post</span>
                         </button>
-                        <button
-                            id="exportBtn"
-                            aria-label="Export data"
-                            title="Export your expenses and posts as JSON"
-                            class="nav-tab nav-tab-green"
-                        >
-                            <span class="nav-icon"
-                                ><i class="fas fa-download"></i
-                            ></span>
-                            <span class="nav-label">Export Data</span>
-                        </button>
+                        <div class="export-dropdown-container" style="position: relative; display: inline-block;">
+                            <button
+                                id="exportBtn"
+                                aria-label="Export data"
+                                title="Export your expenses and posts"
+                                class="nav-tab nav-tab-green"
+                            >
+                                <span class="nav-icon"
+                                    ><i class="fas fa-download"></i
+                                ></span>
+                                <span class="nav-label">Export Data</span>
+                                <i class="fas fa-caret-down" style="margin-left: 4px; font-size: 0.8em;"></i>
+                            </button>
+                            <div id="exportDropdown" class="export-dropdown hidden">
+                                <button id="exportJsonBtn" class="export-dropdown-item">
+                                    <i class="fas fa-file-code"></i> Export as JSON
+                                </button>
+                                <button id="exportCsvBtn" class="export-dropdown-item">
+                                    <i class="fas fa-file-csv"></i> Export as CSV
+                                </button>
+                            </div>
+                        </div>
                         <button
                             id="importBtn"
                             aria-label="Import data"
@@ -2438,11 +2449,22 @@
                     });
                 }
 
-                // Export functionality - with option to export filtered data
-                $("#exportBtn").addEventListener("click", () => {
-                    const hasActiveFilters = Object.values(filters).some(
-                        (v) => v,
-                    );
+                // Export dropdown toggle
+                const exportDropdown = $("#exportDropdown");
+                $("#exportBtn").addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    exportDropdown.classList.toggle("hidden");
+                });
+                // Close dropdown when clicking outside
+                document.addEventListener("click", (e) => {
+                    if (!e.target.closest(".export-dropdown-container")) {
+                        exportDropdown.classList.add("hidden");
+                    }
+                });
+
+                // Helper: Get export data and type
+                function getExportData() {
+                    const hasActiveFilters = Object.values(filters).some((v) => v);
                     let dataToExport = expenses;
                     let exportType = "all";
 
@@ -2454,9 +2476,43 @@
                         );
                         if (choice) {
                             exportType = "filtered";
-                            // The 'expenses' array already contains filtered results from the API
                         }
                     }
+                    return { dataToExport, exportType, hasActiveFilters };
+                }
+
+                // Convert expenses to CSV
+                function expensesToCsv(expenseList) {
+                    if (!expenseList || expenseList.length === 0) {
+                        return "";
+                    }
+                    // Define CSV columns
+                    const columns = [
+                        "id", "description", "category", "type", "date_time",
+                        "amount_due", "amount_paid", "balance_due", "status",
+                        "notes", "created_at"
+                    ];
+                    // Escape CSV values
+                    const escapeCsv = (val) => {
+                        if (val === null || val === undefined) return "";
+                        const str = String(val);
+                        if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+                            return '"' + str.replace(/"/g, '""') + '"';
+                        }
+                        return str;
+                    };
+                    // Build CSV
+                    const header = columns.join(",");
+                    const rows = expenseList.map((exp) =>
+                        columns.map((col) => escapeCsv(exp[col])).join(",")
+                    );
+                    return header + "\n" + rows.join("\n");
+                }
+
+                // JSON Export
+                $("#exportJsonBtn").addEventListener("click", () => {
+                    exportDropdown.classList.add("hidden");
+                    const { dataToExport, exportType, hasActiveFilters } = getExportData();
 
                     const data = {
                         expenses: dataToExport,
@@ -2478,8 +2534,35 @@
                     const suffix = exportType === "filtered" ? "-filtered" : "";
                     a.download = `expense-tracker-export${suffix}-${new Date().toISOString().split("T")[0]}.json`;
                     a.click();
+                    URL.revokeObjectURL(url);
                     notify(
-                        `${exportType === "filtered" ? "Filtered" : "All"} data exported successfully!`,
+                        `${exportType === "filtered" ? "Filtered" : "All"} data exported as JSON!`,
+                    );
+                });
+
+                // CSV Export
+                $("#exportCsvBtn").addEventListener("click", () => {
+                    exportDropdown.classList.add("hidden");
+                    const { dataToExport, exportType } = getExportData();
+
+                    const csvContent = expensesToCsv(dataToExport);
+                    if (!csvContent) {
+                        notify("No expenses to export.", true);
+                        return;
+                    }
+
+                    const blob = new Blob([csvContent], {
+                        type: "text/csv;charset=utf-8;",
+                    });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    const suffix = exportType === "filtered" ? "-filtered" : "";
+                    a.download = `expenses-export${suffix}-${new Date().toISOString().split("T")[0]}.csv`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    notify(
+                        `${exportType === "filtered" ? "Filtered" : "All"} expenses exported as CSV!`,
                     );
                 });
             });
