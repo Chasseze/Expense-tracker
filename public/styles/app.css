@@ -760,15 +760,15 @@ body.theme-dark .skeleton {
     min-width: 0;
 }
 .export-dropdown-container .nav-tab {
+    display: flex;
     width: 100%;
     min-width: 0;
-}
-.nav-container > .export-dropdown-container {
-    width: 100%;
+    box-sizing: border-box;
 }
 .export-caret {
     margin-left: 0.2rem;
     font-size: 0.8em;
+    flex-shrink: 0;
 }
 .export-dropdown.hidden {
     display: none;
