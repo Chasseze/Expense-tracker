@@ -10,12 +10,13 @@
         />
         <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
         <!-- Use built Tailwind CSS for production instead of the CDN. Bump APP_VERSION to force cache refresh. -->
-        <link rel="stylesheet" href="/styles/tailwind.css?v=1" />
+        <link rel="stylesheet" href="/styles/tailwind.css?v=2" />
         <script>
             const APP_VERSION = "1";
         </script>
         <script src="firebase-config.js?v=1" defer></script>
-        <link rel="stylesheet" href="/styles/app.css?v=1" />
+        <script src="js/filter-enhancements.js?v=1" defer></script>
+        <link rel="stylesheet" href="/styles/app.css?v=3" />
     </head>
     <body class="p-4 md:p-6">
         <button
@@ -191,422 +192,273 @@
         </div>
 
         <!-- MAIN APP -->
-        <div id="app" class="max-w-7xl mx-auto hidden">
-            <header class="header-modern">
-                <div class="header-top-bar">
-                    <div class="header-brand">
-                        <div class="header-logo">
-                            <i class="fas fa-wallet"></i>
-                        </div>
-                        <div class="header-title-group">
-                            <h1 class="header-main-title">Expense Tracker</h1>
-                            <p class="header-tagline">
-                                Track, budget, and grow your finances
-                            </p>
-                        </div>
-                    </div>
-                    <div class="header-user-section">
-                        <span
-                            id="storageBadge"
-                            class="storage-badge hidden"
-                        ></span>
-                        <span id="usernameDisplay" class="user-email"></span>
-                        <button
-                            id="themeToggle"
-                            aria-label="Toggle theme"
-                            title="Toggle light/dark theme"
-                            class="theme-btn"
-                        >
-                            <span class="theme-icon">🌙</span>
-                        </button>
-                        <button id="logoutBtn" class="logout-modern">
-                            <i class="fas fa-sign-out-alt"></i>
-                            <span>Logout</span>
-                        </button>
-                    </div>
-                </div>
+        <!-- MAIN APP -->
+        <div id="app" class="app-shell hidden">
 
-                <nav class="header-nav">
-                    <div class="nav-container">
-                        <button
-                            id="addExpenseBtn"
-                            aria-label="Add expense"
-                            title="Add a new expense"
-                            class="nav-tab nav-tab-primary"
-                        >
-                            <span class="nav-icon"
-                                ><i class="fas fa-plus-circle"></i
-                            ></span>
-                            <span class="nav-label">Add Expense</span>
-                        </button>
-                        <button
-                            id="addBlogPostBtn"
-                            aria-label="Write blog post"
-                            title="Write a personal financial blog post"
-                            class="nav-tab nav-tab-magenta"
-                        >
-                            <span class="nav-icon"
-                                ><i class="fas fa-pen-fancy"></i
-                            ></span>
-                            <span class="nav-label">Write Blog Post</span>
-                        </button>
-                        <div class="export-dropdown-container">
-                            <button
-                                id="exportBtn"
-                                aria-label="Export data"
-                                title="Export your expenses and posts"
-                                class="nav-tab nav-tab-green"
-                            >
-                                <span class="nav-icon"
-                                    ><i class="fas fa-download"></i
-                                ></span>
-                                <span class="nav-label">Export Data</span>
-                                <i class="fas fa-caret-down export-caret"></i>
-                            </button>
-                            <div id="exportDropdown" class="export-dropdown hidden">
-                                <button id="exportJsonBtn" class="export-dropdown-item">
-                                    <i class="fas fa-file-code"></i> Export as JSON
-                                </button>
-                                <button id="exportCsvBtn" class="export-dropdown-item">
-                                    <i class="fas fa-file-csv"></i> Export as CSV
-                                </button>
-                            </div>
-                        </div>
-                        <button
-                            id="importBtn"
-                            aria-label="Import data"
-                            title="Import expenses or posts from JSON/CSV"
-                            class="nav-tab nav-tab-cyan"
-                        >
-                            <span class="nav-icon"
-                                ><i class="fas fa-upload"></i
-                            ></span>
-                            <span class="nav-label">Import Data</span>
-                        </button>
-                        <button
-                            id="manageBudgetsBtn"
-                            aria-label="Manage budgets"
-                            title="Set or edit budget thresholds"
-                            class="nav-tab nav-tab-amber"
-                        >
-                            <span class="nav-icon"
-                                ><i class="fas fa-bullseye"></i
-                            ></span>
-                            <span class="nav-label">Manage Budgets</span>
-                        </button>
-                        <button
-                            id="manageCategoriesBtn"
-                            aria-label="Manage categories"
-                            title="Add or remove expense categories"
-                            class="nav-tab nav-tab-violet"
-                        >
-                            <span class="nav-icon"
-                                ><i class="fas fa-tags"></i
-                            ></span>
-                            <span class="nav-label">Categories</span>
-                        </button>
-                    </div>
-                </nav>
-                <input
-                    id="importFile"
-                    type="file"
-                    accept=".json,.csv"
-                    class="hidden"
-                />
-            </header>
-
-            <!-- SUMMARY SECTION -->
-            <div id="summarySection" class="mb-8">
-                <div
-                    class="grid grid-cols-3 gap-4 md:gap-6 mb-6"
-                    id="summaryCards"
-                ></div>
-                <!-- Charts Section - always side by side using flex -->
-                <div class="flex flex-row gap-3 md:gap-6 mb-6">
-                    <div
-                        class="card bg-white rounded-2xl shadow-lg p-3 md:p-6 flex-1 min-w-0"
-                    >
-                        <h2
-                            class="text-xs md:text-lg font-bold text-gray-800 mb-2 md:mb-3 text-center"
-                        >
-                            Spending by Category
-                        </h2>
-                        <div class="relative" style="height: 200px">
-                            <canvas id="categoryPieChart"></canvas>
-                        </div>
-                    </div>
-                    <div
-                        class="card bg-white rounded-2xl shadow-lg p-3 md:p-6 flex-1 min-w-0"
-                    >
-                        <h2
-                            class="text-xs md:text-lg font-bold text-gray-800 mb-2 md:mb-3 text-center"
-                        >
-                            Monthly Spending Trend
-                        </h2>
-                        <div class="relative" style="height: 200px">
-                            <canvas id="monthlyBarChart"></canvas>
-                        </div>
+            <!-- â”€â”€ TOP BAR â”€â”€ -->
+            <header class="app-topbar">
+                <div class="topbar-brand">
+                    <div class="topbar-logo"><i class="fas fa-wallet"></i></div>
+                    <div>
+                        <div class="topbar-name">Expense Tracker</div>
+                        <div class="topbar-tagline">Track, budget &amp; grow</div>
                     </div>
                 </div>
-                <div
-                    id="categoryCard"
-                    class="card bg-white rounded-2xl shadow-lg p-6"
-                >
-                    <h2 class="text-2xl font-bold text-gray-800 mb-4">
-                        <center>Category Breakdown</center>
-                    </h2>
-                    <div
-                        id="categoryBreakdown"
-                        class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
-                    ></div>
-                </div>
-            </div>
-
-            <!-- EXPENSES SECTION -->
-            <section
-                id="expensesSection"
-                class="card bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl shadow-xl p-6 md:p-8 mb-8 text-white"
-            >
-                <div class="text-center mb-6">
-                    <h2 class="text-2xl md:text-3xl font-bold mb-2">
-                        Expense Records
-                    </h2>
-                    <p class="text-blue-100">Your complete financial history</p>
-                </div>
-                <div class="bg-white/10 backdrop-blur-sm rounded-xl p-4 mb-6">
-                    <!-- Row 1: Search and dropdown filters - always 4 columns using flex -->
-                    <div
-                        class="flex flex-row gap-2 md:gap-3 text-sm items-end mb-3"
-                    >
-                        <div class="flex-1 min-w-0">
-                            <label
-                                class="block text-blue-100 mb-1 text-xs md:text-sm"
-                                >Search</label
-                            >
-                            <input
-                                type="text"
-                                id="filterSearch"
-                                placeholder="Search..."
-                                class="w-full rounded-lg border border-white/30 bg-white/10 text-white placeholder-blue-200 px-2 md:px-3 py-2 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-white/60"
-                            />
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <label
-                                class="block text-blue-100 mb-1 text-xs md:text-sm"
-                                >Session/Term</label
-                            >
-                            <select
-                                id="filterTerm"
-                                class="w-full rounded-lg border border-white/30 bg-white/10 text-white px-1 md:px-3 py-2 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-white/60"
-                            >
-                                <option value="">All</option>
-                                <option value="First Term">First Term</option>
-                                <option value="Second Term">Second Term</option>
-                                <option value="Third Term">Third Term</option>
-                                <option value="First Semester">
-                                    First Semester
-                                </option>
-                                <option value="Second Semester">
-                                    Second Semester
-                                </option>
-                            </select>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <label
-                                class="block text-blue-100 mb-1 text-xs md:text-sm"
-                                >Category</label
-                            >
-                            <select
-                                id="filterCategory"
-                                class="w-full rounded-lg border border-white/30 bg-white/10 text-white px-1 md:px-3 py-2 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-white/60"
-                            >
-                                <option value="">All</option>
-                                <option value="Home Upkeep">Home Upkeep</option>
-                                <option value="School Upkeep">
-                                    School Upkeep
-                                </option>
-                                <option value="School Fees">School Fees</option>
-                                <option value="Projects">Projects</option>
-                            </select>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <label
-                                class="block text-blue-100 mb-1 text-xs md:text-sm"
-                                >Status</label
-                            >
-                            <select
-                                id="filterStatus"
-                                class="w-full rounded-lg border border-white/30 bg-white/10 text-white px-1 md:px-3 py-2 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-white/60"
-                            >
-                                <option value="">All</option>
-                                <option value="Paid">Paid</option>
-                                <option value="Partial">Partial</option>
-                            </select>
-                        </div>
+                <div class="topbar-right">
+                    <span id="storageBadge" class="storage-badge hidden"></span>
+                    <div class="topbar-user-chip">
+                        <i class="fas fa-user-circle"></i>
+                        <span id="usernameDisplay"></span>
                     </div>
-                    <!-- Row 2: Date range and action buttons - always 4 columns using flex -->
-                    <div class="flex flex-row gap-2 md:gap-3 text-sm items-end">
-                        <div class="flex-1 min-w-0">
-                            <label
-                                class="block text-blue-100 mb-1 text-xs md:text-sm"
-                                >Start Date</label
-                            >
-                            <input
-                                type="date"
-                                id="filterStartDate"
-                                class="w-full h-[34px] md:h-[38px] rounded-lg border border-white/30 bg-white/10 text-white px-1 md:px-3 py-2 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-white/60"
-                            />
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <label
-                                class="block text-blue-100 mb-1 text-xs md:text-sm"
-                                >End Date</label
-                            >
-                            <input
-                                type="date"
-                                id="filterEndDate"
-                                class="w-full h-[34px] md:h-[38px] rounded-lg border border-white/30 bg-white/10 text-white px-1 md:px-3 py-2 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-white/60"
-                            />
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <label
-                                class="block text-blue-100 mb-1 text-xs md:text-sm"
-                                >&nbsp;</label
-                            >
-                            <button
-                                id="applyFiltersBtn"
-                                class="w-full h-[34px] md:h-[38px] bg-white text-blue-700 px-1 md:px-3 py-2 rounded-lg font-semibold text-xs md:text-sm hover:bg-blue-50"
-                            >
-                                Apply
-                            </button>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <label
-                                class="block text-blue-100 mb-1 text-xs md:text-sm"
-                                >&nbsp;</label
-                            >
-                            <button
-                                id="clearFiltersBtn"
-                                class="w-full h-[34px] md:h-[38px] border border-white/50 px-1 md:px-3 py-2 rounded-lg font-semibold text-white text-xs md:text-sm hover:bg-white/10"
-                            >
-                                Reset
-                            </button>
-                        </div>
-                    </div>
-                    <span
-                        id="activeFilters"
-                        class="text-blue-100 text-xs block mt-3"
-                    ></span>
-                </div>
-                <div id="emptyExpenseState" class="empty-state">
-                    <i class="fas fa-file-invoice"></i>
-                    <h3>No expenses yet</h3>
-                    <p>
-                        Start tracking your financial activity by adding your
-                        first expense
-                    </p>
-                    <button
-                        id="addFirstExpenseBtn"
-                        class="btn bg-white text-blue-600 px-6 py-3 rounded-xl font-semibold hover:bg-blue-50 transition-all"
-                    >
-                        Add First Expense
+                    <button id="themeToggle" aria-label="Toggle theme" title="Toggle light/dark theme" class="topbar-icon-btn">ðŸŒ™</button>
+                    <button id="settingsBtn" class="topbar-icon-btn" title="Account settings"><i class="fas fa-cog"></i></button>
+                    <button id="logoutBtn" class="topbar-logout-btn">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Logout</span>
                     </button>
                 </div>
-                <div id="expenseTableContainer" class="hidden">
-                    <div class="bg-white rounded-xl shadow-lg overflow-hidden">
-                        <table class="w-full text-sm text-gray-800">
-                            <thead>
-                                <tr
-                                    class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white"
-                                >
-                                    <th class="p-4 text-left">Date/Time</th>
-                                    <th class="p-4 text-left">Category</th>
-                                    <th class="p-4 text-left">Session/Term</th>
-                                    <th class="p-4 text-left">Recipient</th>
-                                    <th class="p-4 text-left">Description</th>
-                                    <th class="p-4 text-left">Amount Paid</th>
-                                    <th class="p-4 text-left">Balance Due</th>
-                                    <th class="p-4 text-left">Status</th>
-                                    <th class="p-4 text-left">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="expenseTableBody"></tbody>
-                        </table>
-                    </div>
-                    <div
-                        id="expensePagination"
-                        class="flex items-center justify-between mt-3 p-4 bg-white rounded-lg shadow hidden"
-                    >
-                        <button
-                            id="expensePrevPage"
-                            class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium disabled:opacity-50"
-                            disabled
-                        >
-                            <i class="fas fa-arrow-left mr-2"></i>Previous
+            </header>
+
+            <!-- â”€â”€ BODY: SIDEBAR + MAIN â”€â”€ -->
+            <div class="app-body">
+
+                <!-- LEFT SIDEBAR -->
+                <aside class="app-sidebar" id="appSidebar">
+                    <div class="sidebar-inner">
+                        <div class="sidebar-section-label">Overview</div>
+                        <button class="sidebar-nav-btn active" data-view="dashboard">
+                            <i class="fas fa-chart-pie sb-icon"></i>
+                            <span class="sb-label">Dashboard</span>
                         </button>
-                        <div class="flex items-center gap-3">
-                            <span
-                                id="expensePageInfo"
-                                class="text-sm font-medium"
-                                style="color: #000;"
-                                >Page 1</span
-                            >
-                            <div class="flex items-center gap-2">
-                                <label
-                                    for="expenseGotoPage"
-                                    class="text-sm font-medium"
-                                    style="color: #c026d3 !important;"
-                                    >Go to page</label
-                                >
-                                <input
-                                    id="expenseGotoPage"
-                                    type="number"
-                                    min="1"
-                                    class="w-20 px-2 py-1 border rounded"
-                                    style="color: #000;"
-                                    placeholder="1"
-                                />
-                                <button
-                                    id="expenseGotoBtn"
-                                    class="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white font-medium"
-                                >
-                                    Go
-                                </button>
+                        <button class="sidebar-nav-btn" data-view="expenses">
+                            <i class="fas fa-receipt sb-icon"></i>
+                            <span class="sb-label">Expenses</span>
+                        </button>
+                        <hr class="sidebar-hr">
+                        <div class="sidebar-section-label">Actions</div>
+                        <button class="sidebar-nav-btn primary" id="addExpenseBtn" aria-label="Add expense">
+                            <i class="fas fa-plus-circle sb-icon"></i>
+                            <span class="sb-label">Add Expense</span>
+                        </button>
+                        <div class="export-dropdown-container" style="position:relative">
+                            <button class="sidebar-nav-btn" id="exportBtn" aria-label="Export data">
+                                <i class="fas fa-download sb-icon"></i>
+                                <span class="sb-label">Export Data <i class="fas fa-caret-down" style="font-size:0.7rem"></i></span>
+                            </button>
+                            <div id="exportDropdown" class="export-dropdown hidden">
+                                <button id="exportJsonBtn" class="export-dropdown-item"><i class="fas fa-file-code"></i> Export as JSON</button>
+                                <button id="exportCsvBtn" class="export-dropdown-item"><i class="fas fa-file-csv"></i> Export as CSV</button>
                             </div>
-                            <div class="flex items-center gap-2">
-                                <label
-                                    for="expensePageSize"
-                                    class="text-sm font-medium"
-                                    style="color: #c026d3 !important;"
-                                    >Page size</label
-                                >
-                                <select
-                                    id="expensePageSize"
-                                    class="px-2 py-1 border rounded"
-                                    style="color: #000;"
-                                >
-                                    <option value="10">10</option>
-                                    <option value="25">25</option>
-                                    <option value="50">50</option>
-                                </select>
-                            </div>
-                            <span
-                                id="expenseTotalInfo"
-                                class="text-sm font-medium"
-                                style="color: #000;"
-                            ></span>
                         </div>
-                        <button
-                            id="expenseNextPage"
-                            class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium disabled:opacity-50"
-                        >
-                            Next<i class="fas fa-arrow-right ml-2"></i>
+                        <button class="sidebar-nav-btn" id="importBtn" aria-label="Import data">
+                            <i class="fas fa-upload sb-icon"></i>
+                            <span class="sb-label">Import Data</span>
+                        </button>
+                        <hr class="sidebar-hr">
+                        <div class="sidebar-section-label">Manage</div>
+                        <button class="sidebar-nav-btn" id="manageBudgetsBtn" aria-label="Manage budgets">
+                            <i class="fas fa-bullseye sb-icon"></i>
+                            <span class="sb-label">Budgets</span>
+                        </button>
+                        <button class="sidebar-nav-btn" id="manageCategoriesBtn" aria-label="Manage categories">
+                            <i class="fas fa-tags sb-icon"></i>
+                            <span class="sb-label">Categories</span>
+                        </button>
+                        <button class="sidebar-nav-btn" id="addBlogPostBtn" aria-label="Blog">
+                            <i class="fas fa-pen-fancy sb-icon"></i>
+                            <span class="sb-label">Blog</span>
+                        </button>
+                        <hr class="sidebar-hr">
+                        <button class="sidebar-nav-btn danger" id="trashBtn" aria-label="Deleted expenses">
+                            <i class="fas fa-trash-restore sb-icon"></i>
+                            <span class="sb-label">Trash</span>
                         </button>
                     </div>
-                </div>
-            </section>
+                </aside>
 
+                <!-- MAIN CONTENT AREA -->
+                <main class="app-main">
 
+                    <!-- â•â•â• VIEW: DASHBOARD â•â•â• -->
+                    <div id="view-dashboard" class="app-view active">
+                        <div class="view-topbar">
+                            <h2 class="view-heading"><i class="fas fa-chart-pie"></i> Dashboard</h2>
+                            <div class="flex flex-wrap gap-2 items-center">
+                                <div class="flex items-center gap-2">
+                                    <label class="text-xs text-gray-500">From</label>
+                                    <input type="date" id="dashStartDate" class="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <label class="text-xs text-gray-500">To</label>
+                                    <input type="date" id="dashEndDate" class="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                                </div>
+                                <button id="applyDashDateBtn" class="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-indigo-700">Apply</button>
+                                <button id="clearDashDateBtn" class="text-xs border border-gray-300 text-gray-600 px-3 py-1.5 rounded-lg font-semibold hover:bg-gray-50">All Time</button>
+                            </div>
+                        </div>
+                        <div id="summarySection">
+                            <div class="grid grid-cols-3 gap-4 md:gap-6 mb-6" id="summaryCards"></div>
+                            <div class="flex flex-row gap-3 md:gap-6 mb-6">
+                                <div class="card bg-white rounded-2xl shadow-lg p-3 md:p-6 flex-1 min-w-0">
+                                    <h2 class="text-xs md:text-lg font-bold text-gray-800 mb-2 md:mb-3 text-center">Spending by Category</h2>
+                                    <div class="relative" style="height: clamp(200px, 25vh, 320px)"><canvas id="categoryPieChart"></canvas></div>
+                                </div>
+                                <div class="card bg-white rounded-2xl shadow-lg p-3 md:p-6 flex-1 min-w-0">
+                                    <h2 class="text-xs md:text-lg font-bold text-gray-800 mb-2 md:mb-3 text-center">Monthly Spending Trend</h2>
+                                    <div class="relative" style="height: clamp(200px, 25vh, 320px)"><canvas id="monthlyBarChart"></canvas></div>
+                                </div>
+                            </div>
+                            <div id="categoryCard" class="card bg-white rounded-2xl shadow-lg p-6">
+                                <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Category Breakdown</h2>
+                                <div id="categoryBreakdown" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- â•â•â• VIEW: EXPENSES â•â•â• -->
+                    <div id="view-expenses" class="app-view">
+                        <div class="view-topbar">
+                            <h2 class="view-heading"><i class="fas fa-receipt"></i> Expense Records</h2>
+                        </div>
+                        <section id="expensesSection" class="card bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl shadow-xl p-6 md:p-8 text-white">
+                            <div class="bg-white/10 backdrop-blur-sm rounded-xl p-4 mb-6">
+                                <!-- Row 1: Search and dropdown filters -->
+                                <div class="flex flex-row gap-2 md:gap-3 text-sm items-end mb-3">
+                                    <div class="flex-1 min-w-0">
+                                        <label class="block text-blue-100 mb-1 text-xs md:text-sm">Search</label>
+                                        <input type="text" id="filterSearch" placeholder="Search..." class="w-full rounded-lg border border-white/30 bg-white/10 text-white placeholder-blue-200 px-2 md:px-3 py-2 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-white/60" />
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <label class="block text-blue-100 mb-1 text-xs md:text-sm">Session/Term</label>
+                                        <select id="filterTerm" class="w-full rounded-lg border border-white/30 bg-white/10 text-white px-1 md:px-3 py-2 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-white/60">
+                                            <option value="">All</option>
+                                            <option value="First Term">First Term</option>
+                                            <option value="Second Term">Second Term</option>
+                                            <option value="Third Term">Third Term</option>
+                                            <option value="First Semester">First Semester</option>
+                                            <option value="Second Semester">Second Semester</option>
+                                        </select>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <label class="block text-blue-100 mb-1 text-xs md:text-sm">Category</label>
+                                        <select id="filterCategory" class="w-full rounded-lg border border-white/30 bg-white/10 text-white px-1 md:px-3 py-2 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-white/60">
+                                            <option value="">All</option>
+                                            <option value="Home Upkeep">Home Upkeep</option>
+                                            <option value="School Upkeep">School Upkeep</option>
+                                            <option value="School Fees">School Fees</option>
+                                            <option value="Projects">Projects</option>
+                                        </select>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <label class="block text-blue-100 mb-1 text-xs md:text-sm">Status</label>
+                                        <select id="filterStatus" class="w-full rounded-lg border border-white/30 bg-white/10 text-white px-1 md:px-3 py-2 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-white/60">
+                                            <option value="">All</option>
+                                            <option value="Paid">Paid</option>
+                                            <option value="Partial">Partial</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <!-- Row 2: Date range and action buttons -->
+                                <div class="flex flex-row gap-2 md:gap-3 text-sm items-end">
+                                    <div class="flex-1 min-w-0">
+                                        <label class="block text-blue-100 mb-1 text-xs md:text-sm">Start Date</label>
+                                        <input type="date" id="filterStartDate" class="w-full h-[34px] md:h-[38px] rounded-lg border border-white/30 bg-white/10 text-white px-1 md:px-3 py-2 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-white/60" />
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <label class="block text-blue-100 mb-1 text-xs md:text-sm">End Date</label>
+                                        <input type="date" id="filterEndDate" class="w-full h-[34px] md:h-[38px] rounded-lg border border-white/30 bg-white/10 text-white px-1 md:px-3 py-2 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-white/60" />
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <label class="block text-blue-100 mb-1 text-xs md:text-sm">&nbsp;</label>
+                                        <button id="applyFiltersBtn" class="w-full h-[34px] md:h-[38px] bg-white text-blue-700 px-1 md:px-3 py-2 rounded-lg font-semibold text-xs md:text-sm hover:bg-blue-50">Apply</button>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <label class="block text-blue-100 mb-1 text-xs md:text-sm">&nbsp;</label>
+                                        <button id="clearFiltersBtn" class="w-full h-[34px] md:h-[38px] border border-white/50 px-1 md:px-3 py-2 rounded-lg font-semibold text-white text-xs md:text-sm hover:bg-white/10">Reset</button>
+                                    </div>
+                                </div>
+                                <!-- Row 3: Amount range and sort -->
+                                <div class="flex flex-row flex-wrap gap-2 md:gap-3 text-sm items-end mt-3">
+                                    <div class="flex-1 min-w-0" style="min-width:90px">
+                                        <label class="block text-blue-100 mb-1 text-xs md:text-sm">Min Amount</label>
+                                        <input type="number" id="filterMinAmount" min="0" step="any" placeholder="0" class="w-full rounded-lg border border-white/30 bg-white/10 text-white placeholder-blue-200 px-2 md:px-3 py-2 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-white/60" />
+                                    </div>
+                                    <div class="flex-1 min-w-0" style="min-width:90px">
+                                        <label class="block text-blue-100 mb-1 text-xs md:text-sm">Max Amount</label>
+                                        <input type="number" id="filterMaxAmount" min="0" step="any" placeholder="Any" class="w-full rounded-lg border border-white/30 bg-white/10 text-white placeholder-blue-200 px-2 md:px-3 py-2 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-white/60" />
+                                    </div>
+                                    <div class="flex-1 min-w-0" style="min-width:110px">
+                                        <label class="block text-blue-100 mb-1 text-xs md:text-sm">Sort By</label>
+                                        <select id="filterSortBy" class="w-full rounded-lg border border-white/30 bg-white/10 text-white px-1 md:px-3 py-2 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-white/60">
+                                            <option value="date_desc">Newest First</option>
+                                            <option value="date_asc">Oldest First</option>
+                                            <option value="amount_desc">Highest Amount</option>
+                                            <option value="amount_asc">Lowest Amount</option>
+                                            <option value="category">Category A&#8211;Z</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div id="activeFilterChips" class="flex flex-wrap gap-2 mt-3"></div>
+                                <span id="activeFilters" class="text-blue-100 text-xs block mt-2"></span>
+                            </div>
+                            <div id="emptyExpenseState" class="empty-state">
+                                <i class="fas fa-file-invoice"></i>
+                                <h3>No expenses yet</h3>
+                                <p>Start tracking your financial activity by adding your first expense</p>
+                                <button id="addFirstExpenseBtn" class="btn bg-white text-blue-600 px-6 py-3 rounded-xl font-semibold hover:bg-blue-50 transition-all">Add First Expense</button>
+                            </div>
+                            <div id="expenseTableContainer" class="hidden">
+                                <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                                    <table class="w-full text-sm text-gray-800">
+                                        <thead>
+                                            <tr class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+                                                <th class="p-4 text-left">Date/Time</th>
+                                                <th class="p-4 text-left">Category</th>
+                                                <th class="p-4 text-left">Session/Term</th>
+                                                <th class="p-4 text-left">Recipient</th>
+                                                <th class="p-4 text-left">Description</th>
+                                                <th class="p-4 text-left">Amount Paid</th>
+                                                <th class="p-4 text-left">Balance Due</th>
+                                                <th class="p-4 text-left">Status</th>
+                                                <th class="p-4 text-left">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="expenseTableBody"></tbody>
+                                    </table>
+                                </div>
+                                <div id="expensePagination" class="flex items-center justify-between mt-3 p-4 bg-white rounded-lg shadow hidden">
+                                    <button id="expensePrevPage" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium disabled:opacity-50" disabled>
+                                        <i class="fas fa-arrow-left mr-2"></i>Previous
+                                    </button>
+                                    <div class="flex items-center gap-3">
+                                        <span id="expensePageInfo" class="text-sm font-medium" style="color:#000">Page 1</span>
+                                        <div class="flex items-center gap-2">
+                                            <label for="expenseGotoPage" class="text-sm font-medium" style="color:#c026d3!important">Go to page</label>
+                                            <input id="expenseGotoPage" type="number" min="1" class="w-20 px-2 py-1 border rounded" style="color:#000" placeholder="1" />
+                                            <button id="expenseGotoBtn" class="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white font-medium">Go</button>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <label for="expensePageSize" class="text-sm font-medium" style="color:#c026d3!important">Page size</label>
+                                            <select id="expensePageSize" class="px-2 py-1 border rounded" style="color:#000">
+                                                <option value="10">10</option>
+                                                <option value="25">25</option>
+                                                <option value="50">50</option>
+                                            </select>
+                                        </div>
+                                        <span id="expenseTotalInfo" class="text-sm font-medium" style="color:#000"></span>
+                                    </div>
+                                    <button id="expenseNextPage" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium disabled:opacity-50">
+                                        Next<i class="fas fa-arrow-right ml-2"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+
+                </main>
+            </div>
+
+            <input id="importFile" type="file" accept=".json,.csv" class="hidden" />
         </div>
 
         <script>
@@ -655,6 +507,57 @@
                 }
             })();
         </script>
+        <!-- TRASH MODAL -->
+        <div
+            id="trashModal"
+            class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-40 hidden"
+        >
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-800"><i class="fas fa-trash-restore mr-2 text-red-500"></i>Deleted Expenses</h2>
+                    <button id="closeTrashModal" class="text-gray-500 hover:text-gray-700 text-2xl"><i class="fas fa-times"></i></button>
+                </div>
+                <p class="text-sm text-gray-500 mb-4">Restore expenses to make them active again, or permanently delete to free up space.</p>
+                <div id="trashList" class="space-y-2"></div>
+                <p id="trashEmpty" class="text-center text-gray-400 py-8 hidden">No deleted expenses found.</p>
+            </div>
+        </div>
+
+        <!-- SETTINGS MODAL -->
+        <div
+            id="settingsModal"
+            class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-40 hidden"
+        >
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-800"><i class="fas fa-cog mr-2 text-gray-600"></i>Account Settings</h2>
+                    <button id="closeSettingsModal" class="text-gray-500 hover:text-gray-700 text-2xl"><i class="fas fa-times"></i></button>
+                </div>
+                <section>
+                    <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">Change Password</h3>
+                    <p class="text-xs text-gray-500 mb-3">Only available for accounts created with username/password (not Firebase accounts).</p>
+                    <form id="changePasswordForm" class="space-y-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
+                            <input type="password" id="cpCurrentPassword" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary" autocomplete="current-password" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+                            <input type="password" id="cpNewPassword" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary" autocomplete="new-password" placeholder="8-128 characters" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
+                            <input type="password" id="cpConfirmPassword" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary" autocomplete="new-password" />
+                        </div>
+                        <p id="cpError" class="text-red-600 text-sm hidden"></p>
+                        <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700">
+                            Change Password
+                        </button>
+                    </form>
+                </section>
+            </div>
+        </div>
+
         <!-- EXPENSE MODAL -->
         <div
             id="expenseModal"
@@ -994,6 +897,9 @@
                 search: "",
                 startDate: "",
                 endDate: "",
+                minAmount: "",
+                maxAmount: "",
+                sortBy: "date_desc",
             };
 
             const ensureFirebaseReady = async (timeoutMs = 5000) => {
@@ -1137,6 +1043,17 @@
                     currency: "NGN",
                 }).format(n || 0);
 
+            /** Escape user-supplied strings before inserting into HTML to prevent XSS. */
+            const escapeHtml = (str) => {
+                if (str == null) return "";
+                return String(str)
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#39;");
+            };
+
             const updateStorageBadge = (info) => {
                 storageInfo = { ...storageInfo, ...info };
                 const badge = $("#storageBadge");
@@ -1151,7 +1068,7 @@
 
             const buildExpenseQuery = () => {
                 const params = new URLSearchParams();
-                if (filters.search) params.append("search", filters.search);
+                if (filters.search) params.append("q", filters.search);
                 if (filters.session_term)
                     params.append("session_term", filters.session_term);
                 if (filters.category)
@@ -1160,6 +1077,10 @@
                 if (filters.startDate)
                     params.append("startDate", filters.startDate);
                 if (filters.endDate) params.append("endDate", filters.endDate);
+                if (filters.minAmount) params.append("minAmount", filters.minAmount);
+                if (filters.maxAmount) params.append("maxAmount", filters.maxAmount);
+                if (filters.sortBy && filters.sortBy !== "date_desc")
+                    params.append("sortBy", filters.sortBy);
                 const qs = params.toString();
                 return qs ? `?${qs}` : "";
             };
@@ -1182,12 +1103,18 @@
                 const status = $("#filterStatus");
                 const startDate = $("#filterStartDate");
                 const endDate = $("#filterEndDate");
+                const minAmount = $("#filterMinAmount");
+                const maxAmount = $("#filterMaxAmount");
+                const sortBy = $("#filterSortBy");
                 if (search) search.value = filters.search;
                 if (term) term.value = filters.session_term;
                 if (category) category.value = filters.category;
                 if (status) status.value = filters.status;
                 if (startDate) startDate.value = filters.startDate;
                 if (endDate) endDate.value = filters.endDate;
+                if (minAmount) minAmount.value = filters.minAmount;
+                if (maxAmount) maxAmount.value = filters.maxAmount;
+                if (sortBy) sortBy.value = filters.sortBy || "date_desc";
             };
 
             const toNumber = (value) => {
@@ -1214,7 +1141,7 @@
             };
 
             // API Helper
-            const apiCall = async (endpoint, options = {}) => {
+            const apiCall = async (endpoint, options = {}, timeoutMs = 15000) => {
                 await ensureFirebaseReady();
                 const token = await getIdToken();
                 const config = {
@@ -1228,9 +1155,12 @@
                     config.body = JSON.stringify(options.body);
                 }
 
+                // Attach abort controller for timeout
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+                config.signal = controller.signal;
+
                 try {
-                    // If running in local-only mode, the client uses mocked tokens that the server may not accept.
-                    // In that case do not send Authorization header; server's dev-auth toggle will accept requests.
                     if (!window.appLocalOnly && token) {
                         config.headers["Authorization"] = `Bearer ${token}`;
                     }
@@ -1238,6 +1168,7 @@
                         `${API_BASE}${endpoint}`,
                         config,
                     );
+                    clearTimeout(timeoutId);
                     const data = await response.json();
 
                     if (!response.ok) {
@@ -1246,6 +1177,10 @@
 
                     return data;
                 } catch (error) {
+                    clearTimeout(timeoutId);
+                    if (error.name === "AbortError") {
+                        throw new Error("Request timed out. Please try again.");
+                    }
                     console.error("API Error:", error);
                     throw error;
                 }
@@ -1321,18 +1256,20 @@
                 $("#app").classList.add("hidden");
             }
 
+            // Expose loadData and filters to filter-enhancements.js
+            // IMPORTANT: capture the hoisted function reference BEFORE assigning to
+            // window.loadData, otherwise the arrow calls window.loadData (itself) → infinite recursion.
+            const _loadDataFn = loadData;
+            window.loadData = () => _loadDataFn();
+            window.appFilters = filters;
+
             // Data Management
             async function loadData() {
                 try {
-                    // Show loading state
                     document.body.style.cursor = "wait";
-                    // Load custom categories first
-                    try {
-                        customCategories = await apiCall("/categories");
-                    } catch (e) {
-                        customCategories = [];
-                    }
-                    // Pagination-aware fetch for expenses (page-based)
+                    // Best-effort refresh of native JWT before loading data
+                    await tryRefreshToken();
+
                     const pageSize =
                         window.expensePageSize &&
                         Number.isFinite(window.expensePageSize)
@@ -1356,13 +1293,31 @@
                             : 1;
                     qs.set("pageSize", String(pageSize));
                     qs.set("page", String(currentPage));
-                    // Fetch total count for UI
-                    const countResp = await apiCall(
-                        `/expenses/count?${qs.toString()}`.replace(
-                            /&page=\d+/,
-                            "",
-                        ),
-                    );
+
+                    // Build count query without page param
+                    const countQs = new URLSearchParams(qs);
+                    countQs.delete("page");
+
+                    // Fetch all data in parallel
+                    // Build dashboard URL with optional date range
+                    const dashQs = new URLSearchParams();
+                    const dashStart = ($("#dashStartDate") || {}).value || "";
+                    const dashEnd = ($("#dashEndDate") || {}).value || "";
+                    if (dashStart) dashQs.set("startDate", dashStart);
+                    if (dashEnd) dashQs.set("endDate", dashEnd);
+                    const dashUrl = `/dashboard${dashQs.toString() ? "?" + dashQs.toString() : ""}`;
+
+                    const [customCatsResp, countResp, expResp, blogResp, dashboard] =
+                        await Promise.all([
+                            apiCall("/categories").catch(() => []),
+                            apiCall(`/expenses/count?${countQs.toString()}`).catch(() => null),
+                            apiCall(`/expenses?${qs.toString()}`).catch(() => []),
+                            apiCall("/blog-posts").catch(() => []),
+                            apiCall(dashUrl).catch(() => ({})),
+                        ]);
+
+                    customCategories = Array.isArray(customCatsResp) ? customCatsResp : [];
+
                     window.expenseTotal =
                         countResp && typeof countResp.total === "number"
                             ? countResp.total
@@ -1374,7 +1329,7 @@
                                   1,
                               )
                             : null;
-                    const expResp = await apiCall(`/expenses?${qs.toString()}`);
+
                     expenses = Array.isArray(expResp)
                         ? expResp
                         : expResp.items || [];
@@ -1384,8 +1339,8 @@
                     window.expenseNextCursor = Array.isArray(expResp)
                         ? null
                         : expResp.nextCursor || null;
-                    blogPosts = await apiCall("/blog-posts");
-                    const dashboard = await apiCall("/dashboard");
+
+                    blogPosts = Array.isArray(blogResp) ? blogResp : [];
                     budgets = dashboard.budgets || [];
                     budgetAlerts = dashboard.alerts || [];
                     updateStorageBadge({
@@ -1412,7 +1367,6 @@
                         true,
                     );
                 } finally {
-                    // Hide loading state
                     document.body.style.cursor = "default";
                 }
             }
@@ -1430,10 +1384,10 @@
                     .map(
                         (item) => `
                 <tr class="border-b last:border-0">
-                    <td class="p-3 font-medium">${item.category}</td>
+                    <td class="p-3 font-medium">${escapeHtml(item.category)}</td>
                     <td class="p-3">${fmtMoney(item.threshold)}</td>
                     <td class="p-3">
-                        <button data-category="${item.category}" class="text-red-600 hover:text-red-800 delete-budget">Remove</button>
+                        <button data-category="${escapeHtml(item.category)}" class="text-red-600 hover:text-red-800 delete-budget">Remove</button>
                     </td>
                 </tr>
             `,
@@ -1594,25 +1548,77 @@
                 lastAlertSignature = signature;
             }
 
+            /**
+             * RFC 4180-compliant CSV parser that handles:
+             * - Fields quoted with double-quotes (allowing commas inside)
+             * - Escaped double-quotes ("") inside quoted fields
+             * - Windows and Unix line endings
+             */
             const parseCsv = (text) => {
-                const lines = text
-                    .split(/\r?\n/)
-                    .map((line) => line.trim())
-                    .filter(Boolean);
+                const results = [];
+                const lines = text.split(/\r?\n/);
                 if (!lines.length) return [];
-                const headers = lines[0].split(",").map((h) => h.trim());
-                return lines.slice(1).map((line) => {
-                    const values = line.split(",");
+
+                // Parse a single CSV row respecting quoted fields
+                const parseRow = (line) => {
+                    const fields = [];
+                    let i = 0;
+                    while (i < line.length) {
+                        if (line[i] === '"') {
+                            // Quoted field
+                            let field = "";
+                            i++; // skip opening quote
+                            while (i < line.length) {
+                                if (line[i] === '"' && line[i + 1] === '"') {
+                                    field += '"';
+                                    i += 2;
+                                } else if (line[i] === '"') {
+                                    i++; // skip closing quote
+                                    break;
+                                } else {
+                                    field += line[i++];
+                                }
+                            }
+                            fields.push(field);
+                            if (line[i] === ",") i++; // skip comma
+                        } else {
+                            // Unquoted field
+                            const end = line.indexOf(",", i);
+                            if (end === -1) {
+                                fields.push(line.slice(i).trim());
+                                break;
+                            } else {
+                                fields.push(line.slice(i, end).trim());
+                                i = end + 1;
+                            }
+                        }
+                    }
+                    return fields;
+                };
+
+                const nonEmpty = lines.filter((l) => l.trim());
+                if (!nonEmpty.length) return [];
+                const headers = parseRow(nonEmpty[0]).map((h) => h.trim());
+                for (const line of nonEmpty.slice(1)) {
+                    const values = parseRow(line);
                     const row = {};
                     headers.forEach((header, idx) => {
-                        row[header] = (values[idx] || "").trim();
+                        row[header] = values[idx] !== undefined ? values[idx] : "";
                     });
-                    return row;
-                });
+                    results.push(row);
+                }
+                return results;
             };
 
+            /** Build a dedup key from an expense entry to prevent duplicate imports */
+            const expenseDedupKey = (e) =>
+                `${(e.date_time || e.dateTime || "").slice(0, 16)}|${(e.recipient || "").toLowerCase().trim()}|${(e.description || "").toLowerCase().trim()}|${e.amount_paid ?? e.amountPaid ?? 0}`;
+
             async function processImportedData(data) {
-                const result = { expenses: 0, blogPosts: 0 };
+                const result = { expenses: 0, blogPosts: 0, skipped: 0 };
+
+                // Build a set of keys from already-loaded expenses to prevent duplicates
+                const existingKeys = new Set(expenses.map(expenseDedupKey));
 
                 if (Array.isArray(data.expenses)) {
                     for (const entry of data.expenses) {
@@ -1636,10 +1642,16 @@
                                     entry.balance_due ?? entry.balanceDue,
                                 ),
                             };
+                            const key = expenseDedupKey(payload);
+                            if (existingKeys.has(key)) {
+                                result.skipped += 1;
+                                continue;
+                            }
                             await apiCall("/expenses", {
                                 method: "POST",
                                 body: payload,
                             });
+                            existingKeys.add(key);
                             result.expenses += 1;
                         } catch (error) {
                             console.error("Import expense error:", error);
@@ -1715,8 +1727,9 @@
                     }
 
                     const summary = await processImportedData(payload);
+                    const skippedMsg = summary.skipped > 0 ? ` (${summary.skipped} duplicate${summary.skipped > 1 ? "s" : ""} skipped)` : "";
                     notify(
-                        `Import complete: ${summary.expenses} expenses, ${summary.blogPosts} posts.`,
+                        `Import complete: ${summary.expenses} expenses, ${summary.blogPosts} posts${skippedMsg}.`,
                     );
                     await loadData();
                 } catch (error) {
@@ -1744,10 +1757,10 @@
                     <td class="p-4 text-gray-600">${new Date(expense.date_time).toLocaleDateString()}<br>
                         <span class="text-xs text-gray-400">${new Date(expense.date_time).toLocaleTimeString()}</span>
                     </td>
-                    <td class="p-4"><span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">${expense.category}</span></td>
-                    <td class="p-4">${expense.session_term || "-"}</td>
-                    <td class="p-4">${expense.recipient}</td>
-                    <td class="p-4 max-w-xs" title="${expense.description}">${expense.description.substring(0, 50)}${expense.description.length > 50 ? "..." : ""}</td>
+                    <td class="p-4"><span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">${escapeHtml(expense.category)}</span></td>
+                    <td class="p-4">${escapeHtml(expense.session_term) || "-"}</td>
+                    <td class="p-4">${escapeHtml(expense.recipient)}</td>
+                    <td class="p-4 max-w-xs" title="${escapeHtml(expense.description)}">${escapeHtml(expense.description.substring(0, 50))}${expense.description.length > 50 ? "..." : ""}</td>
                     <td class="p-4 font-medium text-green-600">${fmtMoney(expense.amount_paid)}</td>
                     <td class="p-4 font-medium text-orange-600">${fmtMoney(expense.balance_due)}</td>
                     <td class="p-4">${
@@ -1756,8 +1769,8 @@
                             : '<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Paid</span>'
                     }</td>
                     <td class="p-4 flex gap-2">
-                        <button class="text-indigo-600 hover:text-indigo-800 edit-expense" data-id="${String(expense.id)}"><i class="fas fa-edit"></i></button>
-                        <button class="text-red-600 hover:text-red-800 delete-expense" data-id="${String(expense.id)}"><i class="fas fa-trash"></i></button>
+                        <button class="text-indigo-600 hover:text-indigo-800 edit-expense" data-id="${escapeHtml(String(expense.id))}"><i class="fas fa-edit"></i></button>
+                        <button class="text-red-600 hover:text-red-800 delete-expense" data-id="${escapeHtml(String(expense.id))}"><i class="fas fa-trash"></i></button>
                     </td>
                 </tr>
             `,
@@ -1795,6 +1808,8 @@
                 window.expenseHasMore = false;
                 window.expensePrevCursors = [];
             }
+            // Expose to filter-enhancements.js
+            window.resetExpensePagination = resetExpensePagination;
 
             function updateExpensePaginationUI() {
                 const pager = document.querySelector("#expensePagination");
@@ -1842,8 +1857,72 @@
                 // Blog posts now render on dedicated blog.html page
             }
 
+            // ── Trash / Restore ──
+            async function loadTrash() {
+                const modal = $("#trashModal");
+                modal.classList.remove("hidden");
+                $("#trashList").innerHTML = '<p class="text-center text-gray-400 py-4">Loading…</p>';
+                $("#trashEmpty").classList.add("hidden");
+                try {
+                    const rows = await apiCall("/expenses/trash");
+                    renderTrashItems(rows);
+                } catch (err) {
+                    $("#trashList").innerHTML = '<p class="text-center text-red-500 py-4">Failed to load trash.</p>';
+                }
+            }
+
+            function renderTrashItems(rows) {
+                const list = $("#trashList");
+                const empty = $("#trashEmpty");
+                if (!rows || rows.length === 0) {
+                    list.innerHTML = "";
+                    empty.classList.remove("hidden");
+                    return;
+                }
+                empty.classList.add("hidden");
+                list.innerHTML = rows.map((e) => `
+                    <div class="flex items-center justify-between border rounded-lg p-3 bg-gray-50 gap-2" data-trash-id="${escapeHtml(String(e.id))}">
+                        <div class="min-w-0">
+                            <p class="font-medium text-gray-800 truncate">${escapeHtml(e.description || "—")}</p>
+                            <p class="text-xs text-gray-500">${escapeHtml(e.category || "")} · ${escapeHtml(e.date_time || "")} · Deleted: ${escapeHtml(e.deleted_at || "")}</p>
+                        </div>
+                        <div class="flex gap-2 shrink-0">
+                            <button class="trash-restore-btn text-xs bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700" data-id="${escapeHtml(String(e.id))}">
+                                <i class="fas fa-undo mr-1"></i>Restore
+                            </button>
+                            <button class="trash-perm-btn text-xs bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700" data-id="${escapeHtml(String(e.id))}">
+                                <i class="fas fa-times mr-1"></i>Delete
+                            </button>
+                        </div>
+                    </div>`).join("");
+            }
+
+            // ── Try refresh native JWT token ──
+            async function tryRefreshToken() {
+                try {
+                    if (!authToken) return;
+                    // Only refresh server-issued JWTs (not Firebase tokens)
+                    const parts = authToken.split(".");
+                    if (parts.length !== 3) return;
+                    const payload = JSON.parse(atob(parts[1]));
+                    if (payload.iss && payload.iss.includes("firebase")) return;
+                    if (payload.iss && payload.iss.includes("securetoken")) return;
+                    // Refresh if less than 2 hours remain
+                    const expiresIn = (payload.exp || 0) - Math.floor(Date.now() / 1000);
+                    if (expiresIn > 7200) return;
+                    const data = await apiCall("/auth/refresh", { method: "POST" }, 5000);
+                    if (data && data.token) {
+                        authToken = data.token;
+                        try { localStorage.setItem("authToken", data.token); } catch (e) {}
+                    }
+                } catch (err) {
+                    // Silent — refresh is best-effort
+                }
+            }
+
             function renderDashboard(dashboard) {
-                const { statistics, categories } = dashboard;
+                const statistics = dashboard.statistics || { total_paid: 0, total_balance: 0, total_expenses: 0, total_cost: 0 };
+                const categories = dashboard.categories || [];
                 const budgetMap = budgets.reduce((acc, item) => {
                     acc[item.category] = item.threshold;
                     return acc;
@@ -1881,10 +1960,10 @@
                         (cat) => `
             <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4 border ${alertSet.has(cat.category) ? "border-red-400 shadow-md" : "border-gray-200"}">
                 <div class="flex justify-between items-start mb-2">
-                    <h3 class="font-semibold text-gray-800">${cat.category}</h3>
+                    <h3 class="font-semibold text-gray-800">${escapeHtml(cat.category)}</h3>
                     ${budgetMap[cat.category] ? `<span class="text-xs font-semibold ${alertSet.has(cat.category) ? "text-red-600" : "text-amber-600"}">Limit ${fmtMoney(budgetMap[cat.category])}</span>` : ""}
                 </div>
-                <p class="text-sm text-gray-600">Entries: ${cat.count}</p>
+                <p class="text-sm text-gray-600">Entries: ${Number(cat.count)}</p>
                 <p class="text-sm text-green-600 font-medium">Paid: ${fmtMoney(cat.total_paid)}</p>
                 <p class="text-sm text-orange-600 font-medium">Balance: ${fmtMoney(cat.total_balance)}</p>
                 ${alertSet.has(cat.category) ? `<p class="text-sm text-red-600 font-semibold mt-2"><i class="fas fa-exclamation-triangle mr-1"></i>Over budget</p>` : ""}
@@ -2034,6 +2113,12 @@
                 }
             }
 
+            // Resize charts when the window changes size (charts need manual resize with maintainAspectRatio: false)
+            window.addEventListener("resize", () => {
+                if (categoryPieChart) categoryPieChart.resize();
+                if (monthlyBarChart) monthlyBarChart.resize();
+            });
+
             // Expense Functions
             window.editExpense = async (id) => {
                 const idStr = String(id);
@@ -2156,6 +2241,8 @@
                         const expenseModal = $("#expenseModal");
                         const budgetModal = $("#budgetModal");
                         const categoriesModal = $("#categoriesModal");
+                        const trashModal = $("#trashModal");
+                        const settingsModal = $("#settingsModal");
                         if (expenseModal && !expenseModal.classList.contains("hidden")) {
                             expenseModal.classList.add("hidden");
                         }
@@ -2164,6 +2251,12 @@
                         }
                         if (categoriesModal && !categoriesModal.classList.contains("hidden")) {
                             categoriesModal.classList.add("hidden");
+                        }
+                        if (trashModal && !trashModal.classList.contains("hidden")) {
+                            trashModal.classList.add("hidden");
+                        }
+                        if (settingsModal && !settingsModal.classList.contains("hidden")) {
+                            settingsModal.classList.add("hidden");
                         }
                     }
                     // Ctrl/Cmd + F: Focus filter
@@ -2182,8 +2275,12 @@
                     filters.status = $("#filterStatus").value;
                     filters.startDate = $("#filterStartDate").value;
                     filters.endDate = $("#filterEndDate").value;
+                    filters.minAmount = $("#filterMinAmount").value.trim();
+                    filters.maxAmount = $("#filterMaxAmount").value.trim();
+                    filters.sortBy = $("#filterSortBy").value || "date_desc";
                     resetExpensePagination();
                     updateActiveFiltersLabel();
+                    if (typeof renderFilterChips === "function") renderFilterChips();
                     loadData();
                 });
 
@@ -2196,12 +2293,29 @@
                 });
 
                 $("#clearFiltersBtn").addEventListener("click", () => {
-                    Object.keys(filters).forEach((key) => (filters[key] = ""));
+                    Object.keys(filters).forEach((key) => {
+                        filters[key] = key === "sortBy" ? "date_desc" : "";
+                    });
                     syncFilterInputs();
                     resetExpensePagination();
                     updateActiveFiltersLabel();
+                    if (typeof renderFilterChips === "function") renderFilterChips();
                     loadData();
                 });
+
+                // Dashboard date range filter
+                if ($("#applyDashDateBtn")) {
+                    $("#applyDashDateBtn").addEventListener("click", () => {
+                        loadData();
+                    });
+                }
+                if ($("#clearDashDateBtn")) {
+                    $("#clearDashDateBtn").addEventListener("click", () => {
+                        if ($("#dashStartDate")) $("#dashStartDate").value = "";
+                        if ($("#dashEndDate")) $("#dashEndDate").value = "";
+                        loadData();
+                    });
+                }
 
                 // Import/Export
                 $("#importBtn").addEventListener("click", () => {
@@ -2340,6 +2454,19 @@
                     window.location.href = "/blog.html";
                 });
 
+                // ── Sidebar View Navigation ──
+                (function initSidebarNav() {
+                    const navBtns = document.querySelectorAll(".sidebar-nav-btn[data-view]");
+                    const views   = document.querySelectorAll(".app-view");
+                    function switchView(viewId) {
+                        views.forEach(v => v.classList.remove("active"));
+                        const target = document.getElementById("view-" + viewId);
+                        if (target) target.classList.add("active");
+                        navBtns.forEach(b => b.classList.toggle("active", b.dataset.view === viewId));
+                    }
+                    navBtns.forEach(btn => btn.addEventListener("click", () => switchView(btn.dataset.view)));
+                })();
+
                 // Close modals
                 $("#closeExpenseModal").addEventListener("click", () =>
                     $("#expenseModal").classList.add("hidden"),
@@ -2462,10 +2589,13 @@
                     }
                 });
 
-                // Helper: Get export data and type
-                function getExportData() {
-                    const hasActiveFilters = Object.values(filters).some((v) => v);
-                    let dataToExport = expenses;
+                // Helper: Get export data from server (all pages, not just current page)
+                async function getExportData() {
+                    // sortBy always has a value; only flag real user-set filters
+                    const realFilters = Object.entries(filters).filter(
+                        ([k, v]) => v && !(k === "sortBy" && v === "date_desc"),
+                    );
+                    const hasActiveFilters = realFilters.length > 0;
                     let exportType = "all";
 
                     if (hasActiveFilters) {
@@ -2474,10 +2604,22 @@
                                 "Click OK to export only filtered expenses.\n" +
                                 "Click Cancel to export ALL expenses.",
                         );
-                        if (choice) {
-                            exportType = "filtered";
-                        }
+                        if (choice) exportType = "filtered";
                     }
+
+                    // Fetch all matching records from server (no pagination limit)
+                    let dataToExport;
+                    try {
+                        if (exportType === "filtered") {
+                            dataToExport = await apiCall(`/expenses${buildExpenseQuery()}`);
+                        } else {
+                            dataToExport = await apiCall("/expenses");
+                        }
+                        if (!Array.isArray(dataToExport)) dataToExport = dataToExport.items || [];
+                    } catch (err) {
+                        dataToExport = expenses; // fallback to current page
+                    }
+
                     return { dataToExport, exportType, hasActiveFilters };
                 }
 
@@ -2510,9 +2652,9 @@
                 }
 
                 // JSON Export
-                $("#exportJsonBtn").addEventListener("click", () => {
+                $("#exportJsonBtn").addEventListener("click", async () => {
                     exportDropdown.classList.add("hidden");
-                    const { dataToExport, exportType, hasActiveFilters } = getExportData();
+                    const { dataToExport, exportType, hasActiveFilters } = await getExportData();
 
                     const data = {
                         expenses: dataToExport,
@@ -2541,9 +2683,9 @@
                 });
 
                 // CSV Export
-                $("#exportCsvBtn").addEventListener("click", () => {
+                $("#exportCsvBtn").addEventListener("click", async () => {
                     exportDropdown.classList.add("hidden");
-                    const { dataToExport, exportType } = getExportData();
+                    const { dataToExport, exportType } = await getExportData();
 
                     const csvContent = expensesToCsv(dataToExport);
                     if (!csvContent) {
@@ -2564,6 +2706,84 @@
                     notify(
                         `${exportType === "filtered" ? "Filtered" : "All"} expenses exported as CSV!`,
                     );
+                });
+
+                // ── Trash modal ──
+                $("#trashBtn").addEventListener("click", () => loadTrash());
+                $("#closeTrashModal").addEventListener("click", () =>
+                    $("#trashModal").classList.add("hidden"),
+                );
+                $("#trashModal").addEventListener("click", (e) => {
+                    if (e.target === $("#trashModal")) $("#trashModal").classList.add("hidden");
+                });
+                $("#trashList").addEventListener("click", async (e) => {
+                    const restoreBtn = e.target.closest(".trash-restore-btn");
+                    const permBtn = e.target.closest(".trash-perm-btn");
+                    if (restoreBtn) {
+                        const id = restoreBtn.dataset.id;
+                        try {
+                            await apiCall(`/expenses/${encodeURIComponent(id)}/restore`, { method: "POST" });
+                            notify("Expense restored!");
+                            await loadTrash();
+                            await loadData();
+                        } catch (err) {
+                            notify(err?.message || "Failed to restore expense", true);
+                        }
+                    } else if (permBtn) {
+                        const id = permBtn.dataset.id;
+                        if (!confirm("Permanently delete this expense? This cannot be undone.")) return;
+                        try {
+                            await apiCall(`/expenses/${encodeURIComponent(id)}/permanent`, { method: "DELETE" });
+                            notify("Expense permanently deleted.");
+                            await loadTrash();
+                        } catch (err) {
+                            notify(err?.message || "Failed to delete expense", true);
+                        }
+                    }
+                });
+
+                // ── Settings modal ──
+                $("#settingsBtn").addEventListener("click", () => {
+                    $("#cpError").classList.add("hidden");
+                    $("#changePasswordForm").reset();
+                    $("#settingsModal").classList.remove("hidden");
+                });
+                $("#closeSettingsModal").addEventListener("click", () =>
+                    $("#settingsModal").classList.add("hidden"),
+                );
+                $("#settingsModal").addEventListener("click", (e) => {
+                    if (e.target === $("#settingsModal")) $("#settingsModal").classList.add("hidden");
+                });
+                $("#changePasswordForm").addEventListener("submit", async (e) => {
+                    e.preventDefault();
+                    const current = $("#cpCurrentPassword").value;
+                    const newPw = $("#cpNewPassword").value;
+                    const confirm2 = $("#cpConfirmPassword").value;
+                    const errEl = $("#cpError");
+                    errEl.classList.add("hidden");
+
+                    if (newPw !== confirm2) {
+                        errEl.textContent = "New passwords do not match.";
+                        errEl.classList.remove("hidden");
+                        return;
+                    }
+                    if (newPw.length < 8) {
+                        errEl.textContent = "New password must be at least 8 characters.";
+                        errEl.classList.remove("hidden");
+                        return;
+                    }
+                    try {
+                        await apiCall("/users/password", {
+                            method: "PUT",
+                            body: { currentPassword: current, newPassword: newPw },
+                        });
+                        notify("Password changed successfully!");
+                        $("#settingsModal").classList.add("hidden");
+                        $("#changePasswordForm").reset();
+                    } catch (err) {
+                        errEl.textContent = err?.message || "Failed to change password.";
+                        errEl.classList.remove("hidden");
+                    }
                 });
             });
         </script>

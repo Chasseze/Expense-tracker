@@ -59,7 +59,9 @@ app.get('/api/status', async (req, res) => {
 // Get expenses
 app.get('/api/expenses', verifyToken, async (req, res) => {
   try {
-    const { session_term, category, status, startDate, endDate, search } = req.query;
+    const { session_term, category, status, startDate, endDate } = req.query;
+    // Accept both 'q' (new client) and 'search' (legacy) as the text search param
+    const search = req.query.q || req.query.search || null;
     // Pagination params
     const pageSize = Math.min(Math.max(parseInt(req.query.pageSize, 10) || 0, 0), 100); // 0 (no paging) to 100 max
     const page = Math.max(parseInt(req.query.page, 10) || 0, 0); // 0 means not provided
@@ -75,7 +77,7 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
       query = query.where('date_time', '<=', endDate);
     }
 
-  query = query.orderBy('date_time', 'desc').orderBy(FieldPath.documentId(), 'desc');
+  query = query.orderBy('date_time', 'desc');
 
     // Text search and other filters: fetch all then filter client-side for flexibility
     // Note: URLSearchParams encodes spaces as '+', but Express doesn't always decode them
@@ -87,12 +89,21 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
     const filterCategory = decodeParam(category);
     const filterStatus = decodeParam(status);
 
+    // Soft-delete: exclude deleted items
+    const filterDeleted = req.query.includeDeleted !== '1';
+    // Amount range
+    const minAmt = req.query.minAmount ? parseFloat(req.query.minAmount) : null;
+    const maxAmt = req.query.maxAmount ? parseFloat(req.query.maxAmount) : null;
+    const sortBy = req.query.sortBy || 'date_desc';
+
     // Helper function to apply client-side filters
     const applyFilters = (items) => {
-      const filtered = items.filter(item => {
+      let filtered = items.filter(item => {
+        // Exclude soft-deleted items
+        if (filterDeleted && item.deleted_at) return false;
         // Search filter
         if (searchTerm) {
-          const matchesSearch = 
+          const matchesSearch =
             (item.description && item.description.toLowerCase().includes(searchTerm)) ||
             (item.recipient && item.recipient.toLowerCase().includes(searchTerm)) ||
             (item.category && item.category.toLowerCase().includes(searchTerm)) ||
@@ -110,17 +121,31 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
           if (!itemCategory || !itemCategory.includes(filterCategory)) return false;
         }
         // Status filter (case-insensitive)
-        // Status filter (case-insensitive)
         if (filterStatus && (!item.status || !item.status.toLowerCase().trim().includes(filterStatus))) {
           return false;
         }
+        // Amount range
+        if (minAmt !== null || maxAmt !== null) {
+          const total = (Number(item.amount_paid) || 0) + (Number(item.balance_due) || 0);
+          if (minAmt !== null && total < minAmt) return false;
+          if (maxAmt !== null && total > maxAmt) return false;
+        }
         return true;
       });
+      // Sort
+      const SORT_MAP = {
+        date_desc: (a, b) => (b.date_time || '').localeCompare(a.date_time || ''),
+        date_asc: (a, b) => (a.date_time || '').localeCompare(b.date_time || ''),
+        amount_desc: (a, b) => ((Number(b.amount_paid) + Number(b.balance_due)) - (Number(a.amount_paid) + Number(a.balance_due))),
+        amount_asc: (a, b) => ((Number(a.amount_paid) + Number(a.balance_due)) - (Number(b.amount_paid) + Number(b.balance_due))),
+        category: (a, b) => (a.category || '').localeCompare(b.category || ''),
+      };
+      if (SORT_MAP[sortBy]) filtered.sort(SORT_MAP[sortBy]);
       return filtered;
     };
 
-    // Check if any client-side filters are active
-    const hasClientFilters = searchTerm || filterSessionTerm || filterCategory || filterStatus;
+    // Check if any client-side filters are active (includes amount range)
+    const hasClientFilters = searchTerm || filterSessionTerm || filterCategory || filterStatus || minAmt !== null || maxAmt !== null;
 
     // If explicit page number provided, prefer offset-based pagination for direct jumps
     if (pageSize > 0 && page > 0) {
@@ -155,13 +180,9 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
       }
       let pagedQuery = query;
       if (cursor) {
-        // Support composite cursor: "date_time|docId"
-        if (typeof cursor === 'string' && cursor.includes('|')) {
-          const [dt, id] = cursor.split('|');
-          pagedQuery = pagedQuery.startAfter(dt, id);
-        } else {
-          pagedQuery = pagedQuery.startAfter(cursor);
-        }
+        // Single-field cursor on date_time (strip composite format if present)
+        const cursorVal = typeof cursor === 'string' && cursor.includes('|') ? cursor.split('|')[0] : cursor;
+        pagedQuery = pagedQuery.startAfter(cursorVal);
       }
       // fetch one extra to determine if there is another page
       const snapshot = await pagedQuery.limit(pageSize + 1).get();
@@ -170,16 +191,15 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
       const slice = hasMore ? docs.slice(0, pageSize) : docs;
       const items = slice.map(doc => ({ id: doc.id, ...doc.data() }));
       const last = slice[slice.length - 1];
-      const nextCursor = hasMore && last ? `${last.get('date_time')}|${last.id}` : null;
+      const nextCursor = hasMore && last ? last.get('date_time') : null;
       return res.json({ items, nextCursor, hasMore });
     }
 
     // No pagination requested: return full list (legacy behavior)
     const snapshot = await query.get();
     let expenses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    if (hasClientFilters) {
-      expenses = applyFilters(expenses);
-    }
+    // Always apply filters (includes deleted_at filtering)
+    expenses = applyFilters(expenses);
     res.json(expenses);
   } catch (error) {
     console.error('Get expenses error:', error);
@@ -190,7 +210,12 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
 // Count expenses (for pagination UI)
 app.get('/api/expenses/count', verifyToken, async (req, res) => {
   try {
-    const { session_term, category, status, startDate, endDate, search } = req.query;
+    const { session_term, category, status, startDate, endDate } = req.query;
+    // Accept both 'q' (new client) and 'search' (legacy)
+    const search = req.query.q || req.query.search || null;
+    const minAmt = req.query.minAmount ? parseFloat(req.query.minAmount) : null;
+    const maxAmt = req.query.maxAmount ? parseFloat(req.query.maxAmount) : null;
+
     let query = db.collection('users').doc(req.user.uid).collection('expenses');
 
     // Date range filters can stay as Firestore queries
@@ -207,12 +232,13 @@ app.get('/api/expenses/count', verifyToken, async (req, res) => {
     const filterCategory = category ? category.toLowerCase().trim() : null;
     const filterStatus = status ? status.toLowerCase().trim() : null;
 
-    const hasClientFilters = searchTerm || filterSessionTerm || filterCategory || filterStatus;
+    const hasClientFilters = searchTerm || filterSessionTerm || filterCategory || filterStatus || minAmt !== null || maxAmt !== null;
 
     if (hasClientFilters) {
       const snapshot = await query.get();
       let allItems = snapshot.docs.map(doc => doc.data());
       allItems = allItems.filter(item => {
+        if (item.deleted_at) return false; // exclude soft-deleted
         if (searchTerm) {
           const matchesSearch = 
             (item.description && item.description.toLowerCase().includes(searchTerm)) ||
@@ -230,18 +256,22 @@ app.get('/api/expenses/count', verifyToken, async (req, res) => {
         if (filterStatus && (!item.status || !item.status.toLowerCase().includes(filterStatus))) {
           return false;
         }
+        if (minAmt !== null || maxAmt !== null) {
+          const total = (Number(item.amount_paid) || 0) + (Number(item.balance_due) || 0);
+          if (minAmt !== null && total < minAmt) return false;
+          if (maxAmt !== null && total > maxAmt) return false;
+        }
         return true;
       });
       return res.json({ total: allItems.length });
     }
 
-    // Use aggregate count if available (Admin SDK >= 12)
-    const agg = await query.count().get();
-    const total = agg.data().count || 0;
+    // Fetch all docs and count non-deleted in memory (avoids index requirements for deleted_at==null)
+    const snapshot = await query.get();
+    const total = snapshot.docs.filter(doc => !doc.data().deleted_at).length;
     res.json({ total });
   } catch (error) {
     console.error('Count expenses error:', error);
-    // Fallback: return error to client; client can degrade gracefully
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -250,18 +280,22 @@ app.get('/api/expenses/count', verifyToken, async (req, res) => {
 app.post('/api/expenses', verifyToken, async (req, res) => {
   try {
     const { date_time, category, session_term, recipient, description, amount_paid, balance_due } = req.body;
-    const status = balance_due > 0 ? 'Partial' : 'Paid';
+    if (!date_time || !category || amount_paid == null || balance_due == null) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    const status = Number(balance_due) > 0 ? 'Partial' : 'Paid';
 
     const docRef = await db.collection('users').doc(req.user.uid).collection('expenses').add({
       date_time,
       category,
-      session_term,
-      recipient,
-      description,
+      session_term: session_term || '',
+      recipient: recipient || '',
+      description: description || '',
       amount_paid: Number(amount_paid),
       balance_due: Number(balance_due),
       status,
-      created_at: admin.firestore.FieldValue.serverTimestamp()
+      deleted_at: null,
+      created_at: admin.firestore.FieldValue.serverTimestamp(),
     });
 
     const doc = await docRef.get();
@@ -276,17 +310,20 @@ app.post('/api/expenses', verifyToken, async (req, res) => {
 app.put('/api/expenses/:id', verifyToken, async (req, res) => {
   try {
     const { date_time, category, session_term, recipient, description, amount_paid, balance_due } = req.body;
-    const status = balance_due > 0 ? 'Partial' : 'Paid';
+    if (!date_time || !category || amount_paid == null || balance_due == null) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    const status = Number(balance_due) > 0 ? 'Partial' : 'Paid';
 
     await db.collection('users').doc(req.user.uid).collection('expenses').doc(req.params.id).update({
       date_time,
       category,
-      session_term,
-      recipient,
-      description,
+      session_term: session_term || '',
+      recipient: recipient || '',
+      description: description || '',
       amount_paid: Number(amount_paid),
       balance_due: Number(balance_due),
-      status
+      status,
     });
 
     res.json({ message: 'Expense updated successfully' });
@@ -296,10 +333,12 @@ app.put('/api/expenses/:id', verifyToken, async (req, res) => {
   }
 });
 
-// Delete expense
+// Soft-delete expense
 app.delete('/api/expenses/:id', verifyToken, async (req, res) => {
   try {
-    await db.collection('users').doc(req.user.uid).collection('expenses').doc(req.params.id).delete();
+    await db.collection('users').doc(req.user.uid).collection('expenses').doc(req.params.id).update({
+      deleted_at: admin.firestore.FieldValue.serverTimestamp(),
+    });
     res.json({ message: 'Expense deleted successfully' });
   } catch (error) {
     console.error('Delete expense error:', error);
@@ -307,13 +346,66 @@ app.delete('/api/expenses/:id', verifyToken, async (req, res) => {
   }
 });
 
-// Get blog posts
+// Trash: list soft-deleted expenses
+app.get('/api/expenses/trash', verifyToken, async (req, res) => {
+  try {
+    const snapshot = await db.collection('users').doc(req.user.uid).collection('expenses').get();
+    const rows = snapshot.docs
+      .map(doc => ({ id: doc.id, ...doc.data() }))
+      .filter(e => e.deleted_at)
+      .sort((a, b) => {
+        const ta = a.deleted_at && a.deleted_at.toDate ? a.deleted_at.toDate().getTime() : 0;
+        const tb = b.deleted_at && b.deleted_at.toDate ? b.deleted_at.toDate().getTime() : 0;
+        return tb - ta;
+      });
+    res.json(rows);
+  } catch (error) {
+    console.error('Get trash error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Restore soft-deleted expense
+app.post('/api/expenses/:id/restore', verifyToken, async (req, res) => {
+  try {
+    await db.collection('users').doc(req.user.uid).collection('expenses').doc(req.params.id).update({
+      deleted_at: null,
+    });
+    res.json({ message: 'Expense restored successfully' });
+  } catch (error) {
+    console.error('Restore expense error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Permanently delete a soft-deleted expense
+app.delete('/api/expenses/:id/permanent', verifyToken, async (req, res) => {
+  try {
+    await db.collection('users').doc(req.user.uid).collection('expenses').doc(req.params.id).delete();
+    res.json({ message: 'Expense permanently deleted' });
+  } catch (error) {
+    console.error('Permanent delete error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get blog posts (with optional pagination: ?limit=20&offset=0)
 app.get('/api/blog-posts', verifyToken, async (req, res) => {
   try {
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 0, 0), 100);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+
     const snapshot = await db.collection('users').doc(req.user.uid).collection('blog_posts')
       .orderBy('date_time', 'desc').get();
-    const posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    res.json(posts);
+    const allPosts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const total = allPosts.length;
+
+    if (limit > 0) {
+      const posts = allPosts.slice(offset, offset + limit);
+      res.json({ posts, total, hasMore: offset + posts.length < total });
+    } else {
+      res.json(allPosts); // backward-compatible: no limit → plain array
+    }
   } catch (error) {
     console.error('Get blog posts error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -324,13 +416,23 @@ app.get('/api/blog-posts', verifyToken, async (req, res) => {
 app.post('/api/blog-posts', verifyToken, async (req, res) => {
   try {
     const { date_time, category, title, content } = req.body;
+    if (!date_time || !category || !title || !content) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    if (typeof title !== 'string' || title.trim().length > 200) {
+      return res.status(400).json({ error: 'Title must be 1-200 characters' });
+    }
+    if (typeof content !== 'string' || content.length > 50000) {
+      return res.status(400).json({ error: 'Content too long (max 50,000 characters)' });
+    }
 
     const docRef = await db.collection('users').doc(req.user.uid).collection('blog_posts').add({
       date_time,
       category,
       title,
       content,
-      created_at: admin.firestore.FieldValue.serverTimestamp()
+      created_at: admin.firestore.FieldValue.serverTimestamp(),
+      modified_at: admin.firestore.FieldValue.serverTimestamp(),
     });
 
     const doc = await docRef.get();
@@ -345,12 +447,22 @@ app.post('/api/blog-posts', verifyToken, async (req, res) => {
 app.put('/api/blog-posts/:id', verifyToken, async (req, res) => {
   try {
     const { date_time, category, title, content } = req.body;
+    if (!date_time || !category || !title || !content) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    if (typeof title !== 'string' || title.trim().length > 200) {
+      return res.status(400).json({ error: 'Title must be 1-200 characters' });
+    }
+    if (typeof content !== 'string' || content.length > 50000) {
+      return res.status(400).json({ error: 'Content too long (max 50,000 characters)' });
+    }
 
     await db.collection('users').doc(req.user.uid).collection('blog_posts').doc(req.params.id).update({
       date_time,
       category,
       title,
-      content
+      content,
+      modified_at: admin.firestore.FieldValue.serverTimestamp(),
     });
 
     res.json({ message: 'Blog post updated successfully' });
@@ -483,8 +595,12 @@ app.delete('/api/categories/:name', verifyToken, async (req, res) => {
 // Dashboard statistics
 app.get('/api/dashboard', verifyToken, async (req, res) => {
   try {
-    const snapshot = await db.collection('users').doc(req.user.uid).collection('expenses').get();
-    const expenses = snapshot.docs.map(doc => doc.data());
+    const { startDate, endDate } = req.query;
+    let query = db.collection('users').doc(req.user.uid).collection('expenses');
+    if (startDate) query = query.where('date_time', '>=', startDate);
+    if (endDate) query = query.where('date_time', '<=', endDate + ' 23:59');
+    const snapshot = await query.get();
+    const expenses = snapshot.docs.map(doc => doc.data()).filter(e => !e.deleted_at);
 
     const stats = {
       total_expenses: expenses.length,
@@ -542,6 +658,32 @@ app.get('/api/dashboard', verifyToken, async (req, res) => {
 // Health check
 app.get('/health', (req, res) => {
   res.status(200).send('OK');
+});
+
+// Change password (Firebase Admin SDK – re-auth is handled client-side)
+app.put('/api/users/password', verifyToken, async (req, res) => {
+  try {
+    const { newPassword } = req.body;
+    if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 8 || newPassword.length > 128) {
+      return res.status(400).json({ error: 'New password must be 8-128 characters' });
+    }
+    await admin.auth().updateUser(req.user.uid, { password: newPassword });
+    res.json({ message: 'Password changed successfully' });
+  } catch (error) {
+    console.error('Change password error:', error);
+    // Firebase might throw if re-auth is required – surface a clear message
+    const msg = error.code === 'auth/requires-recent-login'
+      ? 'Please re-authenticate before changing your password'
+      : 'Internal server error';
+    res.status(500).json({ error: msg });
+  }
+});
+
+// Token refresh – Firebase tokens are auto-refreshed by the client SDK;
+// this endpoint exists for compatibility with the local server.
+app.post('/api/auth/refresh', verifyToken, (req, res) => {
+  // The caller already holds a valid Firebase token; tell them to use it.
+  res.json({ message: 'Use Firebase SDK to refresh tokens', uid: req.user.uid });
 });
 
 // Export the Express app as a Cloud Function

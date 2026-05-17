@@ -24,9 +24,21 @@
                 margin: 0;
                 padding: 0;
             }
+            /* ── Reading progress bar ── */
+            #readingProgress {
+                position: fixed;
+                top: 0;
+                left: 0;
+                height: 3px;
+                width: 0%;
+                background: linear-gradient(90deg, #d946ef, #818cf8);
+                z-index: 100;
+                transition: width 0.1s linear;
+                border-radius: 0 2px 2px 0;
+            }
             /* ── Header ── */
             .blog-header {
-                background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+                background: #0f2a5e;
                 color: #fff;
                 padding: 1.25rem 1.5rem;
                 display: flex;
@@ -37,7 +49,28 @@
                 position: sticky;
                 top: 0;
                 z-index: 30;
+                box-shadow: 0 2px 12px rgba(15,42,94,0.4);
             }
+            .blog-header-actions {
+                display: flex;
+                align-items: center;
+                gap: 0.6rem;
+            }
+            .blog-icon-btn {
+                background: rgba(255,255,255,0.12);
+                border: 1px solid rgba(255,255,255,0.18);
+                color: #fff;
+                border-radius: 0.5rem;
+                width: 36px;
+                height: 36px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                transition: background 0.15s;
+                font-size: 0.9rem;
+            }
+            .blog-icon-btn:hover { background: rgba(255,255,255,0.25); }
             .blog-header-left {
                 display: flex;
                 align-items: center;
@@ -98,8 +131,7 @@
                 height: calc(100vh - 70px);
             }
             .sidebar-header {
-                padding: 1rem 1.25rem;
-                border-bottom: 1px solid #e2e8f0;
+                padding: 0.85rem 1.25rem 0;
                 background: #fafbfc;
                 font-weight: 700;
                 color: #475569;
@@ -109,6 +141,75 @@
                 display: flex;
                 align-items: center;
                 gap: 0.5rem;
+                border-bottom: none;
+            }
+            .sidebar-controls {
+                padding: 0.65rem 1rem 0.85rem;
+                background: #fafbfc;
+                border-bottom: 1px solid #e2e8f0;
+                display: flex;
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+            .sidebar-search {
+                display: flex;
+                align-items: center;
+                gap: 0.4rem;
+                background: #fff;
+                border: 1px solid #e2e8f0;
+                border-radius: 0.55rem;
+                padding: 0.4rem 0.65rem;
+                font-size: 0.85rem;
+                color: #475569;
+            }
+            .sidebar-search i { opacity: 0.45; flex-shrink: 0; }
+            .sidebar-search input {
+                border: none;
+                outline: none;
+                background: transparent;
+                flex: 1;
+                color: #1e293b;
+                font-size: 0.85rem;
+            }
+            .sidebar-sort {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            }
+            .sidebar-sort label { font-size: 0.72rem; font-weight: 600; color: #94a3b8; white-space: nowrap; }
+            .sidebar-sort select {
+                flex: 1;
+                font-size: 0.78rem;
+                border: 1px solid #e2e8f0;
+                border-radius: 0.4rem;
+                padding: 0.3rem 0.5rem;
+                background: #fff;
+                color: #334155;
+                cursor: pointer;
+            }
+            .sidebar-cat-chips {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.35rem;
+                padding: 0.6rem 1rem;
+                border-bottom: 1px solid #e2e8f0;
+                background: #fafbfc;
+            }
+            .cat-chip {
+                padding: 0.2rem 0.6rem;
+                border-radius: 9999px;
+                font-size: 0.68rem;
+                font-weight: 700;
+                cursor: pointer;
+                border: 1px solid transparent;
+                transition: all 0.15s;
+                background: #f1f5f9;
+                color: #64748b;
+            }
+            .cat-chip:hover, .cat-chip.active {
+                background: #ede9fe;
+                color: #5b21b6;
+                border-color: #ddd6fe;
             }
             .sidebar-list {
                 list-style: none;
@@ -116,15 +217,26 @@
                 padding: 0;
             }
             .sidebar-item {
-                padding: 1rem 1.25rem;
+                padding: 0.85rem 1.25rem;
                 border-bottom: 1px solid #f1f5f9;
                 cursor: pointer;
-                transition: background 0.15s;
+                transition: background 0.15s, border-left-color 0.15s;
+                border-left: 3px solid transparent;
             }
-            .sidebar-item:hover { background: #f8fafc; }
+            .sidebar-item:hover { background: #f8fafc; border-left-color: #ddd6fe; }
             .sidebar-item.active {
                 background: linear-gradient(90deg, #ede9fe 0%, #f8fafc 100%);
-                border-left: 3px solid #8b5cf6;
+                border-left-color: #8b5cf6;
+            }
+            .sidebar-item-meta {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: 0.4rem;
+            }
+            .sidebar-item-readtime {
+                font-size: 0.67rem;
+                color: #94a3b8;
             }
             .sidebar-item-category {
                 display: inline-block;
@@ -443,6 +555,38 @@
                 .md-preview-side { display: none; }
             }
 
+            /* ── Blog Dark Mode ── */
+            body.blog-dark { background: #0f172a; color: #e2e8f0; }
+            body.blog-dark .blog-header { background: #081a3d; }
+            body.blog-dark .blog-sidebar { background: #1e293b; border-right-color: #334155; }
+            body.blog-dark .sidebar-header,
+            body.blog-dark .sidebar-controls { background: #1e293b; border-bottom-color: #334155; }
+            body.blog-dark .sidebar-cat-chips { background: #1e293b; border-bottom-color: #334155; }
+            body.blog-dark .sidebar-search { background: #0f172a; border-color: #334155; }
+            body.blog-dark .sidebar-search input { color: #e2e8f0; }
+            body.blog-dark .sidebar-sort select { background: #0f172a; color: #e2e8f0; border-color: #334155; }
+            body.blog-dark .sidebar-item { border-bottom-color: #1e293b; }
+            body.blog-dark .sidebar-item:hover { background: #334155; }
+            body.blog-dark .sidebar-item.active { background: linear-gradient(90deg, #312e81 0%, #1e293b 100%); }
+            body.blog-dark .sidebar-item-title { color: #e2e8f0; }
+            body.blog-dark .sidebar-item-excerpt { color: #94a3b8; }
+            body.blog-dark .blog-main { background: #0f172a; }
+            body.blog-dark .article-card { background: #1e293b; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+            body.blog-dark .article-header { border-bottom-color: #334155; }
+            body.blog-dark .article-title { color: #e2e8f0; }
+            body.blog-dark .article-body { color: #cbd5e1; }
+            body.blog-dark .article-body h1, body.blog-dark .article-body h2,
+            body.blog-dark .article-body h3, body.blog-dark .article-body h4 { color: #e2e8f0; }
+            body.blog-dark .article-body h1, body.blog-dark .article-body h2 { border-bottom-color: #334155; }
+            body.blog-dark .article-body blockquote { background: #0f172a; border-left-color: #a78bfa; }
+            body.blog-dark .article-body code { background: #0f172a; color: #c4b5fd; }
+            body.blog-dark .article-footer { background: #1a2744; border-top-color: #334155; }
+            body.blog-dark .article-action-btn { background: #1e293b; border-color: #334155; color: #94a3b8; }
+            body.blog-dark .article-action-btn:hover { background: #334155; color: #e2e8f0; }
+            body.blog-dark .article-welcome { color: #64748b; }
+            body.blog-dark .cat-chip { background: #1e293b; color: #94a3b8; border-color: #334155; }
+            body.blog-dark .cat-chip:hover, body.blog-dark .cat-chip.active { background: #312e81; color: #c4b5fd; border-color: #4338ca; }
+
             /* ── Mobile Toggle ── */
             .mobile-sidebar-toggle {
                 display: none;
@@ -491,6 +635,7 @@
         </style>
     </head>
     <body class="blog-body">
+        <div id="readingProgress"></div>
         <!-- HEADER -->
         <header class="blog-header">
             <div class="blog-header-left">
@@ -500,6 +645,10 @@
             <button id="composeBtn" class="blog-compose-btn">
                 <i class="fas fa-plus"></i> New Post
             </button>
+            </div>
+            <div class="blog-header-actions">
+                <button id="blogDarkToggle" class="blog-icon-btn" title="Toggle dark mode"><i class="fas fa-moon"></i></button>
+            </div>
         </header>
 
         <!-- LAYOUT -->
@@ -510,10 +659,31 @@
                     <i class="fas fa-list"></i> All Posts
                     <span id="postCount" style="margin-left:auto; color:#8b5cf6;"></span>
                 </div>
+                <div class="sidebar-controls">
+                    <div class="sidebar-search">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="sidebarSearch" placeholder="Search posts…" autocomplete="off" />
+                    </div>
+                    <div class="sidebar-sort">
+                        <label for="sidebarSort">Sort:</label>
+                        <select id="sidebarSort">
+                            <option value="newest">Newest first</option>
+                            <option value="oldest">Oldest first</option>
+                            <option value="az">A → Z</option>
+                            <option value="za">Z → A</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="catChips" class="sidebar-cat-chips"></div>
                 <ul id="sidebarList" class="sidebar-list"></ul>
                 <div id="sidebarEmpty" class="sidebar-empty" style="display:none;">
                     <i class="fas fa-inbox"></i>
                     <p>No posts yet.<br>Click "New Post" to start writing.</p>
+                </div>
+                <div style="padding:8px 12px;">
+                    <button id="loadMorePosts" class="hidden" style="width:100%;padding:8px;background:#f3f0ff;color:#7c3aed;border:1px solid #ddd6fe;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:500;">
+                        Load More
+                    </button>
                 </div>
             </aside>
 
@@ -534,6 +704,7 @@
                             <h1 id="articleTitle" class="article-title"></h1>
                             <div class="article-meta">
                                 <span><i class="fas fa-calendar-alt"></i> <span id="articleDate"></span></span>
+                                <span><i class="fas fa-clock"></i> <span id="articleReadTime"></span></span>
                             </div>
                         </div>
                         <div id="articleBody" class="article-body"></div>
@@ -610,6 +781,7 @@
                                 </div>
                                 <div class="md-editor-container">
                                     <textarea id="blogContent" rows="12" placeholder="Write your post using Markdown...&#10;&#10;**Bold** *Italic* ~~Strike~~&#10;# Heading 1&#10;## Heading 2&#10;- Bullet list&#10;1. Numbered list&#10;> Blockquote&#10;`inline code`&#10;[Link](url)&#10;![Image](url)" required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-500"></textarea>
+                                    <div id="editorWordCount" style="font-size:0.72rem;color:#94a3b8;text-align:right;padding:0.2rem 0.4rem 0 0;">0 words</div>
                                 </div>
                             </div>
                             <div class="md-preview-side">
@@ -804,27 +976,86 @@
                 }, 150);
             }
 
+            // ── Helpers ──
+            function estimateReadTime(content) {
+                const words = (content || '').trim().split(/\s+/).filter(Boolean).length;
+                const mins = Math.max(1, Math.round(words / 200));
+                return `${mins} min read`;
+            }
+
+            function countWords(text) {
+                return (text || '').trim().split(/\s+/).filter(Boolean).length;
+            }
+
             // ── Sidebar Rendering ──
+            let sidebarSearchTerm = '';
+            let sidebarSort = 'newest';
+            let sidebarCategory = '';
+
+            function getFilteredSortedPosts() {
+                let posts = [...blogPosts];
+                if (sidebarSearchTerm) {
+                    const q = sidebarSearchTerm.toLowerCase();
+                    posts = posts.filter(p =>
+                        p.title.toLowerCase().includes(q) ||
+                        p.content.toLowerCase().includes(q) ||
+                        (p.category || '').toLowerCase().includes(q)
+                    );
+                }
+                if (sidebarCategory) {
+                    posts = posts.filter(p => p.category === sidebarCategory);
+                }
+                switch (sidebarSort) {
+                    case 'oldest': posts.sort((a,b) => (a.date_time||'').localeCompare(b.date_time||'')); break;
+                    case 'az':     posts.sort((a,b) => a.title.localeCompare(b.title)); break;
+                    case 'za':     posts.sort((a,b) => b.title.localeCompare(a.title)); break;
+                    default:       posts.sort((a,b) => (b.date_time||'').localeCompare(a.date_time||'')); break;
+                }
+                return posts;
+            }
+
+            function renderCatChips() {
+                const chips = document.getElementById('catChips');
+                if (!chips) return;
+                const cats = [...new Set(blogPosts.map(p => p.category).filter(Boolean))];
+                if (cats.length < 2) { chips.style.display = 'none'; return; }
+                chips.style.display = 'flex';
+                chips.innerHTML = [
+                    `<span class="cat-chip ${!sidebarCategory ? 'active' : ''}" data-cat="">All</span>`,
+                    ...cats.map(c => `<span class="cat-chip ${sidebarCategory === c ? 'active' : ''}" data-cat="${escapeHtml(c)}">${escapeHtml(c)}</span>`)
+                ].join('');
+            }
+
             function renderSidebar() {
                 const list = $("#sidebarList");
                 const empty = $("#sidebarEmpty");
                 const count = $("#postCount");
 
-                count.textContent = blogPosts.length ? `(${blogPosts.length})` : "";
+                const totalLabel = blogTotal > blogPosts.length
+                    ? `(${blogPosts.length}/${blogTotal})`
+                    : blogPosts.length ? `(${blogPosts.length})` : "";
+                count.textContent = totalLabel;
 
-                if (blogPosts.length === 0) {
+                renderCatChips();
+
+                const visible = getFilteredSortedPosts();
+
+                if (visible.length === 0) {
                     list.innerHTML = "";
                     empty.style.display = "block";
                     return;
                 }
                 empty.style.display = "none";
 
-                list.innerHTML = blogPosts.map(post => `
+                list.innerHTML = visible.map(post => `
                     <li class="sidebar-item ${selectedPostId === post.id ? 'active' : ''}" data-id="${post.id}">
-                        <span class="sidebar-item-category">${escapeHtml(post.category)}</span>
+                        <div class="sidebar-item-meta">
+                            <span class="sidebar-item-category">${escapeHtml(post.category)}</span>
+                            <span class="sidebar-item-readtime"><i class="fas fa-clock" style="margin-right:3px;"></i>${estimateReadTime(post.content)}</span>
+                        </div>
                         <div class="sidebar-item-title">${escapeHtml(post.title)}</div>
-                        <div class="sidebar-item-excerpt">${escapeHtml(post.content.substring(0, 80))}</div>
-                        <div class="sidebar-item-date"><i class="fas fa-clock" style="margin-right:4px;opacity:0.6;"></i>${formatDate(post.date_time)}</div>
+                        <div class="sidebar-item-excerpt">${escapeHtml(post.content.substring(0, 80))}${post.content.length > 80 ? '…' : ''}</div>
+                        <div class="sidebar-item-date"><i class="fas fa-calendar-alt" style="margin-right:4px;opacity:0.6;"></i>${formatDate(post.date_time)}</div>
                     </li>
                 `).join("");
             }
@@ -846,6 +1077,7 @@
                 $("#articleCategory").textContent = post.category;
                 $("#articleTitle").textContent = post.title;
                 $("#articleDate").textContent = formatDate(post.date_time);
+                $("#articleReadTime").textContent = estimateReadTime(post.content);
                 // Render markdown content
                 $("#articleBody").innerHTML = renderMarkdown(post.content);
 
@@ -855,13 +1087,31 @@
                 closeMobileSidebar();
             }
 
-            // ── Load posts ──
-            async function loadPosts() {
+            // ── Load posts (paginated) ──
+            const BLOG_PAGE_SIZE = 20;
+            let blogTotal = 0;
+            let blogOffset = 0;
+
+            async function loadPosts(append = false) {
                 try {
-                    blogPosts = await apiCall("/blog-posts");
-                    // Sort by date descending (newest first)
-                    blogPosts.sort((a, b) => new Date(b.date_time) - new Date(a.date_time));
+                    if (!append) {
+                        blogPosts = [];
+                        blogOffset = 0;
+                    }
+                    const resp = await apiCall(`/blog-posts?limit=${BLOG_PAGE_SIZE}&offset=${blogOffset}`);
+                    // Support both paginated {posts,total} and legacy plain array response
+                    let newPosts;
+                    if (Array.isArray(resp)) {
+                        newPosts = resp;
+                        blogTotal = resp.length;
+                    } else {
+                        newPosts = resp.posts || [];
+                        blogTotal = resp.total || 0;
+                    }
+                    blogPosts = append ? [...blogPosts, ...newPosts] : newPosts;
+                    blogOffset = blogPosts.length;
                     renderSidebar();
+                    renderLoadMoreBtn();
 
                     // If we had a selected post, refresh it; otherwise show welcome
                     if (selectedPostId) {
@@ -872,6 +1122,14 @@
                     console.error("Failed to load blog posts:", err);
                     notify("Failed to load posts. Please log in first.", true);
                 }
+            }
+
+            function renderLoadMoreBtn() {
+                const btn = $("#loadMorePosts");
+                if (!btn) return;
+                const hasMore = blogPosts.length < blogTotal;
+                btn.classList.toggle("hidden", !hasMore);
+                btn.textContent = `Load More (${blogTotal - blogPosts.length} remaining)`;
             }
 
             // ── Modal helpers ──
@@ -949,13 +1207,24 @@
                 $("#mobileSidebarToggle").addEventListener("click", openMobileSidebar);
                 $("#sidebarOverlay").addEventListener("click", closeMobileSidebar);
 
+                // Load More button
+                const loadMoreBtn = $("#loadMorePosts");
+                if (loadMoreBtn) {
+                    loadMoreBtn.addEventListener("click", () => loadPosts(true));
+                }
+
                 // Markdown toolbar clicks
                 document.querySelectorAll('.md-toolbar button[data-md]').forEach(btn => {
                     btn.addEventListener('click', () => insertMdSyntax(btn.dataset.md));
                 });
 
-                // Live preview on typing
-                $("#blogContent").addEventListener('input', updatePreview);
+                // Live preview on typing + word count
+                $("#blogContent").addEventListener('input', () => {
+                    updatePreview();
+                    const wc = countWords($("#blogContent").value);
+                    const el = $("#editorWordCount");
+                    if (el) el.textContent = `${wc} word${wc !== 1 ? 's' : ''}`;
+                });
 
                 // Keyboard shortcuts for bold/italic
                 $("#blogContent").addEventListener('keydown', (e) => {
@@ -1003,6 +1272,54 @@
                 if (!hasAuth) {
                     window.location.href = "/index.html";
                     return;
+                }
+
+                // Sidebar search
+                document.getElementById('sidebarSearch').addEventListener('input', (e) => {
+                    sidebarSearchTerm = e.target.value.trim();
+                    renderSidebar();
+                });
+
+                // Sidebar sort
+                document.getElementById('sidebarSort').addEventListener('change', (e) => {
+                    sidebarSort = e.target.value;
+                    renderSidebar();
+                });
+
+                // Category chip clicks
+                document.getElementById('catChips').addEventListener('click', (e) => {
+                    const chip = e.target.closest('.cat-chip');
+                    if (!chip) return;
+                    sidebarCategory = chip.dataset.cat;
+                    renderSidebar();
+                });
+
+                // Dark mode toggle
+                const darkToggle = document.getElementById('blogDarkToggle');
+                const applyBlogTheme = (dark) => {
+                    document.body.classList.toggle('blog-dark', dark);
+                    darkToggle.innerHTML = dark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+                    localStorage.setItem('blogDark', dark ? '1' : '0');
+                };
+                darkToggle.addEventListener('click', () => {
+                    applyBlogTheme(!document.body.classList.contains('blog-dark'));
+                });
+                applyBlogTheme(localStorage.getItem('blogDark') === '1');
+
+                // Reading progress bar
+                document.querySelector('.blog-main').addEventListener('scroll', updateReadingProgress);
+                function updateReadingProgress() {
+                    const article = document.getElementById('articleBody');
+                    const bar = document.getElementById('readingProgress');
+                    if (!article || !bar || document.getElementById('articleView').style.display === 'none') {
+                        bar.style.width = '0%';
+                        return;
+                    }
+                    const main = document.querySelector('.blog-main');
+                    const scrollTop = main.scrollTop;
+                    const scrollHeight = main.scrollHeight - main.clientHeight;
+                    const pct = scrollHeight > 0 ? Math.min((scrollTop / scrollHeight) * 100, 100) : 0;
+                    bar.style.width = pct + '%';
                 }
 
                 // Load posts

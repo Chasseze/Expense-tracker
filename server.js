@@ -2,6 +2,8 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const cors = require("cors");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 const path = require("path");
 
 let sqlite3;
@@ -9,12 +11,45 @@ let createClient;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET =
-  process.env.JWT_SECRET || "your-secret-key-here-change-this-in-production";
+
+const DEFAULT_JWT_SECRET = "your-secret-key-here-change-this-in-production";
+const JWT_SECRET = process.env.JWT_SECRET || DEFAULT_JWT_SECRET;
+if (JWT_SECRET === DEFAULT_JWT_SECRET) {
+  console.warn(
+    "[SECURITY WARNING] JWT_SECRET is using the insecure default. Set JWT_SECRET in your environment variables before deploying to production.",
+  );
+}
+
+// CORS: allow same-origin and any configured ALLOWED_ORIGINS (comma-separated)
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
+  : [];
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g. curl, mobile apps, same-origin)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    callback(new Error("CORS: origin not allowed"));
+  },
+  optionsSuccessStatus: 200,
+};
+
+// Rate limiters for auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many attempts. Please try again later." },
+});
 
 // Middleware
-app.use(cors());
-app.use(express.json());
+app.use(helmet({ contentSecurityPolicy: false })); // CSP disabled so CDN scripts in index.html still load
+app.use(cors(corsOptions));
+app.use(express.json({ limit: "1mb" }));
 app.use(express.static("public"));
 
 // Database setup (LibSQL/Turso first, fallback to local SQLite)
@@ -27,11 +62,15 @@ const dbPath =
 let db;
 let ftsHasBm25 = false;
 
-// Development auth toggle: set DISABLE_AUTH=1 to disable auth checks globally.
-// Additionally, when not in production we expose small routes to enable/disable auth at runtime:
+// Development auth toggle: set DISABLE_AUTH=1 to explicitly disable auth checks.
+// Auth is ENABLED by default in all environments; opt-out is explicit.
 const devAuthFromEnv = process.env.DISABLE_AUTH === "1";
-let devAuthDisabled =
-  Boolean(devAuthFromEnv) || process.env.NODE_ENV !== "production";
+let devAuthDisabled = Boolean(devAuthFromEnv);
+if (devAuthDisabled) {
+  console.warn(
+    "[SECURITY WARNING] Authentication is DISABLED via DISABLE_AUTH=1. Do NOT use this in production.",
+  );
+}
 
 if (!useLibsql) {
   try {
@@ -98,6 +137,7 @@ async function initializeDatabase() {
             amount_paid REAL NOT NULL,
             balance_due REAL DEFAULT 0,
             status TEXT DEFAULT 'Paid',
+            deleted_at DATETIME DEFAULT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (id)
         )`,
@@ -109,6 +149,7 @@ async function initializeDatabase() {
             title TEXT NOT NULL,
             content TEXT NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            modified_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (id)
         )`,
     `CREATE TABLE IF NOT EXISTS budget_limits (
@@ -131,6 +172,19 @@ async function initializeDatabase() {
 
   for (const statement of statements) {
     await dbRun(statement);
+  }
+
+  // Schema migrations: add columns that may not exist in older databases
+  const migrations = [
+    `ALTER TABLE blog_posts ADD COLUMN modified_at DATETIME DEFAULT CURRENT_TIMESTAMP`,
+    `ALTER TABLE expenses ADD COLUMN deleted_at DATETIME DEFAULT NULL`,
+  ];
+  for (const migration of migrations) {
+    try {
+      await dbRun(migration);
+    } catch (_err) {
+      // Column already exists — safe to ignore duplicate column errors
+    }
   }
 
   // If using local SQLite, create an FTS5 virtual table and triggers for fast text search
@@ -229,6 +283,17 @@ function formatDateTimeBoundary(value, edge) {
   return edge === "start" ? `${value} 00:00` : `${value} 23:59`;
 }
 
+/**
+ * Safely escape a string for use in an FTS5 MATCH expression.
+ * Strips all FTS5 operator characters and quotes to prevent injection.
+ * Only alphanumeric, spaces, underscores, and hyphens are kept.
+ */
+function escapeForFts(s) {
+  // Remove FTS5 special characters: " * ^ ( ) ~ + - . , : ; ! ?
+  // Keep alphanumeric, underscore, hyphen, and spaces only
+  return String(s).replace(/[^a-zA-Z0-9_ \-]/g, " ").trim();
+}
+
 // Authentication middleware
 function authenticateToken(req, res, next) {
   // Bypass auth in development when explicitly disabled
@@ -323,18 +388,25 @@ app.get("/api/status", async (req, res) => {
 });
 
 // User registration
-app.post("/api/register", async (req, res) => {
+app.post("/api/register", authLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
 
     if (!username || !password) {
       return res.status(400).json({ error: "Username and password required" });
     }
+    if (typeof username !== "string" || username.trim().length < 3 || username.trim().length > 50) {
+      return res.status(400).json({ error: "Username must be 3-50 characters" });
+    }
+    if (typeof password !== "string" || password.length < 8 || password.length > 128) {
+      return res.status(400).json({ error: "Password must be 8-128 characters" });
+    }
+    const sanitizedUsername = username.trim();
 
     // Check if user exists
     const existingUser = await dbAll(
       "SELECT id FROM users WHERE username = ?",
-      [username],
+      [sanitizedUsername],
     );
     if (existingUser.length > 0) {
       return res.status(400).json({ error: "Username already exists" });
@@ -344,18 +416,18 @@ app.post("/api/register", async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 12);
     const result = await dbRun(
       "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-      [username, passwordHash],
+      [sanitizedUsername, passwordHash],
     );
 
     // Generate token
-    const token = jwt.sign({ userId: result.id, username }, JWT_SECRET, {
+    const token = jwt.sign({ userId: result.id, username: sanitizedUsername }, JWT_SECRET, {
       expiresIn: "24h",
     });
 
     res.json({
       message: "User created successfully",
       token,
-      user: { id: result.id, username },
+      user: { id: result.id, username: sanitizedUsername },
     });
   } catch (error) {
     console.error("Registration error:", error);
@@ -364,12 +436,15 @@ app.post("/api/register", async (req, res) => {
 });
 
 // User login
-app.post("/api/login", async (req, res) => {
+app.post("/api/login", authLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
 
     if (!username || !password) {
       return res.status(400).json({ error: "Username and password required" });
+    }
+    if (typeof username !== "string" || typeof password !== "string") {
+      return res.status(400).json({ error: "Invalid credentials" });
     }
 
     // Find user
@@ -414,11 +489,14 @@ app.get("/api/expenses", authenticateToken, async (req, res) => {
       status,
       startDate,
       endDate,
+      minAmount,
+      maxAmount,
+      sortBy,
       pageSize,
       page,
       cursor,
     } = req.query;
-    const conditions = ["user_id = ?"];
+    const conditions = ["user_id = ?", "deleted_at IS NULL"];
     const params = [req.user.userId];
 
     // Accept both session_term and term for compatibility
@@ -436,6 +514,22 @@ app.get("/api/expenses", authenticateToken, async (req, res) => {
     if (status) {
       conditions.push("status = ?");
       params.push(status);
+    }
+
+    // Amount range filters
+    if (minAmount) {
+      const min = parseFloat(minAmount);
+      if (!isNaN(min)) {
+        conditions.push("(amount_paid + balance_due) >= ?");
+        params.push(min);
+      }
+    }
+    if (maxAmount) {
+      const max = parseFloat(maxAmount);
+      if (!isNaN(max)) {
+        conditions.push("(amount_paid + balance_due) <= ?");
+        params.push(max);
+      }
     }
 
     if (startDate) {
@@ -459,7 +553,6 @@ app.get("/api/expenses", authenticateToken, async (req, res) => {
 
       if (!useLibsql) {
         // Build an FTS5 MATCH expression safely from tokens and fields
-        const escapeForFts = (s) => s.replace(/"/g, "");
         const tokens = rawQ
           .split(/\s+/)
           .map((t) => escapeForFts(t))
@@ -588,7 +681,6 @@ app.get("/api/expenses", authenticateToken, async (req, res) => {
     // If bm25 is available and a search term was provided, use an optimized JOIN query
     if (req.query.q && !useLibsql && ftsHasBm25) {
       const rawQ = String(req.query.q || "").trim();
-      const escapeForFts = (s) => s.replace(/"/g, "");
       const tokens = rawQ
         .split(/\s+/)
         .map((t) => escapeForFts(t))
@@ -611,7 +703,7 @@ app.get("/api/expenses", authenticateToken, async (req, res) => {
       const matchExpr = perFieldExpr.join(" OR ");
 
       // Rebuild base WHERE conditions excluding the FTS id-IN subquery
-      const baseConds = ["e.user_id = ?"];
+      const baseConds = ["e.user_id = ?", "e.deleted_at IS NULL"];
       const baseParams = [req.user.userId];
       if (sessionTermValue) {
         baseConds.push("e.session_term = ?");
@@ -655,23 +747,32 @@ app.get("/api/expenses", authenticateToken, async (req, res) => {
       return res.json(expenses);
     }
 
+    // Determine sort order (sortBy overrides default)
+    const SAFE_SORT_MAP = {
+      date_desc: "date_time DESC",
+      date_asc: "date_time ASC",
+      amount_desc: "(amount_paid + balance_due) DESC",
+      amount_asc: "(amount_paid + balance_due) ASC",
+      category: "category ASC, date_time DESC",
+    };
+    const defaultSort = SAFE_SORT_MAP[sortBy] || "date_time DESC";
+
     // Fallback ordering when no bm25 available: preserve date ordering and previously applied simple heuristics
-    let orderClause = "ORDER BY date_time DESC";
+    let orderClause = `ORDER BY ${defaultSort}`;
     if (req.query.q && !useLibsql) {
       // Prioritize rows where description matches, then recipient, then others (simple heuristic)
       orderClause = `ORDER BY (CASE WHEN id IN (SELECT rowid FROM expenses_fts WHERE description MATCH ?) THEN 0 WHEN id IN (SELECT rowid FROM expenses_fts WHERE recipient MATCH ?) THEN 1 ELSE 2 END), date_time DESC`;
       const rawQ2 = String(req.query.q || "").trim();
-      const escapeForFts2 = (s) => s.replace(/"/g, "");
       const tokens2 = rawQ2
         .split(/\s+/)
-        .map((t) => escapeForFts2(t))
+        .map((t) => escapeForFts(t))
         .filter(Boolean);
       const qMode2 = String(req.query.qMode || "any").toLowerCase();
       let descExpr = "";
       let recipExpr = "";
       if (qMode2 === "phrase") {
-        descExpr = `description:"${escapeForFts2(rawQ2)}"`;
-        recipExpr = `recipient:"${escapeForFts2(rawQ2)}"`;
+        descExpr = `description:"${escapeForFts(rawQ2)}"`;
+        recipExpr = `recipient:"${escapeForFts(rawQ2)}"`;
       } else if (qMode2 === "prefix") {
         descExpr = tokens2.map((t) => `description:${t}*`).join(" OR ");
         recipExpr = tokens2.map((t) => `recipient:${t}*`).join(" OR ");
@@ -711,9 +812,9 @@ app.get("/api/expenses", authenticateToken, async (req, res) => {
 // Count expenses (for pagination)
 app.get("/api/expenses/count", authenticateToken, async (req, res) => {
   try {
-    const { session_term, term, category, status, startDate, endDate } =
+    const { session_term, term, category, status, startDate, endDate, minAmount, maxAmount } =
       req.query;
-    const conditions = ["user_id = ?"];
+    const conditions = ["user_id = ?", "deleted_at IS NULL"];
     const params = [req.user.userId];
 
     const sessionTermValue = session_term || term;
@@ -740,6 +841,47 @@ app.get("/api/expenses/count", authenticateToken, async (req, res) => {
     if (endDate) {
       conditions.push("date_time <= ?");
       params.push(formatDateTimeBoundary(endDate, "end"));
+    }
+
+    if (minAmount) {
+      const min = parseFloat(minAmount);
+      if (!isNaN(min)) {
+        conditions.push("(amount_paid + balance_due) >= ?");
+        params.push(min);
+      }
+    }
+
+    if (maxAmount) {
+      const max = parseFloat(maxAmount);
+      if (!isNaN(max)) {
+        conditions.push("(amount_paid + balance_due) <= ?");
+        params.push(max);
+      }
+    }
+
+    // Text search — mirror the same logic used in GET /api/expenses
+    if (req.query.q) {
+      if (!useLibsql) {
+        const rawQ = String(req.query.q || "").trim();
+        const qMode = String(req.query.qMode || "any").toLowerCase();
+        const tokens = rawQ.split(/\s+/).map((t) => escapeForFts(t)).filter(Boolean);
+        const fields = ["description", "recipient"];
+        const perFieldExpr = fields.map((f) => {
+          if (qMode === "phrase") return `${f}:"${escapeForFts(rawQ)}"`;
+          if (qMode === "prefix") return tokens.map((t) => `${f}:${t}*`).join(" OR ");
+          if (qMode === "all") return tokens.map((t) => `${f}:${t}`).join(" AND ");
+          return tokens.map((t) => `${f}:${t}`).join(" OR ");
+        }).filter(Boolean);
+        const matchExpr = perFieldExpr.join(" OR ");
+        if (matchExpr) {
+          conditions.push("id IN (SELECT rowid FROM expenses_fts WHERE expenses_fts MATCH ?)");
+          params.push(matchExpr);
+        }
+      } else {
+        const q = String(req.query.q).toLowerCase();
+        conditions.push("(LOWER(description) LIKE ? OR LOWER(recipient) LIKE ?)");
+        params.push(`%${q}%`, `%${q}%`);
+      }
     }
 
     const whereClause = conditions.length
@@ -769,6 +911,15 @@ app.post("/api/expenses", authenticateToken, async (req, res) => {
     // Validation
     if (!date_time || !category || !recipient || !description) {
       return res.status(400).json({ error: "Missing required fields" });
+    }
+    if (typeof category !== "string" || category.trim().length > 100) {
+      return res.status(400).json({ error: "Category must be 1-100 characters" });
+    }
+    if (typeof recipient !== "string" || recipient.trim().length > 200) {
+      return res.status(400).json({ error: "Recipient must be 1-200 characters" });
+    }
+    if (typeof description !== "string" || description.trim().length > 500) {
+      return res.status(400).json({ error: "Description must be 1-500 characters" });
     }
 
     const amountPaid = parseFloat(amount_paid);
@@ -832,6 +983,9 @@ app.put("/api/expenses/:id", authenticateToken, async (req, res) => {
     const amountPaid = parseFloat(amount_paid);
     const balanceDue = parseFloat(balance_due) || 0;
 
+    if (!date_time || !category || !recipient || !description) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
     if (isNaN(amountPaid) || amountPaid < 0 || balanceDue < 0) {
       return res.status(400).json({ error: "Invalid amount values" });
     }
@@ -866,10 +1020,10 @@ app.put("/api/expenses/:id", authenticateToken, async (req, res) => {
 
 app.delete("/api/expenses/:id", authenticateToken, async (req, res) => {
   try {
-    await dbRun("DELETE FROM expenses WHERE id = ? AND user_id = ?", [
-      req.params.id,
-      req.user.userId,
-    ]);
+    await dbRun(
+      "UPDATE expenses SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+      [req.params.id, req.user.userId],
+    );
     res.json({ message: "Expense deleted successfully" });
   } catch (error) {
     console.error("Delete expense error:", error);
@@ -879,14 +1033,74 @@ app.delete("/api/expenses/:id", authenticateToken, async (req, res) => {
   }
 });
 
+// Trash: list soft-deleted expenses
+app.get("/api/expenses/trash", authenticateToken, async (req, res) => {
+  try {
+    const rows = await dbAll(
+      "SELECT * FROM expenses WHERE user_id = ? AND deleted_at IS NOT NULL ORDER BY deleted_at DESC",
+      [req.user.userId],
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error("Get trash error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Restore a soft-deleted expense
+app.post("/api/expenses/:id/restore", authenticateToken, async (req, res) => {
+  try {
+    await dbRun(
+      "UPDATE expenses SET deleted_at = NULL WHERE id = ? AND user_id = ? AND deleted_at IS NOT NULL",
+      [req.params.id, req.user.userId],
+    );
+    res.json({ message: "Expense restored successfully" });
+  } catch (error) {
+    console.error("Restore expense error:", error);
+    res.status(500).json({ error: "Unable to restore expense. Please try again." });
+  }
+});
+
+// Permanently delete a soft-deleted expense
+app.delete("/api/expenses/:id/permanent", authenticateToken, async (req, res) => {
+  try {
+    await dbRun(
+      "DELETE FROM expenses WHERE id = ? AND user_id = ? AND deleted_at IS NOT NULL",
+      [req.params.id, req.user.userId],
+    );
+    res.json({ message: "Expense permanently deleted" });
+  } catch (error) {
+    console.error("Permanent delete error:", error);
+    res.status(500).json({ error: "Unable to permanently delete expense. Please try again." });
+  }
+});
+
 // Blog posts routes
 app.get("/api/blog-posts", authenticateToken, async (req, res) => {
   try {
-    const posts = await dbAll(
-      "SELECT * FROM blog_posts WHERE user_id = ? ORDER BY date_time DESC",
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 0, 0), 100);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+
+    const totalRows = await dbAll(
+      "SELECT COUNT(*) as count FROM blog_posts WHERE user_id = ?",
       [req.user.userId],
     );
-    res.json(posts);
+    const total = Number(totalRows[0]?.count) || 0;
+
+    const params = [req.user.userId];
+    let sql = "SELECT * FROM blog_posts WHERE user_id = ? ORDER BY date_time DESC";
+    if (limit > 0) {
+      sql += " LIMIT ? OFFSET ?";
+      params.push(limit, offset);
+    }
+
+    const posts = await dbAll(sql, params);
+
+    if (limit > 0) {
+      res.json({ posts, total, hasMore: offset + posts.length < total });
+    } else {
+      res.json(posts); // backward-compatible: no limit → return plain array
+    }
   } catch (error) {
     console.error("Get blog posts error:", error);
     res.status(500).json({ error: "Internal server error" });
@@ -896,6 +1110,16 @@ app.get("/api/blog-posts", authenticateToken, async (req, res) => {
 app.post("/api/blog-posts", authenticateToken, async (req, res) => {
   try {
     const { date_time, category, title, content } = req.body;
+
+    if (!date_time || !category || !title || !content) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+    if (typeof title !== "string" || title.trim().length > 200) {
+      return res.status(400).json({ error: "Title must be 1-200 characters" });
+    }
+    if (typeof content !== "string" || content.length > 50000) {
+      return res.status(400).json({ error: "Content too long (max 50,000 characters)" });
+    }
 
     const result = await dbRun(
       "INSERT INTO blog_posts (user_id, date_time, category, title, content) VALUES (?, ?, ?, ?, ?)",
@@ -917,7 +1141,7 @@ app.put("/api/blog-posts/:id", authenticateToken, async (req, res) => {
     const { date_time, category, title, content } = req.body;
 
     await dbRun(
-      "UPDATE blog_posts SET date_time = ?, category = ?, title = ?, content = ? WHERE id = ? AND user_id = ?",
+      "UPDATE blog_posts SET date_time = ?, category = ?, title = ?, content = ?, modified_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?",
       [date_time, category, title, content, req.params.id, req.user.userId],
     );
 
@@ -944,14 +1168,28 @@ app.delete("/api/blog-posts/:id", authenticateToken, async (req, res) => {
 // Dashboard statistics
 app.get("/api/dashboard", authenticateToken, async (req, res) => {
   try {
+    const { startDate, endDate } = req.query;
+    const dateConditions = ["user_id = ?", "deleted_at IS NULL"];
+    const dateParams = [req.user.userId];
+
+    if (startDate) {
+      dateConditions.push("date_time >= ?");
+      dateParams.push(formatDateTimeBoundary(startDate, "start"));
+    }
+    if (endDate) {
+      dateConditions.push("date_time <= ?");
+      dateParams.push(formatDateTimeBoundary(endDate, "end"));
+    }
+    const dateWhere = `WHERE ${dateConditions.join(" AND ")}`;
+
     const stats = await dbAll(
       `SELECT
                 COUNT(*) as total_expenses,
                 SUM(amount_paid) as total_paid,
                 SUM(balance_due) as total_balance,
                 SUM(amount_paid + balance_due) as total_cost
-             FROM expenses WHERE user_id = ?`,
-      [req.user.userId],
+             FROM expenses ${dateWhere}`,
+      dateParams,
     );
 
     const categories = await dbAll(
@@ -960,8 +1198,8 @@ app.get("/api/dashboard", authenticateToken, async (req, res) => {
                 COUNT(*) as count,
                 SUM(amount_paid) as total_paid,
                 SUM(balance_due) as total_balance
-             FROM expenses WHERE user_id = ? GROUP BY category`,
-      [req.user.userId],
+             FROM expenses ${dateWhere} GROUP BY category`,
+      dateParams,
     );
 
     const budgets = await dbAll(
@@ -1056,6 +1294,60 @@ app.delete("/api/budgets/:category", authenticateToken, async (req, res) => {
     res.json({ message: "Budget removed successfully" });
   } catch (error) {
     console.error("Delete budget error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Change password (native JWT users only)
+app.put("/api/users/password", authenticateToken, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: "Both current and new password are required" });
+    }
+    if (typeof newPassword !== "string" || newPassword.length < 8 || newPassword.length > 128) {
+      return res.status(400).json({ error: "New password must be 8-128 characters" });
+    }
+
+    const users = await dbAll("SELECT * FROM users WHERE id = ?", [req.user.userId]);
+    if (users.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    const user = users[0];
+    if (!user.password_hash) {
+      return res.status(400).json({ error: "Password change not supported for this account type" });
+    }
+
+    const valid = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!valid) {
+      return res.status(401).json({ error: "Current password is incorrect" });
+    }
+
+    const newHash = await bcrypt.hash(newPassword, 12);
+    await dbRun("UPDATE users SET password_hash = ? WHERE id = ?", [newHash, req.user.userId]);
+    res.json({ message: "Password changed successfully" });
+  } catch (error) {
+    console.error("Change password error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Refresh JWT token (native JWT users only)
+app.post("/api/auth/refresh", authenticateToken, async (req, res) => {
+  try {
+    const users = await dbAll("SELECT id, username FROM users WHERE id = ?", [req.user.userId]);
+    if (users.length === 0) {
+      return res.status(403).json({ error: "User no longer exists" });
+    }
+    const user = users[0];
+    const token = jwt.sign(
+      { userId: user.id, username: user.username },
+      JWT_SECRET,
+      { expiresIn: "24h" },
+    );
+    res.json({ token, user: { id: user.id, username: user.username } });
+  } catch (error) {
+    console.error("Token refresh error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 });
