@@ -17,6 +17,7 @@
     }
   ],
   "hosting": {
+    "site": "expense-tracker-prod-df355",
     "public": "public",
     "ignore": [
       "firebase.json",
@@ -33,9 +34,6 @@
           }
         ]
       },
-        "hosting": {
-+    "site": "expense-tracker-prod-df355",
-     "public": "public",
       {
         "source": "**/*.@(jpg|jpeg|gif|png|svg|webp|ico)",
         "headers": [
