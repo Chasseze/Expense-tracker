@@ -20,10 +20,13 @@ jobs:
       - name: Build assets
         run: |
           npm run build
+      - name: Install function dependencies
+        run: |
+          npm ci --prefix functions
       - name: Firebase Deploy
         uses: w9jds/firebase-action@v2
         with:
-          args: deploy --only hosting --project expense-tracker-prod-df355
+          args: deploy --only hosting,functions --project expense-tracker-prod-df355
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
       - name: Notify smoke workflow (repository_dispatch)
@@ -33,3 +36,4 @@ jobs:
           DEPLOY_ID: ${{ github.sha }}
         run: |
           node scripts/notify-github-deploy.js
+''

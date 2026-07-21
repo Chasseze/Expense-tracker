@@ -10,7 +10,7 @@
     "test:e2e": "node scripts/playwright-smoke.js",
     "build:css": "npx tailwindcss -i ./src/input.css -o ./public/styles/tailwind.css --minify",
     "build": "npm run build:css",
-    "deploy:ci": "npx firebase deploy --only hosting --project expense-tracker-prod-df355 && node scripts/notify-github-deploy.js"
+    "deploy:ci": "npx firebase deploy --only hosting,functions --project expense-tracker-prod-df355 && node scripts/notify-github-deploy.js"
   },
   "dependencies": {
     "@libsql/client": "^0.6.1",
