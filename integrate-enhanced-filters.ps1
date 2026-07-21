@@ -80,7 +80,7 @@ Write-Host "================================================================" -F
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Cyan
 Write-Host "1. Run: npm start" -ForegroundColor White
-Write-Host "2. Open: http://localhost:3000" -ForegroundColor White
+Write-Host "2. Open: http://localhost:3040" -ForegroundColor White
 Write-Host "3. Login and test the new filter features!" -ForegroundColor White
 Write-Host ""
 Write-Host "New Features Available:" -ForegroundColor Cyan

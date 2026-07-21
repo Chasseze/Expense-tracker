@@ -1,5 +1,5 @@
 (async () => {
-  const base = 'http://localhost:3000';
+  const base = 'http://localhost:3040';
   const out = (label, v) => console.log(label + ':', v);
   try {
     // /api/status

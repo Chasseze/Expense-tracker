@@ -2,7 +2,7 @@ const http = require('http');
 
 const opts = {
   hostname: 'localhost',
-  port: 3000,
+  port: 3040,
   path: '/dev/disable-auth',
   method: 'POST',
   headers: {

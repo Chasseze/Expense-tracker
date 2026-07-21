@@ -82,7 +82,7 @@ After making these changes:
 npm start
 ```
 
-Then open `http://localhost:3000` and test:
+Then open `http://localhost:3040` and test:
 
 1. ? Text search - type in search box
 2. ? Date range - select start/end dates
