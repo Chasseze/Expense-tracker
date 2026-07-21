@@ -52,7 +52,7 @@ app.use(helmet({ contentSecurityPolicy: false })); // CSP disabled so CDN script
 app.use(compression());
 app.use(cors(corsOptions));
 app.use(express.json({ limit: "1mb" }));
-app.use(express.static("public"));
+app.use(express.static("public", { maxAge: process.env.NODE_ENV === "production" ? "1h" : 0 }));
 
 // Database setup (LibSQL/Turso first, fallback to local SQLite)
 const useLibsql = Boolean(process.env.LIBSQL_URL);
