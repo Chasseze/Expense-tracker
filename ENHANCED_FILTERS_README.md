@@ -78,7 +78,7 @@ if (window.initFilterPresetModal) {
 
 2. **Open your browser:**
    ```
-   http://localhost:3000
+   http://localhost:3040
    ```
 
 3. **Try these features:**

@@ -107,7 +107,7 @@ Write-Host "`n" -ForegroundColor White
 
 Write-Host "TEST LOCALLY:" -ForegroundColor Yellow
 Write-Host "  npm start" -ForegroundColor White
-Write-Host "  Open: http://localhost:3000`n" -ForegroundColor White
+Write-Host "  Open: http://localhost:3040`n" -ForegroundColor White
 
 Write-Host "DEPLOY TO FIREBASE:" -ForegroundColor Yellow
 Write-Host "  npm run deploy:ci`n" -ForegroundColor White

@@ -80,7 +80,7 @@ $env:DISABLE_AUTH="1"
 npm start
 
 # Or visit with local mode
-http://localhost:3000/?local=true
+http://localhost:3040/?local=true
 ```
 
 ### Keyboard Shortcuts

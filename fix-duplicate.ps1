@@ -26,7 +26,7 @@ Write-Host "========================================`n" -ForegroundColor Green
 Write-Host "Your enhanced filters are ready to use!`n" -ForegroundColor Cyan
 Write-Host "Next step:" -ForegroundColor Yellow
 Write-Host "  1. Run: npm start" -ForegroundColor White
-Write-Host "  2. Open: http://localhost:3000" -ForegroundColor White
+Write-Host "  2. Open: http://localhost:3040" -ForegroundColor White
 Write-Host "  3. Test all 9 new filter features!`n" -ForegroundColor White
 
 Write-Host "New features available:" -ForegroundColor Cyan

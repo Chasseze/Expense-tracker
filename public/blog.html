@@ -209,7 +209,7 @@
             .cat-chip:hover, .cat-chip.active {
                 background: #ede9fe;
                 color: #5b21b6;
-                border-color: #ddd6fe;
+                border-color: #bfdbfe;
             }
             .sidebar-list {
                 list-style: none;
@@ -223,10 +223,10 @@
                 transition: background 0.15s, border-left-color 0.15s;
                 border-left: 3px solid transparent;
             }
-            .sidebar-item:hover { background: #f8fafc; border-left-color: #ddd6fe; }
+            .sidebar-item:hover { background: #f8fafc; border-left-color: #bfdbfe; }
             .sidebar-item.active {
                 background: linear-gradient(90deg, #ede9fe 0%, #f8fafc 100%);
-                border-left-color: #8b5cf6;
+                border-left-color: #facc15;
             }
             .sidebar-item-meta {
                 display: flex;
@@ -297,7 +297,7 @@
                 padding: 4rem 2rem;
                 color: #64748b;
             }
-            .article-welcome i { font-size: 4rem; margin-bottom: 1.5rem; opacity: 0.25; color: #8b5cf6; }
+            .article-welcome i { font-size: 4rem; margin-bottom: 1.5rem; opacity: 0.25; color: #facc15; }
             .article-welcome h2 { font-size: 1.5rem; color: #475569; margin-bottom: 0.5rem; }
 
             /* ── Article View ── */
@@ -359,7 +359,7 @@
             .article-body ul, .article-body ol { margin: 0 0 1rem 1.5rem; padding-left: 1rem; }
             .article-body li { margin-bottom: 0.35rem; }
             .article-body blockquote {
-                border-left: 4px solid #8b5cf6;
+                border-left: 4px solid #facc15;
                 padding: 0.75rem 1rem;
                 margin: 1rem 0;
                 background: #f8fafc;
@@ -368,7 +368,7 @@
             }
             .article-body code {
                 background: #f1f5f9;
-                color: #7c3aed;
+                color: #0f2a5e;
                 padding: 0.15rem 0.4rem;
                 border-radius: 0.25rem;
                 font-family: 'Fira Code', 'Consolas', monospace;
@@ -542,8 +542,8 @@
             .md-preview-box p { margin: 0 0 0.75rem 0; }
             .md-preview-box ul, .md-preview-box ol { margin: 0 0 0.75rem 1.25rem; padding-left: 0.75rem; }
             .md-preview-box li { margin-bottom: 0.25rem; }
-            .md-preview-box blockquote { border-left: 3px solid #8b5cf6; padding: 0.5rem 0.75rem; margin: 0.75rem 0; background: #f8fafc; color: #475569; font-style: italic; }
-            .md-preview-box code { background: #f1f5f9; color: #7c3aed; padding: 0.1rem 0.3rem; border-radius: 0.2rem; font-size: 0.85em; }
+            .md-preview-box blockquote { border-left: 3px solid #facc15; padding: 0.5rem 0.75rem; margin: 0.75rem 0; background: #f8fafc; color: #475569; font-style: italic; }
+            .md-preview-box code { background: #f1f5f9; color: #0f2a5e; padding: 0.1rem 0.3rem; border-radius: 0.2rem; font-size: 0.85em; }
             .md-preview-box pre { background: #1e293b; color: #e2e8f0; padding: 0.75rem; border-radius: 0.35rem; overflow-x: auto; margin: 0.75rem 0; }
             .md-preview-box pre code { background: none; color: inherit; padding: 0; }
             .md-preview-box a { color: #6366f1; text-decoration: underline; }
@@ -594,7 +594,7 @@
                 bottom: 1.5rem;
                 left: 1.5rem;
                 z-index: 40;
-                background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+                background: linear-gradient(135deg, #6366f1 0%, #facc15 100%);
                 color: #fff;
                 border: none;
                 border-radius: 50%;
@@ -642,11 +642,10 @@
                 <a href="/index.html" class="blog-back-link"><i class="fas fa-arrow-left"></i> Dashboard</a>
                 <h1><i class="fas fa-feather-alt" style="margin-right:0.4rem;opacity:0.85;"></i>Financial Journal</h1>
             </div>
-            <button id="composeBtn" class="blog-compose-btn">
-                <i class="fas fa-plus"></i> New Post
-            </button>
-            </div>
             <div class="blog-header-actions">
+                <button id="composeBtn" class="blog-compose-btn">
+                    <i class="fas fa-plus"></i> New Post
+                </button>
                 <button id="blogDarkToggle" class="blog-icon-btn" title="Toggle dark mode"><i class="fas fa-moon"></i></button>
             </div>
         </header>
@@ -657,7 +656,7 @@
             <aside id="blogSidebar" class="blog-sidebar">
                 <div class="sidebar-header">
                     <i class="fas fa-list"></i> All Posts
-                    <span id="postCount" style="margin-left:auto; color:#8b5cf6;"></span>
+                    <span id="postCount" style="margin-left:auto; color:#facc15;"></span>
                 </div>
                 <div class="sidebar-controls">
                     <div class="sidebar-search">
@@ -681,7 +680,7 @@
                     <p>No posts yet.<br>Click "New Post" to start writing.</p>
                 </div>
                 <div style="padding:8px 12px;">
-                    <button id="loadMorePosts" class="hidden" style="width:100%;padding:8px;background:#f3f0ff;color:#7c3aed;border:1px solid #ddd6fe;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:500;">
+                    <button id="loadMorePosts" class="hidden" style="width:100%;padding:8px;background:#eff6ff;color:#0f2a5e;border:1px solid #bfdbfe;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:500;">
                         Load More
                     </button>
                 </div>
@@ -998,7 +997,7 @@
                     const q = sidebarSearchTerm.toLowerCase();
                     posts = posts.filter(p =>
                         p.title.toLowerCase().includes(q) ||
-                        p.content.toLowerCase().includes(q) ||
+                        (p.content || p.excerpt || "").toLowerCase().includes(q) ||
                         (p.category || '').toLowerCase().includes(q)
                     );
                 }
@@ -1051,17 +1050,17 @@
                     <li class="sidebar-item ${selectedPostId === post.id ? 'active' : ''}" data-id="${post.id}">
                         <div class="sidebar-item-meta">
                             <span class="sidebar-item-category">${escapeHtml(post.category)}</span>
-                            <span class="sidebar-item-readtime"><i class="fas fa-clock" style="margin-right:3px;"></i>${estimateReadTime(post.content)}</span>
+                            <span class="sidebar-item-readtime"><i class="fas fa-clock" style="margin-right:3px;"></i>${estimateReadTime(post.content || post.excerpt || '')}</span>
                         </div>
                         <div class="sidebar-item-title">${escapeHtml(post.title)}</div>
-                        <div class="sidebar-item-excerpt">${escapeHtml(post.content.substring(0, 80))}${post.content.length > 80 ? '…' : ''}</div>
+                        <div class="sidebar-item-excerpt">${escapeHtml((post.excerpt || post.content || '').substring(0, 80))}${(post.excerpt || post.content || '').length > 80 ? '…' : ''}</div>
                         <div class="sidebar-item-date"><i class="fas fa-calendar-alt" style="margin-right:4px;opacity:0.6;"></i>${formatDate(post.date_time)}</div>
                     </li>
                 `).join("");
             }
 
             // ── Article View ──
-            function showArticle(post) {
+            async function showArticle(post) {
                 if (!post) {
                     $("#articleWelcome").style.display = "block";
                     $("#articleView").style.display = "none";
@@ -1071,6 +1070,17 @@
                 }
 
                 selectedPostId = post.id;
+                // Load full content when list only has excerpts
+                if (!post.content) {
+                    try {
+                        const full = await apiCall(`/blog-posts/${encodeURIComponent(String(post.id))}`);
+                        post = { ...post, ...full };
+                        const idx = blogPosts.findIndex(p => String(p.id) === String(post.id));
+                        if (idx >= 0) blogPosts[idx] = { ...blogPosts[idx], ...post };
+                    } catch (err) {
+                        console.warn('Failed to load full post', err);
+                    }
+                }
                 $("#articleWelcome").style.display = "none";
                 $("#articleView").style.display = "block";
 
@@ -1098,7 +1108,7 @@
                         blogPosts = [];
                         blogOffset = 0;
                     }
-                    const resp = await apiCall(`/blog-posts?limit=${BLOG_PAGE_SIZE}&offset=${blogOffset}`);
+                    const resp = await apiCall(`/blog-posts?limit=${BLOG_PAGE_SIZE}&offset=${blogOffset}&fields=summary`);
                     // Support both paginated {posts,total} and legacy plain array response
                     let newPosts;
                     if (Array.isArray(resp)) {
@@ -1141,7 +1151,17 @@
                     : new Date().toISOString().slice(0, 16);
                 $("#blogCategory").value = post ? post.category : "Financial Insights";
                 $("#blogTitle").value = post ? post.title : "";
-                $("#blogContent").value = post ? post.content : "";
+                $("#blogContent").value = post ? (post.content || "") : "";
+                if (post && !post.content) {
+                    apiCall(`/blog-posts/${encodeURIComponent(String(post.id))}`).then(full => {
+                        const idx = blogPosts.findIndex(p => String(p.id) === String(post.id));
+                        if (idx >= 0) blogPosts[idx] = { ...blogPosts[idx], ...full };
+                        if (String(editingId) === String(post.id)) {
+                            $("#blogContent").value = full.content || "";
+                            updatePreview();
+                        }
+                    }).catch(() => {});
+                }
                 $("#blogModal").style.display = "flex";
                 // Update preview when opening modal
                 updatePreview();
@@ -1300,11 +1320,14 @@
                     document.body.classList.toggle('blog-dark', dark);
                     darkToggle.innerHTML = dark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
                     localStorage.setItem('blogDark', dark ? '1' : '0');
+                    localStorage.setItem('theme', dark ? 'dark' : 'light');
                 };
                 darkToggle.addEventListener('click', () => {
                     applyBlogTheme(!document.body.classList.contains('blog-dark'));
                 });
-                applyBlogTheme(localStorage.getItem('blogDark') === '1');
+                const shared = localStorage.getItem('theme');
+                const dark = shared ? shared === 'dark' : localStorage.getItem('blogDark') === '1';
+                applyBlogTheme(dark);
 
                 // Reading progress bar
                 document.querySelector('.blog-main').addEventListener('scroll', updateReadingProgress);

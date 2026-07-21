@@ -189,7 +189,7 @@ Write-Host "`n" -ForegroundColor White
 Write-Host "NEXT STEPS:" -ForegroundColor Yellow
 Write-Host "  1. Test locally:" -ForegroundColor White
 Write-Host "     npm start" -ForegroundColor Cyan
-Write-Host "     Open: http://localhost:3000" -ForegroundColor Gray
+Write-Host "     Open: http://localhost:3040" -ForegroundColor Gray
 Write-Host ""
 Write-Host "  2. Test the filters:" -ForegroundColor White
 Write-Host "     • Type in search box" -ForegroundColor Gray

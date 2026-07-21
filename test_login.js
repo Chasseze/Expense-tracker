@@ -1,6 +1,6 @@
 const http = require('http');
 
-const BASE_URL = 'http://localhost:3000/api';
+const BASE_URL = 'http://localhost:3040/api';
 const DEFAULT_HEADERS = {
   'Content-Type': 'application/json'
 };
@@ -9,7 +9,7 @@ async function makeRequest(method, endpoint, data = null, headers = {}) {
   return new Promise((resolve, reject) => {
     const options = {
       hostname: 'localhost',
-      port: 3000,
+      port: 3040,
       path: `/api${endpoint}`,
       method,
       headers: {
@@ -253,7 +253,7 @@ async function runAllTests() {
     await testServerStatus();
   } catch (error) {
     console.log(`❌ Cannot connect to server: ${error.message}`);
-    console.log('Make sure the server is running on http://localhost:3000');
+    console.log('Make sure the server is running on http://localhost:3040');
     process.exit(1);
   }
 

@@ -16,7 +16,7 @@ npm start
 
 ### 2. Open Browser
 ```
-http://localhost:3000
+http://localhost:3040
 ```
 
 ### 3. Login
