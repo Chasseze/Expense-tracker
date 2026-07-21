@@ -1,6 +1,6 @@
 # Expense Tracker AI Guide
 - **Stack**: Node 18+/Express 4 app using @libsql/client (Turso/LiteFS) when `LIBSQL_URL` env is set; falls back to sqlite3; static SPA served from public/index.html.
-- **Startup**: Use npm install; run npm start or node server.js; server listens on PORT env or 3000.
+- **Startup**: Use npm install; run npm start or node server.js; server listens on PORT env or 3040.
 - **Deployment**: Procfile.txt and railway.json both run node server.js; set `JWT_SECRET`, `LIBSQL_URL`, and `LIBSQL_AUTH_TOKEN` (if required) in hosting dashboard.
 - **Database Path**: Without `LIBSQL_URL` the server opens SQLite at ./expense_tracker.db (or /tmp/expense_tracker.db in production); remote LibSQL uses the configured URL.
 - **Schema Bootstrapping**: async initializeDatabase in server.js runs via dbRun to create users, expenses, blog_posts, and budget_limits tables on each boot; safe for repeated runs.

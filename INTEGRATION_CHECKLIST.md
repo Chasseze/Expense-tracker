@@ -81,7 +81,7 @@ Use this checklist to track your progress integrating the enhanced filters.
 
 ### Test Text Search
 - [ ] Start server: `npm start`
-- [ ] Open browser: `http://localhost:3000`
+- [ ] Open browser: `http://localhost:3040`
 - [ ] Login to your account
 - [ ] Type text in search box
 - [ ] Wait 500ms (or press Enter)

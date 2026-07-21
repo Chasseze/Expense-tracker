@@ -4,7 +4,7 @@
 param(
     [switch]$KeepServerRunning = $false,
     [switch]$SkipTests = $false,
-    [int]$Port = 3000,
+    [int]$Port = 3040,
     [string]$TestScript = "test_login.js"
 )
 

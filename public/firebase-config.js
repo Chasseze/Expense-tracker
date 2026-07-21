@@ -16,7 +16,7 @@ let firebaseReady = false;
 let currentUserSnapshot = null; // lightweight {uid,email}
 
 // Local-only mode: do not contact Firebase when running locally.
-// Enable by visiting http://localhost:3000/?local=true or setting localStorage.setItem('localOnly','1')
+// Enable by visiting http://localhost:3040/?local=true or setting localStorage.setItem('localOnly','1')
 const localOnly = (typeof window !== 'undefined') && (window.location && window.location.search && window.location.search.includes('local=true') || localStorage.getItem('localOnly') === '1');
 // Expose to page scripts so they can avoid sending mocked tokens to the server
 if (typeof window !== 'undefined') {

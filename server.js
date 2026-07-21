@@ -10,7 +10,7 @@ let sqlite3;
 let createClient;
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3040;
 
 const DEFAULT_JWT_SECRET = "your-secret-key-here-change-this-in-production";
 const JWT_SECRET = process.env.JWT_SECRET || DEFAULT_JWT_SECRET;

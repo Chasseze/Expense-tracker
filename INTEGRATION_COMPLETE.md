@@ -37,7 +37,7 @@ npm start
 ```
 
 ### Open Your Browser
-Navigate to: `http://localhost:3000`
+Navigate to: `http://localhost:3040`
 
 ### Test These Features
 
@@ -162,7 +162,7 @@ C:\Users\chass\expense-tracker\
 1. Open browser console (F12)
 2. Look for any red errors
 3. Check if `filter-enhancements.js` loads (Network tab)
-4. Verify server is running on port 3000
+4. Verify server is running on port 3040
 
 ### If presets don't save:
 1. Check localStorage is enabled in browser
@@ -227,7 +227,7 @@ Your expense tracker now has professional-grade filtering capabilities!
 npm start
 ```
 
-Then open `http://localhost:3000` and enjoy your new features! ??
+Then open `http://localhost:3040` and enjoy your new features! ??
 
 ---
 

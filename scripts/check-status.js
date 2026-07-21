@@ -1,5 +1,5 @@
 const http = require('http');
-const url = 'http://localhost:3000/api/status';
+const url = 'http://localhost:3040/api/status';
 
 function check() {
   http.get(url, (res) => {
