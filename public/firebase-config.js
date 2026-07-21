@@ -165,13 +165,8 @@ async function initFirebase() {
         // Keep the firebase.User object locally for token retrieval, but dispatch only a small snapshot
         firebaseUser = user;
         currentUserSnapshot = { uid: user.uid || null, email: user.email || null };
-        firebaseIdToken = await user.getIdToken();
+        firebaseIdToken = await user.getIdToken(/* forceRefresh */ false);
         persistAuthState();
-        // Token expires after ~1 hour, refresh when needed and persist
-        user.getIdToken(/* forceRefresh */ true).then(token => {
-          firebaseIdToken = token;
-          persistAuthState();
-        }).catch(err => console.warn('Token refresh failed:', err));
         showApp();
       } else {
         firebaseUser = null;
@@ -260,32 +255,31 @@ async function firebaseLogout() {
   }
 }
 
-async function getIdToken() {
-  if (firebaseUser) {
+let _getTokenInflight = null;
+async function getIdToken(forceRefresh = false) {
+  if (!firebaseUser) return firebaseIdToken || null;
+  if (_getTokenInflight && !forceRefresh) return _getTokenInflight;
+  _getTokenInflight = (async () => {
     try {
-      firebaseIdToken = await firebaseUser.getIdToken();
+      firebaseIdToken = await firebaseUser.getIdToken(Boolean(forceRefresh));
       persistAuthState();
       return firebaseIdToken;
     } catch (error) {
       console.error('Error getting ID token:', error);
       return null;
+    } finally {
+      setTimeout(() => { _getTokenInflight = null; }, 1500);
     }
-  }
-  return null;
+  })();
+  return _getTokenInflight;
 }
 
-// Initialize Firebase when page loads
-document.addEventListener('DOMContentLoaded', initFirebase);
-
-// Also start initialization immediately for faster loading
-// This ensures Firebase functions are available when event listeners are attached
+// Single initialization path (avoid double init on DOMContentLoaded + immediate IIFE)
 const firebaseInitPromise = (async () => {
-  // Wait a bit for DOM to be ready, then init
+  if (localOnly) return;
   if (document.readyState === 'loading') {
-    // DOM not ready, wait for it
-    await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve));
+    await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve, { once: true }));
   }
-  // Initialize Firebase
   if (!firebaseReady) {
     await initFirebase();
   }
@@ -293,11 +287,13 @@ const firebaseInitPromise = (async () => {
 
 // Export functions to global scope to ensure they're always accessible
 // This prevents "function not defined" errors during race conditions
-window.firebaseRegister = firebaseRegister;
-window.firebaseLogin = firebaseLogin;
-window.firebaseLogout = firebaseLogout;
-window.getIdToken = getIdToken;
-window.initFirebase = initFirebase;
-window.showApp = showApp;
-window.showAuthScreen = showAuthScreen;
+if (!localOnly) {
+  window.firebaseRegister = firebaseRegister;
+  window.firebaseLogin = firebaseLogin;
+  window.firebaseLogout = firebaseLogout;
+  window.getIdToken = getIdToken;
+  window.initFirebase = initFirebase;
+  window.showApp = showApp;
+  window.showAuthScreen = showAuthScreen;
+}
 window.firebaseInitPromise = firebaseInitPromise;

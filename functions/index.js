@@ -77,6 +77,23 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
       query = query.where('date_time', '<=', endDate);
     }
 
+    // Push exact-match filters to Firestore when possible (requires composite indexes for combos)
+    const rawCategory = category ? decodeURIComponent(String(category).replace(/\+/g, ' ')).trim() : '';
+    const rawStatus = status ? decodeURIComponent(String(status).replace(/\+/g, ' ')).trim() : '';
+    const rawSession = session_term ? decodeURIComponent(String(session_term).replace(/\+/g, ' ')).trim() : '';
+    const searchPreview = (req.query.q || req.query.search || null);
+    const amountPreview = req.query.minAmount || req.query.maxAmount;
+    const canPushEquality = !searchPreview && !amountPreview;
+    if (canPushEquality && rawCategory) {
+      query = query.where('category', '==', rawCategory);
+    }
+    if (canPushEquality && rawStatus) {
+      query = query.where('status', '==', rawStatus);
+    }
+    if (canPushEquality && rawSession) {
+      query = query.where('session_term', '==', rawSession);
+    }
+
   query = query.orderBy('date_time', 'desc');
 
     // Text search and other filters: fetch all then filter client-side for flexibility
@@ -145,7 +162,13 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
     };
 
     // Check if any client-side filters are active (includes amount range)
-    const hasClientFilters = searchTerm || filterSessionTerm || filterCategory || filterStatus || minAmt !== null || maxAmt !== null;
+    // Equality filters pushed to Firestore do not require a full collection scan
+    const hasClientFilters = Boolean(
+      searchTerm ||
+      minAmt !== null ||
+      maxAmt !== null ||
+      (!canPushEquality && (filterSessionTerm || filterCategory || filterStatus))
+    );
 
     // If explicit page number provided, prefer offset-based pagination for direct jumps
     if (pageSize > 0 && page > 0) {
@@ -160,12 +183,32 @@ app.get('/api/expenses', verifyToken, async (req, res) => {
         return res.json({ items, nextCursor: null, hasMore: offset + pageSize < allItems.length, total: allItems.length });
       }
       const offset = Math.max((pageNum - 1) * pageSize, 0);
-      const snapshot = await query.offset(offset).limit(pageSize).get();
-      const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // Compute next cursor hint for possible mixed navigation
-      const last = snapshot.docs[snapshot.docs.length - 1];
-      const nextCursor = last ? last.get('date_time') : null;
-      return res.json({ items, nextCursor, hasMore: items.length === pageSize });
+      // Prefer cursor when provided to avoid expensive offset scans
+      let pageQuery = query;
+      if (cursor && pageNum === 1) {
+        const cursorVal = typeof cursor === 'string' && cursor.includes('|') ? cursor.split('|')[0] : cursor;
+        pageQuery = pageQuery.startAfter(cursorVal);
+      } else if (offset > 0) {
+        pageQuery = pageQuery.offset(offset);
+      }
+      const snapshot = await pageQuery.limit(pageSize + 1).get();
+      const docs = snapshot.docs;
+      const hasMore = docs.length > pageSize;
+      const slice = hasMore ? docs.slice(0, pageSize) : docs;
+      const items = slice.map(doc => ({ id: doc.id, ...doc.data() })).filter(e => !e.deleted_at);
+      const last = slice[slice.length - 1];
+      const nextCursor = hasMore && last ? last.get('date_time') : null;
+      // Cheap-ish total: only when first page (avoid double full scan on every page)
+      let total;
+      if (pageNum === 1) {
+        try {
+          const agg = await query.count().get();
+          total = agg.data().count;
+        } catch (e) {
+          total = undefined;
+        }
+      }
+      return res.json({ items, nextCursor, hasMore, ...(total != null ? { total } : {}) });
     }
 
     // If pageSize is provided (>0), use cursor-based pagination
@@ -395,16 +438,45 @@ app.get('/api/blog-posts', verifyToken, async (req, res) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 0, 0), 100);
     const offset = Math.max(parseInt(req.query.offset) || 0, 0);
 
-    const snapshot = await db.collection('users').doc(req.user.uid).collection('blog_posts')
-      .orderBy('date_time', 'desc').get();
-    const allPosts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    const total = allPosts.length;
+    const summaryOnly = String(req.query.fields || '').toLowerCase() === 'summary';
+    let blogQuery = db.collection('users').doc(req.user.uid).collection('blog_posts').orderBy('date_time', 'desc');
+    let posts = [];
+    let total = null;
+    let hasMore = false;
 
     if (limit > 0) {
-      const posts = allPosts.slice(offset, offset + limit);
-      res.json({ posts, total, hasMore: offset + posts.length < total });
+      const snap = await blogQuery.offset(offset).limit(limit + 1).get();
+      const docs = snap.docs;
+      hasMore = docs.length > limit;
+      const slice = hasMore ? docs.slice(0, limit) : docs;
+      posts = slice.map(doc => ({ id: doc.id, ...doc.data() }));
+      try {
+        const agg = await db.collection('users').doc(req.user.uid).collection('blog_posts').count().get();
+        total = agg.data().count;
+      } catch (e) {
+        total = offset + posts.length + (hasMore ? 1 : 0);
+      }
     } else {
-      res.json(allPosts); // backward-compatible: no limit → plain array
+      const snapshot = await blogQuery.get();
+      posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      total = posts.length;
+    }
+
+    if (summaryOnly) {
+      posts = posts.map(p => ({
+        id: p.id,
+        date_time: p.date_time,
+        category: p.category,
+        title: p.title,
+        excerpt: typeof p.content === 'string' ? p.content.slice(0, 180) : '',
+        content_length: typeof p.content === 'string' ? p.content.length : 0,
+      }));
+    }
+
+    if (limit > 0) {
+      res.json({ posts, total, hasMore });
+    } else {
+      res.json(posts);
     }
   } catch (error) {
     console.error('Get blog posts error:', error);
@@ -468,6 +540,20 @@ app.put('/api/blog-posts/:id', verifyToken, async (req, res) => {
     res.json({ message: 'Blog post updated successfully' });
   } catch (error) {
     console.error('Update blog post error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get single blog post
+app.get('/api/blog-posts/:id', verifyToken, async (req, res) => {
+  try {
+    const doc = await db.collection('users').doc(req.user.uid).collection('blog_posts').doc(req.params.id).get();
+    if (!doc.exists) {
+      return res.status(404).json({ error: 'Blog post not found' });
+    }
+    res.json({ id: doc.id, ...doc.data() });
+  } catch (error) {
+    console.error('Get blog post error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -642,9 +728,21 @@ app.get('/api/dashboard', verifyToken, async (req, res) => {
       })
       .filter(Boolean);
 
+    const monthlyMap = {};
+    expenses.forEach(e => {
+      const dt = e.date_time ? String(e.date_time) : '';
+      const key = dt.slice(0, 7);
+      if (!/^\d{4}-\d{2}$/.test(key)) return;
+      if (!monthlyMap[key]) monthlyMap[key] = { month: key, paid: 0, balance: 0 };
+      monthlyMap[key].paid += Number(e.amount_paid) || 0;
+      monthlyMap[key].balance += Number(e.balance_due) || 0;
+    });
+    const monthlySeries = Object.values(monthlyMap).sort((a, b) => a.month.localeCompare(b.month));
+
     res.json({
       statistics: stats,
       categories,
+      monthlySeries,
       budgets,
       alerts,
       storageMode: 'firestore'

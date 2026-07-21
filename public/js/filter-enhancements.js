@@ -168,16 +168,23 @@ function renderFilterChips() {
         });
     }
     
+    const money = (n) => {
+        try {
+            return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 2 }).format(n);
+        } catch (e) {
+            return '₦' + Number(n).toFixed(2);
+        }
+    };
     if (enhancedFilters.minAmount) {
         chips.push({
-            label: `Min: ?${parseFloat(enhancedFilters.minAmount).toFixed(2)}`,
+            label: `Min: ${money(parseFloat(enhancedFilters.minAmount))}`,
             key: 'minAmount'
         });
     }
     
     if (enhancedFilters.maxAmount) {
         chips.push({
-            label: `Max: ?${parseFloat(enhancedFilters.maxAmount).toFixed(2)}`,
+            label: `Max: ${money(parseFloat(enhancedFilters.maxAmount))}`,
             key: 'maxAmount'
         });
     }
@@ -190,10 +197,10 @@ function renderFilterChips() {
     
     container.classList.remove('empty:hidden');
     container.innerHTML = chips.map(chip => `
-        <div class="inline-flex items-center gap-2 bg-white/20 text-white px-3 py-1.5 rounded-full text-xs font-medium">
+        <div class="chip">
             <span>${chip.label}</span>
             <button 
-                class="remove-filter-chip hover:bg-white/20 rounded-full p-0.5 transition-colors" 
+                class="remove-filter-chip" 
                 data-filter-key="${chip.key}"
                 aria-label="Remove ${chip.label} filter"
             >

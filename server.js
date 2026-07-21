@@ -5,6 +5,7 @@ const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const path = require("path");
+const compression = require("compression");
 
 let sqlite3;
 let createClient;
@@ -48,6 +49,7 @@ const authLimiter = rateLimit({
 
 // Middleware
 app.use(helmet({ contentSecurityPolicy: false })); // CSP disabled so CDN scripts in index.html still load
+app.use(compression());
 app.use(cors(corsOptions));
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static("public"));
@@ -1087,8 +1089,14 @@ app.get("/api/blog-posts", authenticateToken, async (req, res) => {
     );
     const total = Number(totalRows[0]?.count) || 0;
 
+    const summaryOnly = String(req.query.fields || "").toLowerCase() === "summary";
     const params = [req.user.userId];
-    let sql = "SELECT * FROM blog_posts WHERE user_id = ? ORDER BY date_time DESC";
+    let sql = summaryOnly
+      ? `SELECT id, date_time, category, title,
+                substr(content, 1, 180) as excerpt,
+                length(content) as content_length
+         FROM blog_posts WHERE user_id = ? ORDER BY date_time DESC`
+      : "SELECT * FROM blog_posts WHERE user_id = ? ORDER BY date_time DESC";
     if (limit > 0) {
       sql += " LIMIT ? OFFSET ?";
       params.push(limit, offset);
@@ -1152,6 +1160,22 @@ app.put("/api/blog-posts/:id", authenticateToken, async (req, res) => {
   }
 });
 
+app.get("/api/blog-posts/:id", authenticateToken, async (req, res) => {
+  try {
+    const rows = await dbAll(
+      "SELECT * FROM blog_posts WHERE id = ? AND user_id = ?",
+      [req.params.id, req.user.userId],
+    );
+    if (!rows.length) {
+      return res.status(404).json({ error: "Blog post not found" });
+    }
+    res.json(rows[0]);
+  } catch (error) {
+    console.error("Get blog post error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 app.delete("/api/blog-posts/:id", authenticateToken, async (req, res) => {
   try {
     await dbRun("DELETE FROM blog_posts WHERE id = ? AND user_id = ?", [
@@ -1202,6 +1226,17 @@ app.get("/api/dashboard", authenticateToken, async (req, res) => {
       dateParams,
     );
 
+    const monthlySeries = await dbAll(
+      `SELECT
+                strftime('%Y-%m', date_time) as month,
+                SUM(amount_paid) as paid,
+                SUM(balance_due) as balance
+             FROM expenses ${dateWhere}
+             GROUP BY strftime('%Y-%m', date_time)
+             ORDER BY month ASC`,
+      dateParams,
+    );
+
     const budgets = await dbAll(
       `SELECT category, threshold FROM budget_limits WHERE user_id = ?`,
       [req.user.userId],
@@ -1235,6 +1270,7 @@ app.get("/api/dashboard", authenticateToken, async (req, res) => {
         total_cost: 0,
       },
       categories,
+      monthlySeries: monthlySeries || [],
       budgets,
       alerts,
       storageMode,
