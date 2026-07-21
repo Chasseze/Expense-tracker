@@ -33,4 +33,3 @@ jobs:
           DEPLOY_ID: ${{ github.sha }}
         run: |
           node scripts/notify-github-deploy.js
-''
