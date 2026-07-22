@@ -322,7 +322,7 @@ app.get('/api/expenses/count', verifyToken, async (req, res) => {
 // Create expense
 app.post('/api/expenses', verifyToken, async (req, res) => {
   try {
-    const { date_time, category, session_term, recipient, description, amount_paid, balance_due } = req.body;
+    const { date_time, category, session_term, recipient, description, amount_paid, balance_due, due_date } = req.body;
     if (!date_time || !category || amount_paid == null || balance_due == null) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -337,6 +337,7 @@ app.post('/api/expenses', verifyToken, async (req, res) => {
       amount_paid: Number(amount_paid),
       balance_due: Number(balance_due),
       status,
+      due_date: due_date || null,
       deleted_at: null,
       created_at: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -352,7 +353,7 @@ app.post('/api/expenses', verifyToken, async (req, res) => {
 // Update expense
 app.put('/api/expenses/:id', verifyToken, async (req, res) => {
   try {
-    const { date_time, category, session_term, recipient, description, amount_paid, balance_due } = req.body;
+    const { date_time, category, session_term, recipient, description, amount_paid, balance_due, due_date } = req.body;
     if (!date_time || !category || amount_paid == null || balance_due == null) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -367,6 +368,7 @@ app.put('/api/expenses/:id', verifyToken, async (req, res) => {
       amount_paid: Number(amount_paid),
       balance_due: Number(balance_due),
       status,
+      due_date: due_date || null,
     });
 
     res.json({ message: 'Expense updated successfully' });
@@ -739,12 +741,42 @@ app.get('/api/dashboard', verifyToken, async (req, res) => {
     });
     const monthlySeries = Object.values(monthlyMap).sort((a, b) => a.month.localeCompare(b.month));
 
+    // Payment-due reminders: global across all (non-deleted) expenses with a
+    // balance owing, not scoped to the dashboard's date range.
+    const allExpensesSnap = await db.collection('users').doc(req.user.uid).collection('expenses').get();
+    const allExpenses = allExpensesSnap.docs
+      .map(doc => ({ id: doc.id, ...doc.data() }))
+      .filter(e => !e.deleted_at && Number(e.balance_due) > 0 && e.due_date);
+
+    const today = new Date().toISOString().slice(0, 10);
+    const sevenDaysOut = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const toAlertShape = (e) => ({
+      id: e.id,
+      category: e.category,
+      recipient: e.recipient,
+      description: e.description,
+      balance_due: e.balance_due,
+      due_date: e.due_date,
+    });
+
+    const overdue = allExpenses
+      .filter(e => e.due_date < today)
+      .sort((a, b) => a.due_date.localeCompare(b.due_date))
+      .map(toAlertShape);
+    const dueSoon = allExpenses
+      .filter(e => e.due_date >= today && e.due_date <= sevenDaysOut)
+      .sort((a, b) => a.due_date.localeCompare(b.due_date))
+      .map(toAlertShape);
+
     res.json({
       statistics: stats,
       categories,
       monthlySeries,
       budgets,
       alerts,
+      overdue,
+      dueSoon,
       storageMode: 'firestore'
     });
   } catch (error) {
