@@ -940,7 +940,7 @@ body.theme-dark .export-dropdown-item:hover {
 /* ── SIDEBAR ── */
 .app-sidebar {
     width: 52px;
-    background: #0f2a5e;
+    background: linear-gradient(180deg, #143675 0%, #0f2a5e 46%, #0a1f4c 100%);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -949,6 +949,8 @@ body.theme-dark .export-dropdown-item:hover {
     height: 100%;
     overflow-y: auto;
     overflow-x: hidden;
+    border-right: 1px solid rgba(250,204,21,0.14);
+    box-shadow: inset -1px 0 0 rgba(255,255,255,0.03), 2px 0 18px rgba(4,12,32,0.35);
 }
 .app-sidebar:hover {
     width: 220px;
@@ -970,14 +972,25 @@ body.theme-dark .export-dropdown-item:hover {
     min-width: 220px; /* prevent label collapse during transition */
 }
 .sidebar-section-label {
-    font-size: 0.6rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.58rem;
+    font-weight: 800;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
-    color: rgba(255,255,255,0.35);
-    padding: 0.5rem 0.95rem 0.2rem;
+    color: rgba(250,204,21,0.55);
+    padding: 0.85rem 0.95rem 0.35rem;
     white-space: nowrap;
     overflow: hidden;
+}
+.sidebar-section-label::before {
+    content: "";
+    width: 12px;
+    height: 2px;
+    border-radius: 2px;
+    background: rgba(250,204,21,0.45);
+    flex-shrink: 0;
 }
 .sidebar-hr {
     border: none;
@@ -986,26 +999,38 @@ body.theme-dark .export-dropdown-item:hover {
 }
 /* Base sidebar nav button */
 .sidebar-nav-btn {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 0.7rem;
-    width: 100%;
-    padding: 0.65rem 0.95rem;
+    gap: 0.65rem;
+    padding: 0.5rem 0.75rem;
     background: transparent;
     border: none;
-    border-left: 3px solid transparent;
-    border-radius: 6px;
-    color: rgba(255,255,255,0.65);
+    border-radius: 11px;
+    color: rgba(255,255,255,0.7);
     font-size: 0.85rem;
     font-weight: 500;
     cursor: pointer;
     text-align: left;
     text-decoration: none;
-    transition: background 0.18s, color 0.18s, border-color 0.18s, box-shadow 0.18s;
+    transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
     white-space: nowrap;
     overflow: hidden;
-    margin: 0 6px;
-    width: calc(100% - 12px);
+    margin: 1px 8px;
+    width: calc(100% - 16px);
+}
+.sidebar-nav-btn::before {
+    content: "";
+    position: absolute;
+    left: -8px;
+    top: 50%;
+    transform: translateY(-50%) scaleY(0);
+    width: 3px;
+    height: 60%;
+    border-radius: 0 3px 3px 0;
+    background: var(--brand-gold);
+    box-shadow: 0 0 10px rgba(250,204,21,0.7);
+    transition: transform 0.2s cubic-bezier(0.4,0,0.2,1);
 }
 .sidebar-nav-btn:hover {
     background: rgba(217,70,239,0.12);
@@ -1043,10 +1068,17 @@ body.theme-dark .export-dropdown-item:hover {
     box-shadow: 0 0 12px rgba(248,113,113,0.4);
 }
 .sb-icon {
-    font-size: 1rem;
-    width: 1.1rem;
-    text-align: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    font-size: 0.9rem;
+    border-radius: 9px;
+    background: rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.72);
     flex-shrink: 0;
+    transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
 }
 .sb-label {
     flex: 1;
@@ -1098,7 +1130,7 @@ body.theme-dark .app-topbar {
     background: #081a3d;
 }
 body.theme-dark .app-sidebar {
-    background: #081a3d;
+    background: linear-gradient(180deg, #0c264f 0%, #081a3d 50%, #050f2a 100%);
 }
 body.theme-dark .app-main {
     background: #0f172a;
@@ -1332,30 +1364,57 @@ body.theme-dark.app-body-root {
 }
 .btn-ghost-sm:hover { background: #f8fafc; }
 
-/* Sidebar brand accents (less magenta glow) */
+/* ── Sidebar nav — redesigned pill states (navy + gold) ── */
 .sidebar-nav-btn:hover {
-    background: rgba(250, 204, 21, 0.12);
+    background: rgba(255,255,255,0.06);
     color: #fff;
-    border-left-color: var(--brand-gold);
+    transform: translateX(2px);
     box-shadow: none;
 }
+.sidebar-nav-btn:hover .sb-icon {
+    background: rgba(250,204,21,0.16);
+    color: var(--brand-gold);
+}
+
 .sidebar-nav-btn.active {
-    background: rgba(250, 204, 21, 0.16);
-    color: #fef08a;
-    border-left-color: var(--brand-gold);
+    background: linear-gradient(90deg, rgba(250,204,21,0.16) 0%, rgba(250,204,21,0.04) 100%);
+    color: #fef9c3;
+    font-weight: 600;
     box-shadow: none;
 }
+.sidebar-nav-btn.active::before { transform: translateY(-50%) scaleY(1); }
+.sidebar-nav-btn.active .sb-icon {
+    background: var(--brand-gold);
+    color: #0f2a5e;
+    box-shadow: 0 4px 12px rgba(250,204,21,0.4);
+}
+
+/* Primary CTA — filled gold */
 .sidebar-nav-btn.primary {
-    background: rgba(250, 204, 21, 0.14);
-    color: #fef08a;
-    border-left-color: var(--brand-gold);
-    box-shadow: none;
+    background: linear-gradient(135deg, #fde047 0%, #facc15 100%);
+    color: #0f2a5e;
+    font-weight: 700;
+    box-shadow: 0 6px 16px rgba(250,204,21,0.28);
 }
+.sidebar-nav-btn.primary .sb-icon {
+    background: rgba(15,42,94,0.14);
+    color: #0f2a5e;
+}
+.sidebar-nav-btn.primary::before { display: none; }
 .sidebar-nav-btn.primary:hover {
-    background: rgba(250, 204, 21, 0.24);
-    color: #fff;
-    box-shadow: none;
+    background: linear-gradient(135deg, #fef08a 0%, #fde047 100%);
+    color: #0a1f4c;
+    transform: translateX(0) translateY(-1px);
+    box-shadow: 0 8px 22px rgba(250,204,21,0.42);
 }
+.sidebar-nav-btn.primary:hover .sb-icon { background: rgba(15,42,94,0.2); }
+
+/* Danger — Trash */
+.sidebar-nav-btn.danger:hover .sb-icon {
+    background: rgba(248,113,113,0.2);
+    color: #fca5a5;
+}
+.sidebar-nav-btn.danger.active::before { background: #f87171; box-shadow: 0 0 10px rgba(248,113,113,0.7); }
 .view-heading i { color: var(--brand-gold); }
 
 /* Expenses panel + filters */
