@@ -36,6 +36,8 @@
             let blogPosts = [];
             let budgets = [];
             let budgetAlerts = [];
+            let overdueAlerts = [];
+            let dueSoonAlerts = [];
             let lastAlertSignature = "";
             let storageInfo = { storageMode: "sqlite", libsqlUrl: null };
             const filters = {
@@ -506,6 +508,9 @@
                     blogPosts = Array.isArray(blogPosts) ? blogPosts : [];
                     budgets = dashboard.budgets || [];
                     budgetAlerts = dashboard.alerts || [];
+                    overdueAlerts = dashboard.overdue || [];
+                    dueSoonAlerts = dashboard.dueSoon || [];
+                    renderAlertsBell();
                     updateStorageBadge({
                         storageMode: dashboard.storageMode,
                         libsqlUrl: storageInfo.libsqlUrl,
@@ -691,23 +696,98 @@
             }
 
             function announceBudgetAlerts() {
-                if (!budgetAlerts.length) {
+                const totalCount =
+                    budgetAlerts.length + overdueAlerts.length + dueSoonAlerts.length;
+                if (!totalCount) {
                     lastAlertSignature = "";
                     return;
                 }
-                const signature = JSON.stringify(
-                    budgetAlerts.map(
-                        (a) => `${a.category}:${a.total}:${a.threshold}`,
-                    ),
-                );
-                if (signature === lastAlertSignature) return;
-                budgetAlerts.forEach((alert) => {
-                    notify(
-                        `Budget alert: ${alert.category} reached ${fmtMoney(alert.total)} of ${fmtMoney(alert.threshold)}`,
-                        true,
-                    );
+                const signature = JSON.stringify({
+                    b: budgetAlerts.map((a) => `${a.category}:${a.total}:${a.threshold}`),
+                    o: overdueAlerts.map((a) => `${a.id}:${a.due_date}`),
+                    d: dueSoonAlerts.map((a) => `${a.id}:${a.due_date}`),
                 });
+                if (signature === lastAlertSignature) return;
+
+                const parts = [];
+                if (budgetAlerts.length)
+                    parts.push(
+                        `${budgetAlerts.length} categor${budgetAlerts.length === 1 ? "y" : "ies"} over budget`,
+                    );
+                if (overdueAlerts.length)
+                    parts.push(
+                        `${overdueAlerts.length} payment${overdueAlerts.length === 1 ? "" : "s"} overdue`,
+                    );
+                if (dueSoonAlerts.length)
+                    parts.push(
+                        `${dueSoonAlerts.length} due soon`,
+                    );
+                notify(parts.join(", "), true);
                 lastAlertSignature = signature;
+            }
+
+            function renderAlertsBell() {
+                const badge = $("#alertsBadge");
+                const body = $("#alertsDropdownBody");
+                if (!badge || !body) return;
+
+                const total =
+                    budgetAlerts.length + overdueAlerts.length + dueSoonAlerts.length;
+                badge.textContent = String(total);
+                badge.classList.toggle("hidden", total === 0);
+
+                if (!total) {
+                    body.innerHTML = '<p class="alerts-empty">You\'re all caught up.</p>';
+                    return;
+                }
+
+                const sections = [];
+                if (overdueAlerts.length) {
+                    sections.push(`
+            <div class="alerts-section">
+                <h4>Overdue</h4>
+                ${overdueAlerts
+                    .map(
+                        (a) => `
+                <div class="alert-chip alert-chip-danger">
+                    <strong>${escapeHtml(a.recipient || a.category)}</strong>
+                    ${fmtMoney(a.balance_due)} was due ${escapeHtml(a.due_date)}
+                </div>`,
+                    )
+                    .join("")}
+            </div>`);
+                }
+                if (dueSoonAlerts.length) {
+                    sections.push(`
+            <div class="alerts-section">
+                <h4>Due Soon</h4>
+                ${dueSoonAlerts
+                    .map(
+                        (a) => `
+                <div class="alert-chip">
+                    <strong>${escapeHtml(a.recipient || a.category)}</strong>
+                    ${fmtMoney(a.balance_due)} due ${escapeHtml(a.due_date)}
+                </div>`,
+                    )
+                    .join("")}
+            </div>`);
+                }
+                if (budgetAlerts.length) {
+                    sections.push(`
+            <div class="alerts-section">
+                <h4>Over Budget</h4>
+                ${budgetAlerts
+                    .map(
+                        (a) => `
+                <div class="alert-chip">
+                    <strong>${escapeHtml(a.category)}</strong>
+                    ${fmtMoney(a.total)} / limit ${fmtMoney(a.threshold)}
+                </div>`,
+                    )
+                    .join("")}
+            </div>`);
+                }
+                body.innerHTML = sections.join("");
             }
 
             /**
@@ -1354,6 +1434,7 @@
                 $("#expenseDescription").value = expense.description;
                 $("#expenseAmountPaid").value = expense.amount_paid;
                 $("#expenseBalanceDue").value = expense.balance_due;
+                $("#expenseDueDate").value = expense.due_date || "";
 
                 $("#expenseModalTitle").textContent = "Edit Expense";
                 $("#expenseModal").classList.remove("hidden");
@@ -1580,6 +1661,7 @@
                         description: $("#expenseDescription").value,
                         amount_paid: amountPaid,
                         balance_due: balanceDue,
+                        due_date: $("#expenseDueDate").value || null,
                     };
 
                     try {
@@ -1808,6 +1890,21 @@
                         exportDropdown.classList.add("hidden");
                     }
                 });
+
+                // Alerts bell dropdown toggle
+                const alertsDropdown = $("#alertsDropdown");
+                const alertsBellBtn = $("#alertsBellBtn");
+                if (alertsBellBtn && alertsDropdown) {
+                    alertsBellBtn.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        alertsDropdown.classList.toggle("hidden");
+                    });
+                    document.addEventListener("click", (e) => {
+                        if (!e.target.closest(".alerts-bell-wrap")) {
+                            alertsDropdown.classList.add("hidden");
+                        }
+                    });
+                }
 
                 // Helper: Get export data from server (all pages, not just current page)
                 async function getExportData() {

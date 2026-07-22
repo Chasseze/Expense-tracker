@@ -180,6 +180,9 @@ async function initializeDatabase() {
   const migrations = [
     `ALTER TABLE blog_posts ADD COLUMN modified_at DATETIME DEFAULT CURRENT_TIMESTAMP`,
     `ALTER TABLE expenses ADD COLUMN deleted_at DATETIME DEFAULT NULL`,
+    `ALTER TABLE expenses ADD COLUMN due_date TEXT DEFAULT NULL`,
+    `ALTER TABLE expenses ADD COLUMN recurring_template_id INTEGER DEFAULT NULL`,
+    `ALTER TABLE expenses ADD COLUMN receipt_path TEXT DEFAULT NULL`,
   ];
   for (const migration of migrations) {
     try {
@@ -908,6 +911,7 @@ app.post("/api/expenses", authenticateToken, async (req, res) => {
       description,
       amount_paid,
       balance_due,
+      due_date,
     } = req.body;
 
     // Validation
@@ -938,10 +942,11 @@ app.post("/api/expenses", authenticateToken, async (req, res) => {
     }
 
     const status = balanceDue > 0 ? "Partial" : "Paid";
+    const dueDate = due_date && String(due_date).trim() ? String(due_date).trim() : null;
 
     const result = await dbRun(
-      `INSERT INTO expenses (user_id, date_time, category, session_term, recipient, description, amount_paid, balance_due, status)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO expenses (user_id, date_time, category, session_term, recipient, description, amount_paid, balance_due, status, due_date)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         req.user.userId,
         date_time,
@@ -952,6 +957,7 @@ app.post("/api/expenses", authenticateToken, async (req, res) => {
         amountPaid,
         balanceDue,
         status,
+        dueDate,
       ],
     );
 
@@ -979,6 +985,7 @@ app.put("/api/expenses/:id", authenticateToken, async (req, res) => {
       description,
       amount_paid,
       balance_due,
+      due_date,
     } = req.body;
 
     // Validation
@@ -993,10 +1000,11 @@ app.put("/api/expenses/:id", authenticateToken, async (req, res) => {
     }
 
     const status = balanceDue > 0 ? "Partial" : "Paid";
+    const dueDate = due_date && String(due_date).trim() ? String(due_date).trim() : null;
 
     await dbRun(
       `UPDATE expenses SET date_time = ?, category = ?, session_term = ?, recipient = ?,
-             description = ?, amount_paid = ?, balance_due = ?, status = ? WHERE id = ? AND user_id = ?`,
+             description = ?, amount_paid = ?, balance_due = ?, status = ?, due_date = ? WHERE id = ? AND user_id = ?`,
       [
         date_time,
         category,
@@ -1006,6 +1014,7 @@ app.put("/api/expenses/:id", authenticateToken, async (req, res) => {
         amountPaid,
         balanceDue,
         status,
+        dueDate,
         req.params.id,
         req.user.userId,
       ],
@@ -1262,6 +1271,31 @@ app.get("/api/dashboard", authenticateToken, async (req, res) => {
       })
       .filter(Boolean);
 
+    // Payment-due reminders: global (not scoped to the dashboard's date range),
+    // since "what do I still owe and when" isn't tied to the currently viewed period.
+    const today = new Date().toISOString().slice(0, 10);
+    const sevenDaysOut = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+
+    const overdue = await dbAll(
+      `SELECT id, category, recipient, description, balance_due, due_date
+             FROM expenses
+            WHERE user_id = ? AND deleted_at IS NULL AND balance_due > 0
+              AND due_date IS NOT NULL AND due_date < ?
+            ORDER BY due_date ASC`,
+      [req.user.userId, today],
+    );
+
+    const dueSoon = await dbAll(
+      `SELECT id, category, recipient, description, balance_due, due_date
+             FROM expenses
+            WHERE user_id = ? AND deleted_at IS NULL AND balance_due > 0
+              AND due_date IS NOT NULL AND due_date >= ? AND due_date <= ?
+            ORDER BY due_date ASC`,
+      [req.user.userId, today, sevenDaysOut],
+    );
+
     res.json({
       statistics: stats[0] || {
         total_expenses: 0,
@@ -1273,6 +1307,8 @@ app.get("/api/dashboard", authenticateToken, async (req, res) => {
       monthlySeries: monthlySeries || [],
       budgets,
       alerts,
+      overdue,
+      dueSoon,
       storageMode,
     });
   } catch (error) {
