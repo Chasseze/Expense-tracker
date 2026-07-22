@@ -1284,6 +1284,62 @@ body.theme-dark.app-body-root {
     color: #1e293b;
 }
 .chart-canvas-wrap { position: relative; height: clamp(180px, 28vh, 300px); }
+/* Written-out category totals */
+.category-summary-card {
+    margin-top: 1rem;
+    padding: 0.7rem 0.95rem 0.85rem;
+}
+.category-summary-card h2 {
+    text-align: left;
+    margin: 0 0 0.6rem;
+}
+.category-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.55rem;
+}
+.cat-summary-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.05rem;
+    padding: 0.4rem 0.55rem 0.45rem 0.7rem;
+    border-radius: 0.55rem;
+    background: #f8fafc;
+    border-left: 3px solid #94a3b8;
+}
+.cat-summary-name {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+.cat-summary-total {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+.cat-summary-count {
+    font-size: 0.72rem;
+    color: #94a3b8;
+}
+.cat-summary-empty {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+/* Accent colors mirror the Spending by Category legend order */
+.cat-summary-item:nth-child(8n + 1) { border-left-color: rgba(59, 130, 246, 0.9); }
+.cat-summary-item:nth-child(8n + 2) { border-left-color: rgba(16, 185, 129, 0.9); }
+.cat-summary-item:nth-child(8n + 3) { border-left-color: rgba(249, 115, 22, 0.9); }
+.cat-summary-item:nth-child(8n + 4) { border-left-color: rgba(139, 92, 246, 0.9); }
+.cat-summary-item:nth-child(8n + 5) { border-left-color: rgba(236, 72, 153, 0.9); }
+.cat-summary-item:nth-child(8n + 6) { border-left-color: rgba(20, 184, 166, 0.9); }
+.cat-summary-item:nth-child(8n + 7) { border-left-color: rgba(245, 158, 11, 0.9); }
+.cat-summary-item:nth-child(8n + 8) { border-left-color: rgba(239, 68, 68, 0.9); }
+body.theme-dark .cat-summary-item { background: #0f172a; }
+body.theme-dark .cat-summary-total { color: #e2e8f0; }
+
 .category-alert-list:not(.hidden) {
     margin-top: 1rem;
     display: grid;

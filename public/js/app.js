@@ -1117,6 +1117,30 @@
             </div>
         `;
 
+                // Written-out category totals (name, total, number of entries)
+                const summaryGrid = $("#categorySummaryGrid");
+                if (summaryGrid) {
+                    if (!categories.length) {
+                        summaryGrid.innerHTML =
+                            '<p class="cat-summary-empty">No expenses recorded yet.</p>';
+                    } else {
+                        summaryGrid.innerHTML = categories
+                            .map((cat) => {
+                                const total =
+                                    (Number(cat.total_paid) || 0) +
+                                    (Number(cat.total_balance) || 0);
+                                const count = Number(cat.count) || 0;
+                                return `
+            <div class="cat-summary-item">
+                <span class="cat-summary-name">${escapeHtml(cat.category)}</span>
+                <span class="cat-summary-total">${fmtMoney(total)}</span>
+                <span class="cat-summary-count">${count} ${count === 1 ? "entry" : "entries"}</span>
+            </div>`;
+                            })
+                            .join("");
+                    }
+                }
+
                 const alertCats = categories.filter((cat) => alertSet.has(cat.category));
                 const card = $("#categoryCard");
                 const breakdown = $("#categoryBreakdown");
