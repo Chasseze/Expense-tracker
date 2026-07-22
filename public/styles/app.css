@@ -818,7 +818,8 @@ body.theme-dark .export-dropdown-item:hover {
 .app-shell {
     display: flex;
     flex-direction: column;
-    min-height: 100vh;
+    height: 100vh;
+    overflow: hidden;
 }
 
 /* ── TOP BAR ── */
@@ -1091,7 +1092,7 @@ body.theme-dark .export-dropdown-item:hover {
     flex: 1;
     overflow-y: auto;
     background: var(--bg-1);
-    padding: 1.25rem 1.5rem;
+    padding: 0.9rem 1.5rem;
 }
 
 /* ── VIEWS ── */
@@ -1112,7 +1113,7 @@ body.theme-dark .export-dropdown-item:hover {
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 0.75rem;
-    margin-bottom: 1.25rem;
+    margin-bottom: 0.75rem;
 }
 .view-heading {
     font-size: 1.25rem;
@@ -1249,14 +1250,14 @@ body.theme-dark.app-body-root {
     display: grid;
     grid-template-columns: 1fr;
     gap: 0.9rem;
-    margin-bottom: 1.25rem;
+    margin-bottom: 0.85rem;
 }
 @media (min-width: 640px) {
     .summary-grid { grid-template-columns: repeat(3, 1fr); gap: 1rem; }
 }
 .insights-section { margin-top: 0.5rem; }
 .insights-heading {
-    display: flex; flex-direction: column; gap: 0.15rem; margin-bottom: 0.85rem;
+    display: flex; flex-direction: column; gap: 0.15rem; margin-bottom: 0.5rem;
 }
 .insights-heading h3 {
     margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text);
@@ -1274,20 +1275,20 @@ body.theme-dark.app-body-root {
     background: var(--surface);
     border-radius: 1rem;
     box-shadow: var(--card-shadow);
-    padding: 1rem 1.1rem 1.15rem;
+    padding: 0.8rem 1.1rem 0.85rem;
 }
 .chart-card h2 {
-    margin: 0 0 0.75rem;
+    margin: 0 0 0.55rem;
     text-align: center;
     font-size: 0.95rem;
     font-weight: 700;
     color: #1e293b;
 }
-.chart-canvas-wrap { position: relative; height: clamp(180px, 28vh, 300px); }
+.chart-canvas-wrap { position: relative; height: clamp(170px, 24vh, 260px); }
 /* Written-out category totals */
 .category-summary-card {
-    margin-top: 1rem;
-    padding: 0.7rem 0.95rem 0.85rem;
+    margin-top: 0.7rem;
+    padding: 0.6rem 0.95rem 0.7rem;
 }
 .category-summary-card h2 {
     text-align: left;
