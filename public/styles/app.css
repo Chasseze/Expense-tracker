@@ -966,7 +966,7 @@ body.theme-dark .export-dropdown-item:hover {
     .app-sidebar:hover { width: 52px; }
 }
 .sidebar-inner {
-    padding: 0.75rem 0;
+    padding: 1.1rem 0;
     display: flex;
     flex-direction: column;
     gap: 1px;
