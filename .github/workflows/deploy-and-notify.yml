@@ -8,6 +8,9 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # repository_dispatch (the notify step) needs contents: write
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - name: Setup Node
@@ -32,7 +35,10 @@ jobs:
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: firebase deploy --only hosting,functions --project expense-tracker-prod-df355 --non-interactive
+      # Non-fatal: a smoke-test notification failure must not mark a
+      # successful deploy as failed.
       - name: Notify smoke workflow (repository_dispatch)
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOSTING_URL: https://expense-tracker-prod-df355.web.app
