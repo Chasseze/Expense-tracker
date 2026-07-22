@@ -145,6 +145,20 @@
                     "order": "DESCENDING"
                 }
             ]
+        },
+        {
+            "collectionGroup": "recurring_templates",
+            "queryScope": "COLLECTION_GROUP",
+            "fields": [
+                {
+                    "fieldPath": "active",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "next_run_date",
+                    "order": "ASCENDING"
+                }
+            ]
         }
     ]
 }

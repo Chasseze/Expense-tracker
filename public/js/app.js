@@ -562,6 +562,68 @@
                     .join("");
             }
 
+            let recurringTemplates = [];
+
+            async function loadRecurring() {
+                try {
+                    recurringTemplates = await apiCall("/recurring");
+                } catch (error) {
+                    recurringTemplates = [];
+                    notify("Unable to load recurring expenses", true);
+                }
+                renderRecurringTable();
+            }
+
+            function fillRecurringCategoryOptions() {
+                const select = document.querySelector("#recurringCategory");
+                if (!select) return;
+                const categories = new Set([
+                    ...defaultExpenseCategories,
+                    ...customCategories,
+                    ...expenses.map((e) => e.category),
+                ]);
+                select.innerHTML = Array.from(categories)
+                    .sort()
+                    .map((cat) => `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`)
+                    .join("");
+            }
+
+            const FREQUENCY_LABELS = {
+                weekly: "Weekly",
+                monthly: "Monthly",
+                quarterly: "Quarterly",
+                yearly: "Yearly",
+            };
+
+            function renderRecurringTable() {
+                const tbody = document.querySelector("#recurringTableBody");
+                if (!tbody) return;
+                if (!recurringTemplates.length) {
+                    tbody.innerHTML =
+                        '<tr><td colspan="7" class="p-4 text-center text-gray-500">No recurring expenses yet.</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = recurringTemplates
+                    .map((tpl) => {
+                        const total = (Number(tpl.amount_paid) || 0) + (Number(tpl.balance_due) || 0);
+                        const isActive = Number(tpl.active) === 1;
+                        return `
+                <tr class="border-b last:border-0">
+                    <td class="p-3 font-medium">${escapeHtml(tpl.recipient)}</td>
+                    <td class="p-3">${escapeHtml(tpl.category)}</td>
+                    <td class="p-3">${fmtMoney(total)}</td>
+                    <td class="p-3">${FREQUENCY_LABELS[tpl.frequency] || tpl.frequency}</td>
+                    <td class="p-3">${escapeHtml(tpl.next_run_date)}</td>
+                    <td class="p-3">${isActive ? '<span class="text-green-600 font-medium">Active</span>' : '<span class="text-gray-400 font-medium">Paused</span>'}</td>
+                    <td class="p-3 flex gap-3">
+                        <button data-id="${tpl.id}" data-active="${isActive ? 1 : 0}" class="text-amber-600 hover:text-amber-800 toggle-recurring">${isActive ? "Pause" : "Resume"}</button>
+                        <button data-id="${tpl.id}" class="text-red-600 hover:text-red-800 delete-recurring">Remove</button>
+                    </td>
+                </tr>`;
+                    })
+                    .join("");
+            }
+
             function syncBudgetThresholdInput() {
                 const select = document.querySelector("#budgetCategory");
                 const input = document.querySelector("#budgetThreshold");
@@ -1830,6 +1892,76 @@
                             await loadData();
                         } catch (error) {
                             notify("Error removing budget", true);
+                        }
+                    }
+                });
+
+                // Recurring modal controls
+                $("#manageRecurringBtn").addEventListener("click", () => {
+                    fillRecurringCategoryOptions();
+                    $("#recurringStartDate").value = new Date().toISOString().slice(0, 10);
+                    loadRecurring();
+                    $("#recurringModal").classList.remove("hidden");
+                });
+
+                $("#closeRecurringModal").addEventListener("click", () =>
+                    $("#recurringModal").classList.add("hidden"),
+                );
+
+                $("#recurringForm").addEventListener("submit", async (e) => {
+                    e.preventDefault();
+                    const amountPaid = toNumber($("#recurringAmountPaid").value);
+                    const balanceDue = toNumber($("#recurringBalanceDue").value) || 0;
+                    if (isNaN(amountPaid) || amountPaid < 0) {
+                        notify("Amount paid must be a positive number", true);
+                        return;
+                    }
+                    try {
+                        await apiCall("/recurring", {
+                            method: "POST",
+                            body: {
+                                category: $("#recurringCategory").value,
+                                frequency: $("#recurringFrequency").value,
+                                recipient: $("#recurringRecipient").value,
+                                description: $("#recurringDescription").value,
+                                amount_paid: amountPaid,
+                                balance_due: balanceDue,
+                                start_date: $("#recurringStartDate").value,
+                            },
+                        });
+                        notify("Recurring expense created!");
+                        $("#recurringForm").reset();
+                        $("#recurringStartDate").value = new Date().toISOString().slice(0, 10);
+                        fillRecurringCategoryOptions();
+                        await loadRecurring();
+                    } catch (error) {
+                        notify(error.message || "Error creating recurring expense", true);
+                    }
+                });
+
+                $("#recurringTableBody").addEventListener("click", async (e) => {
+                    if (e.target.matches(".toggle-recurring")) {
+                        const id = e.target.dataset.id;
+                        const isActive = e.target.dataset.active === "1";
+                        try {
+                            await apiCall(`/recurring/${id}`, {
+                                method: "PUT",
+                                body: { active: !isActive },
+                            });
+                            notify(isActive ? "Recurring expense paused" : "Recurring expense resumed");
+                            await loadRecurring();
+                        } catch (error) {
+                            notify("Error updating recurring expense", true);
+                        }
+                    } else if (e.target.matches(".delete-recurring")) {
+                        const id = e.target.dataset.id;
+                        if (!confirm("Remove this recurring expense template? Already-generated expenses are not affected.")) return;
+                        try {
+                            await apiCall(`/recurring/${id}`, { method: "DELETE" });
+                            notify("Recurring expense removed");
+                            await loadRecurring();
+                        } catch (error) {
+                            notify("Error removing recurring expense", true);
                         }
                     }
                 });

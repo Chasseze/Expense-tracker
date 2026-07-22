@@ -113,9 +113,14 @@ if (useLibsql) {
       console.error("Error opening database:", err);
     } else {
       console.log("Connected to SQLite database");
-      initializeDatabase().catch((initErr) => {
-        console.error("Error initializing SQLite database:", initErr);
-      });
+      initializeDatabase()
+        .then(() => {
+          generateDueRecurringExpenses();
+          setInterval(generateDueRecurringExpenses, 24 * 60 * 60 * 1000);
+        })
+        .catch((initErr) => {
+          console.error("Error initializing SQLite database:", initErr);
+        });
     }
   });
 }
@@ -162,6 +167,22 @@ async function initializeDatabase() {
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(user_id, category),
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )`,
+    `CREATE TABLE IF NOT EXISTS recurring_templates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            category TEXT NOT NULL,
+            session_term TEXT,
+            recipient TEXT NOT NULL,
+            description TEXT NOT NULL,
+            amount_paid REAL NOT NULL,
+            balance_due REAL DEFAULT 0,
+            frequency TEXT NOT NULL,
+            next_run_date TEXT NOT NULL,
+            active INTEGER DEFAULT 1,
+            last_generated_at DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (id)
         )`,
     // Performance indexes
@@ -1313,6 +1334,187 @@ app.get("/api/dashboard", authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error("Dashboard error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+const RECURRING_FREQUENCIES = ["weekly", "monthly", "quarterly", "yearly"];
+
+function advanceDate(dateStr, frequency) {
+  const d = new Date(dateStr + "T00:00:00Z");
+  switch (frequency) {
+    case "weekly":
+      d.setUTCDate(d.getUTCDate() + 7);
+      break;
+    case "monthly":
+      d.setUTCMonth(d.getUTCMonth() + 1);
+      break;
+    case "quarterly":
+      d.setUTCMonth(d.getUTCMonth() + 3);
+      break;
+    case "yearly":
+      d.setUTCFullYear(d.getUTCFullYear() + 1);
+      break;
+  }
+  return d.toISOString().slice(0, 10);
+}
+
+// Generates due expenses from active recurring templates. Runs at startup and every 24h.
+async function generateDueRecurringExpenses() {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const dueTemplates = await dbAll(
+      `SELECT * FROM recurring_templates WHERE active = 1 AND next_run_date <= ?`,
+      [today],
+    );
+
+    for (const tpl of dueTemplates) {
+      let nextRun = tpl.next_run_date;
+      let iterations = 0;
+      // Catch up if the server was down across one or more occurrences, capped to avoid runaway loops.
+      while (nextRun <= today && iterations < 12) {
+        const status = Number(tpl.balance_due) > 0 ? "Partial" : "Paid";
+        await dbRun(
+          `INSERT INTO expenses (user_id, date_time, category, session_term, recipient, description, amount_paid, balance_due, status, recurring_template_id)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            tpl.user_id,
+            `${nextRun} 09:00`,
+            tpl.category,
+            tpl.session_term,
+            tpl.recipient,
+            tpl.description,
+            tpl.amount_paid,
+            tpl.balance_due,
+            status,
+            tpl.id,
+          ],
+        );
+        nextRun = advanceDate(nextRun, tpl.frequency);
+        iterations += 1;
+      }
+      await dbRun(
+        `UPDATE recurring_templates SET next_run_date = ?, last_generated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [nextRun, tpl.id],
+      );
+    }
+    if (dueTemplates.length) {
+      console.log(`Recurring: generated occurrences for ${dueTemplates.length} template(s).`);
+    }
+  } catch (error) {
+    console.error("Recurring generation error:", error);
+  }
+}
+
+app.get("/api/recurring", authenticateToken, async (req, res) => {
+  try {
+    const rows = await dbAll(
+      "SELECT * FROM recurring_templates WHERE user_id = ? ORDER BY next_run_date ASC",
+      [req.user.userId],
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error("Get recurring templates error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.post("/api/recurring", authenticateToken, async (req, res) => {
+  try {
+    const {
+      category,
+      session_term,
+      recipient,
+      description,
+      amount_paid,
+      balance_due,
+      frequency,
+      start_date,
+    } = req.body;
+
+    if (!category || !recipient || !description || !start_date) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+    if (!RECURRING_FREQUENCIES.includes(frequency)) {
+      return res.status(400).json({ error: "Invalid frequency" });
+    }
+    const amountPaid = parseFloat(amount_paid);
+    const balanceDue = parseFloat(balance_due) || 0;
+    if (isNaN(amountPaid) || amountPaid < 0 || balanceDue < 0) {
+      return res.status(400).json({ error: "Invalid amount values" });
+    }
+
+    const result = await dbRun(
+      `INSERT INTO recurring_templates (user_id, category, session_term, recipient, description, amount_paid, balance_due, frequency, next_run_date)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        req.user.userId,
+        category,
+        session_term,
+        recipient,
+        description,
+        amountPaid,
+        balanceDue,
+        frequency,
+        start_date,
+      ],
+    );
+
+    const newTpl = await dbAll("SELECT * FROM recurring_templates WHERE id = ?", [result.id]);
+    res.json({ message: "Recurring expense created", template: newTpl[0] });
+  } catch (error) {
+    console.error("Create recurring template error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.put("/api/recurring/:id", authenticateToken, async (req, res) => {
+  try {
+    const { category, session_term, recipient, description, amount_paid, balance_due, frequency, active } = req.body;
+
+    const updates = [];
+    const params = [];
+    if (category != null) { updates.push("category = ?"); params.push(category); }
+    if (session_term != null) { updates.push("session_term = ?"); params.push(session_term); }
+    if (recipient != null) { updates.push("recipient = ?"); params.push(recipient); }
+    if (description != null) { updates.push("description = ?"); params.push(description); }
+    if (amount_paid != null) { updates.push("amount_paid = ?"); params.push(parseFloat(amount_paid) || 0); }
+    if (balance_due != null) { updates.push("balance_due = ?"); params.push(parseFloat(balance_due) || 0); }
+    if (frequency != null) {
+      if (!RECURRING_FREQUENCIES.includes(frequency)) {
+        return res.status(400).json({ error: "Invalid frequency" });
+      }
+      updates.push("frequency = ?");
+      params.push(frequency);
+    }
+    if (active != null) { updates.push("active = ?"); params.push(active ? 1 : 0); }
+
+    if (!updates.length) {
+      return res.status(400).json({ error: "No fields to update" });
+    }
+
+    params.push(req.params.id, req.user.userId);
+    await dbRun(
+      `UPDATE recurring_templates SET ${updates.join(", ")} WHERE id = ? AND user_id = ?`,
+      params,
+    );
+
+    res.json({ message: "Recurring expense updated" });
+  } catch (error) {
+    console.error("Update recurring template error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.delete("/api/recurring/:id", authenticateToken, async (req, res) => {
+  try {
+    await dbRun(
+      "DELETE FROM recurring_templates WHERE id = ? AND user_id = ?",
+      [req.params.id, req.user.userId],
+    );
+    res.json({ message: "Recurring expense deleted" });
+  } catch (error) {
+    console.error("Delete recurring template error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 });

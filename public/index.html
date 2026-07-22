@@ -208,6 +208,10 @@
                             <i class="fas fa-tags sb-icon"></i>
                             <span class="sb-label">Categories</span>
                         </button>
+                        <button class="sidebar-nav-btn" id="manageRecurringBtn" aria-label="Manage recurring expenses">
+                            <i class="fas fa-sync-alt sb-icon"></i>
+                            <span class="sb-label">Recurring</span>
+                        </button>
                         <button class="sidebar-nav-btn" id="addBlogPostBtn" aria-label="Blog">
                             <i class="fas fa-pen-fancy sb-icon"></i>
                             <span class="sb-label">Blog</span>
@@ -748,6 +752,131 @@
                                 </tr>
                             </thead>
                             <tbody id="budgetTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RECURRING MODAL -->
+        <div
+            id="recurringModal"
+            class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-40 hidden"
+        >
+            <div
+                class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6"
+            >
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">
+                        Recurring Expenses
+                    </h2>
+                    <button
+                        id="closeRecurringModal"
+                        class="text-gray-500 hover:text-gray-700 text-2xl"
+                    >
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <p class="text-sm text-gray-500 mb-4">
+                    Templates below auto-generate a new expense on their schedule &mdash; rent, subscriptions, school fees, etc.
+                </p>
+                <form
+                    id="recurringForm"
+                    class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"
+                >
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                        <select
+                            id="recurringCategory"
+                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-500"
+                        ></select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Frequency</label>
+                        <select
+                            id="recurringFrequency"
+                            required
+                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-500"
+                        >
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly" selected>Monthly</option>
+                            <option value="quarterly">Quarterly</option>
+                            <option value="yearly">Yearly</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Recipient</label>
+                        <input
+                            type="text"
+                            id="recurringRecipient"
+                            required
+                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-500"
+                        />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                        <input
+                            type="text"
+                            id="recurringDescription"
+                            required
+                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-500"
+                        />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Amount Paid (₦)</label>
+                        <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            id="recurringAmountPaid"
+                            required
+                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-500"
+                        />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Balance Due (₦)</label>
+                        <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            id="recurringBalanceDue"
+                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-500"
+                        />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Starts On</label>
+                        <input
+                            type="date"
+                            id="recurringStartDate"
+                            required
+                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-500"
+                        />
+                    </div>
+                    <div class="md:col-span-2 flex gap-3 justify-end">
+                        <button
+                            type="submit"
+                            class="bg-amber-500 hover:bg-amber-600 text-white px-5 py-3 rounded-lg font-semibold"
+                        >
+                            Add Recurring Expense
+                        </button>
+                    </div>
+                </form>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800 mb-3">Active Templates</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-gray-700 border rounded-lg">
+                            <thead class="bg-amber-50 text-amber-700">
+                                <tr>
+                                    <th class="p-3 text-left">Recipient</th>
+                                    <th class="p-3 text-left">Category</th>
+                                    <th class="p-3 text-left">Amount</th>
+                                    <th class="p-3 text-left">Frequency</th>
+                                    <th class="p-3 text-left">Next Run</th>
+                                    <th class="p-3 text-left">Status</th>
+                                    <th class="p-3 text-left">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recurringTableBody"></tbody>
                         </table>
                     </div>
                 </div>

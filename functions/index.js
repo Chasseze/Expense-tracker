@@ -1,4 +1,5 @@
 const functions = require('firebase-functions');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 const admin = require('firebase-admin');
 const express = require('express');
 const cors = require('cors');
@@ -623,6 +624,119 @@ app.delete('/api/budgets/:category', verifyToken, async (req, res) => {
   }
 });
 
+const RECURRING_FREQUENCIES = ['weekly', 'monthly', 'quarterly', 'yearly'];
+
+function advanceDate(dateStr, frequency) {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  switch (frequency) {
+    case 'weekly':
+      d.setUTCDate(d.getUTCDate() + 7);
+      break;
+    case 'monthly':
+      d.setUTCMonth(d.getUTCMonth() + 1);
+      break;
+    case 'quarterly':
+      d.setUTCMonth(d.getUTCMonth() + 3);
+      break;
+    case 'yearly':
+      d.setUTCFullYear(d.getUTCFullYear() + 1);
+      break;
+  }
+  return d.toISOString().slice(0, 10);
+}
+
+// List recurring templates
+app.get('/api/recurring', verifyToken, async (req, res) => {
+  try {
+    const snapshot = await db.collection('users').doc(req.user.uid).collection('recurring_templates')
+      .orderBy('next_run_date', 'asc').get();
+    res.json(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+  } catch (error) {
+    console.error('Get recurring templates error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Create recurring template
+app.post('/api/recurring', verifyToken, async (req, res) => {
+  try {
+    const { category, session_term, recipient, description, amount_paid, balance_due, frequency, start_date } = req.body;
+    if (!category || !recipient || !description || !start_date) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    if (!RECURRING_FREQUENCIES.includes(frequency)) {
+      return res.status(400).json({ error: 'Invalid frequency' });
+    }
+    const amountPaid = Number(amount_paid);
+    const balanceDue = Number(balance_due) || 0;
+    if (isNaN(amountPaid) || amountPaid < 0 || balanceDue < 0) {
+      return res.status(400).json({ error: 'Invalid amount values' });
+    }
+
+    const docRef = await db.collection('users').doc(req.user.uid).collection('recurring_templates').add({
+      category,
+      session_term: session_term || '',
+      recipient,
+      description,
+      amount_paid: amountPaid,
+      balance_due: balanceDue,
+      frequency,
+      next_run_date: start_date,
+      active: true,
+      last_generated_at: null,
+      created_at: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    const doc = await docRef.get();
+    res.json({ message: 'Recurring expense created', template: { id: docRef.id, ...doc.data() } });
+  } catch (error) {
+    console.error('Create recurring template error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update / pause / resume recurring template
+app.put('/api/recurring/:id', verifyToken, async (req, res) => {
+  try {
+    const { category, session_term, recipient, description, amount_paid, balance_due, frequency, active } = req.body;
+    const updates = {};
+    if (category != null) updates.category = category;
+    if (session_term != null) updates.session_term = session_term;
+    if (recipient != null) updates.recipient = recipient;
+    if (description != null) updates.description = description;
+    if (amount_paid != null) updates.amount_paid = Number(amount_paid) || 0;
+    if (balance_due != null) updates.balance_due = Number(balance_due) || 0;
+    if (frequency != null) {
+      if (!RECURRING_FREQUENCIES.includes(frequency)) {
+        return res.status(400).json({ error: 'Invalid frequency' });
+      }
+      updates.frequency = frequency;
+    }
+    if (active != null) updates.active = Boolean(active);
+
+    if (!Object.keys(updates).length) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    await db.collection('users').doc(req.user.uid).collection('recurring_templates').doc(req.params.id).update(updates);
+    res.json({ message: 'Recurring expense updated' });
+  } catch (error) {
+    console.error('Update recurring template error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete recurring template
+app.delete('/api/recurring/:id', verifyToken, async (req, res) => {
+  try {
+    await db.collection('users').doc(req.user.uid).collection('recurring_templates').doc(req.params.id).delete();
+    res.json({ message: 'Recurring expense deleted' });
+  } catch (error) {
+    console.error('Delete recurring template error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Get custom categories
 app.get('/api/categories', verifyToken, async (req, res) => {
   try {
@@ -818,3 +932,47 @@ app.post('/api/auth/refresh', verifyToken, (req, res) => {
 
 // Export the Express app as a Cloud Function
 exports.api = functions.https.onRequest(app);
+
+// Scheduled job: generate due expenses from active recurring templates across all users.
+exports.generateRecurringExpenses = onSchedule('every 24 hours', async () => {
+  const today = new Date().toISOString().slice(0, 10);
+  const dueSnapshot = await db.collectionGroup('recurring_templates')
+    .where('active', '==', true)
+    .where('next_run_date', '<=', today)
+    .get();
+
+  for (const doc of dueSnapshot.docs) {
+    const tpl = doc.data();
+    const expensesRef = doc.ref.parent.parent.collection('expenses');
+    let nextRun = tpl.next_run_date;
+    let iterations = 0;
+    // Catch up if a scheduled run was missed across one or more occurrences, capped to avoid runaway loops.
+    while (nextRun <= today && iterations < 12) {
+      const status = Number(tpl.balance_due) > 0 ? 'Partial' : 'Paid';
+      await expensesRef.add({
+        date_time: `${nextRun} 09:00`,
+        category: tpl.category,
+        session_term: tpl.session_term || '',
+        recipient: tpl.recipient,
+        description: tpl.description,
+        amount_paid: tpl.amount_paid,
+        balance_due: tpl.balance_due,
+        status,
+        due_date: null,
+        recurring_template_id: doc.id,
+        deleted_at: null,
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      nextRun = advanceDate(nextRun, tpl.frequency);
+      iterations += 1;
+    }
+    await doc.ref.update({
+      next_run_date: nextRun,
+      last_generated_at: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  }
+
+  if (dueSnapshot.size) {
+    console.log(`Recurring: generated occurrences for ${dueSnapshot.size} template(s).`);
+  }
+});
