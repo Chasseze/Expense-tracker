@@ -84,29 +84,39 @@ const RECEIPT_MIME_EXT = {
   "application/pdf": ".pdf",
 };
 
-const receiptUpload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => cb(null, uploadsDir),
-    filename: (req, file, cb) => {
-      const ext = RECEIPT_MIME_EXT[file.mimetype] || "";
-      cb(null, `${req.user.userId}-${req.params.id}-${Date.now()}${ext}`);
+function makeReceiptUpload(prefix) {
+  return multer({
+    storage: multer.diskStorage({
+      destination: (req, file, cb) => cb(null, uploadsDir),
+      filename: (req, file, cb) => {
+        const ext = RECEIPT_MIME_EXT[file.mimetype] || "";
+        cb(null, `${prefix}${req.user.userId}-${req.params.id}-${Date.now()}${ext}`);
+      },
+    }),
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+      if (!RECEIPT_MIME_EXT[file.mimetype]) {
+        return cb(new Error("Only JPEG, PNG, WEBP, GIF images or PDF files are allowed"));
+      }
+      cb(null, true);
     },
-  }),
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    if (!RECEIPT_MIME_EXT[file.mimetype]) {
-      return cb(new Error("Only JPEG, PNG, WEBP, GIF images or PDF files are allowed"));
-    }
-    cb(null, true);
-  },
-});
-
-function uploadReceiptMiddleware(req, res, next) {
-  receiptUpload.single("receipt")(req, res, (err) => {
-    if (err) return res.status(400).json({ error: err.message || "Upload failed" });
-    next();
   });
 }
+
+const receiptUpload = makeReceiptUpload("");
+const purchaseReceiptUpload = makeReceiptUpload("purchase-");
+
+function makeReceiptMiddleware(uploader) {
+  return function (req, res, next) {
+    uploader.single("receipt")(req, res, (err) => {
+      if (err) return res.status(400).json({ error: err.message || "Upload failed" });
+      next();
+    });
+  };
+}
+
+const uploadReceiptMiddleware = makeReceiptMiddleware(receiptUpload);
+const uploadPurchaseReceiptMiddleware = makeReceiptMiddleware(purchaseReceiptUpload);
 
 // Development auth toggle: set DISABLE_AUTH=1 to explicitly disable auth checks.
 // Auth is ENABLED by default in all environments; opt-out is explicit.
@@ -263,6 +273,7 @@ async function initializeDatabase() {
     `ALTER TABLE expenses ADD COLUMN due_date TEXT DEFAULT NULL`,
     `ALTER TABLE expenses ADD COLUMN recurring_template_id INTEGER DEFAULT NULL`,
     `ALTER TABLE expenses ADD COLUMN receipt_path TEXT DEFAULT NULL`,
+    `ALTER TABLE purchases ADD COLUMN receipt_path TEXT DEFAULT NULL`,
   ];
   for (const migration of migrations) {
     try {
@@ -1406,11 +1417,18 @@ app.get("/api/reports", authenticateToken, async (req, res) => {
       params,
     );
 
+    const transactions = await dbAll(
+      `SELECT id, date_time, category, recipient, description, amount_paid, balance_due, status, receipt_path
+             FROM expenses ${where} ORDER BY date_time DESC LIMIT 1000`,
+      params,
+    );
+
     res.json({
       statistics: stats[0] || { total_expenses: 0, total_paid: 0, total_balance: 0, total_cost: 0 },
       byCategory,
       byStatus,
       byMonth,
+      transactions,
     });
   } catch (error) {
     console.error("Reports error:", error);
@@ -1811,6 +1829,81 @@ app.delete("/api/purchases/:id", authenticateToken, async (req, res) => {
   }
 });
 
+app.post(
+  "/api/purchases/:id/receipt",
+  authenticateToken,
+  uploadPurchaseReceiptMiddleware,
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+      const rows = await dbAll(
+        "SELECT id, receipt_path FROM purchases WHERE id = ? AND user_id = ?",
+        [req.params.id, req.user.userId],
+      );
+      if (!rows.length) {
+        fs.unlink(req.file.path, () => {});
+        return res.status(404).json({ error: "Purchase not found" });
+      }
+      if (rows[0].receipt_path) {
+        fs.unlink(path.join(uploadsDir, rows[0].receipt_path), () => {});
+      }
+      await dbRun(
+        "UPDATE purchases SET receipt_path = ? WHERE id = ? AND user_id = ?",
+        [req.file.filename, req.params.id, req.user.userId],
+      );
+      res.json({ message: "Receipt uploaded successfully", receipt_path: req.file.filename });
+    } catch (error) {
+      console.error("Upload purchase receipt error:", error);
+      res.status(500).json({ error: "Unable to upload receipt" });
+    }
+  },
+);
+
+app.get("/api/purchases/:id/receipt", authenticateToken, async (req, res) => {
+  try {
+    const rows = await dbAll(
+      "SELECT receipt_path FROM purchases WHERE id = ? AND user_id = ?",
+      [req.params.id, req.user.userId],
+    );
+    if (!rows.length || !rows[0].receipt_path) {
+      return res.status(404).json({ error: "No receipt on file" });
+    }
+    const filePath = path.join(uploadsDir, rows[0].receipt_path);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: "Receipt file missing" });
+    }
+    res.sendFile(filePath);
+  } catch (error) {
+    console.error("Get purchase receipt error:", error);
+    res.status(500).json({ error: "Unable to retrieve receipt" });
+  }
+});
+
+app.delete("/api/purchases/:id/receipt", authenticateToken, async (req, res) => {
+  try {
+    const rows = await dbAll(
+      "SELECT receipt_path FROM purchases WHERE id = ? AND user_id = ?",
+      [req.params.id, req.user.userId],
+    );
+    if (!rows.length) {
+      return res.status(404).json({ error: "Purchase not found" });
+    }
+    if (rows[0].receipt_path) {
+      fs.unlink(path.join(uploadsDir, rows[0].receipt_path), () => {});
+    }
+    await dbRun(
+      "UPDATE purchases SET receipt_path = NULL WHERE id = ? AND user_id = ?",
+      [req.params.id, req.user.userId],
+    );
+    res.json({ message: "Receipt removed" });
+  } catch (error) {
+    console.error("Delete purchase receipt error:", error);
+    res.status(500).json({ error: "Unable to remove receipt" });
+  }
+});
+
 // Convert a planned purchase into a real expense record.
 app.post("/api/purchases/:id/convert", authenticateToken, async (req, res) => {
   try {
@@ -1834,9 +1927,25 @@ app.post("/api/purchases/:id/convert", authenticateToken, async (req, res) => {
     const status = balanceDue > 0 ? "Partial" : "Paid";
     const dateTime = req.body.date_time || new Date().toISOString().slice(0, 16).replace("T", " ");
 
+    // Carry the purchase's receipt over to the new expense as its own copy,
+    // so deleting one record's receipt never affects the other.
+    let expenseReceiptName = null;
+    if (purchase.receipt_path) {
+      const srcPath = path.join(uploadsDir, purchase.receipt_path);
+      if (fs.existsSync(srcPath)) {
+        const ext = path.extname(purchase.receipt_path);
+        expenseReceiptName = `${req.user.userId}-conv-${Date.now()}${ext}`;
+        try {
+          fs.copyFileSync(srcPath, path.join(uploadsDir, expenseReceiptName));
+        } catch (_err) {
+          expenseReceiptName = null;
+        }
+      }
+    }
+
     const expenseResult = await dbRun(
-      `INSERT INTO expenses (user_id, date_time, category, recipient, description, amount_paid, balance_due, status)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO expenses (user_id, date_time, category, recipient, description, amount_paid, balance_due, status, receipt_path)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         req.user.userId,
         dateTime,
@@ -1846,6 +1955,7 @@ app.post("/api/purchases/:id/convert", authenticateToken, async (req, res) => {
         amountPaid,
         balanceDue,
         status,
+        expenseReceiptName,
       ],
     );
 

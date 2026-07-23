@@ -751,6 +751,11 @@
                            <button class="text-green-600 hover:text-green-800 convert-purchase" data-id="${p.id}" title="Mark purchased"><i class="fas fa-check-circle"></i></button>`
                                 : ""
                         }
+                        ${
+                            p.receipt_path
+                                ? `<button class="text-gray-500 hover:text-gray-700 view-purchase-receipt" data-id="${p.id}" title="View receipt"><i class="fas fa-paperclip"></i></button>`
+                                : ""
+                        }
                         <button class="text-red-600 hover:text-red-800 delete-purchase" data-id="${p.id}" title="Remove"><i class="fas fa-trash"></i></button>
                     </td>
                 </tr>`;
@@ -825,6 +830,33 @@
                 $("#reportStatusTableBody").innerHTML = (data.byStatus || [])
                     .map((r) => rowHtml(r.status, r))
                     .join("") || '<tr><td colspan="5" class="p-3 text-center text-gray-500">No data for this filter.</td></tr>';
+
+                const txns = data.transactions || [];
+                $("#reportTransactionsTableBody").innerHTML = txns.length
+                    ? txns
+                          .map((t) => {
+                              const dt = t.date_time ? new Date(t.date_time).toLocaleDateString() : "-";
+                              const statusBadge =
+                                  Number(t.balance_due) > 0
+                                      ? '<span class="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Partial</span>'
+                                      : '<span class="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Paid</span>';
+                              return `
+            <tr class="border-b border-gray-100">
+                <td class="p-2">${escapeHtml(dt)}</td>
+                <td class="p-2">${escapeHtml(t.category || "-")}</td>
+                <td class="p-2">${escapeHtml(t.recipient || "-")}</td>
+                <td class="p-2">${fmtMoney(t.amount_paid)}</td>
+                <td class="p-2">${fmtMoney(t.balance_due)}</td>
+                <td class="p-2">${statusBadge}</td>
+                <td class="p-2">${
+                    t.receipt_path
+                        ? `<a href="#" class="report-receipt-link text-primary" data-id="${escapeHtml(String(t.id))}" title="View receipt"><i class="fas fa-paperclip"></i></a>`
+                        : '<span class="text-gray-300">—</span>'
+                }</td>
+            </tr>`;
+                          })
+                          .join("")
+                    : '<tr><td colspan="7" class="p-3 text-center text-gray-500">No transactions for this filter.</td></tr>';
 
                 $("#reportResults").classList.remove("hidden");
                 $("#reportEmptyState").classList.add("hidden");
@@ -1291,9 +1323,18 @@
                 hasFileEl.classList.toggle("flex", hasFile);
             }
 
-            async function openReceipt(id) {
+            function showPurchaseReceiptState(hasFile) {
+                const noFile = $("#purchaseReceiptNoFile");
+                const hasFileEl = $("#purchaseReceiptHasFile");
+                if (!noFile || !hasFileEl) return;
+                noFile.classList.toggle("hidden", hasFile);
+                hasFileEl.classList.toggle("hidden", !hasFile);
+                hasFileEl.classList.toggle("flex", hasFile);
+            }
+
+            async function openReceiptFor(resource, id) {
                 try {
-                    const res = await receiptFetch(`/expenses/${id}/receipt`);
+                    const res = await receiptFetch(`/${resource}/${id}/receipt`);
                     if (!res.ok) {
                         notify("Unable to load receipt", true);
                         return;
@@ -1304,6 +1345,9 @@
                 } catch (error) {
                     notify("Unable to load receipt", true);
                 }
+            }
+            function openReceipt(id) {
+                return openReceiptFor("expenses", id);
             }
 
             function renderExpenses() {
@@ -2176,6 +2220,15 @@
                 if ($("#generateReportBtn")) {
                     $("#generateReportBtn").addEventListener("click", generateReport);
                 }
+                if ($("#reportTransactionsTableBody")) {
+                    $("#reportTransactionsTableBody").addEventListener("click", (e) => {
+                        const link = e.target.closest(".report-receipt-link");
+                        if (!link) return;
+                        e.preventDefault();
+                        const id = link.dataset.id;
+                        if (id) openReceiptFor("expenses", id);
+                    });
+                }
                 if ($("#exportReportCsvBtn")) {
                     $("#exportReportCsvBtn").addEventListener("click", () => {
                         if (!lastReportData) {
@@ -2220,6 +2273,7 @@
                     $("#addPurchaseBtn").addEventListener("click", () => {
                         window.editingPurchaseId = null;
                         $("#purchaseForm").reset();
+                        $("#purchaseReceiptSection").classList.add("hidden");
                         openPurchaseModal("Add Purchase");
                     });
                 }
@@ -2241,6 +2295,9 @@
                     $("#purchasePriority").value = p.priority || "Medium";
                     $("#purchaseTargetDate").value = p.target_date || "";
                     $("#purchaseNotes").value = p.notes || "";
+                    $("#purchaseReceiptFileInput").value = "";
+                    $("#purchaseReceiptSection").classList.remove("hidden");
+                    showPurchaseReceiptState(Boolean(p.receipt_path));
                     openPurchaseModal("Edit Purchase");
                 };
 
@@ -2277,13 +2334,15 @@
 
                 if ($("#purchasesTableBody")) {
                     $("#purchasesTableBody").addEventListener("click", async (e) => {
-                        const btn = e.target.closest(".edit-purchase, .delete-purchase, .convert-purchase");
+                        const btn = e.target.closest(".edit-purchase, .delete-purchase, .convert-purchase, .view-purchase-receipt");
                         if (!btn) return;
                         const id = btn.dataset.id;
                         if (!id) return;
 
                         if (btn.classList.contains("edit-purchase")) {
                             window.editPurchase(id);
+                        } else if (btn.classList.contains("view-purchase-receipt")) {
+                            openReceiptFor("purchases", id);
                         } else if (btn.classList.contains("delete-purchase")) {
                             if (!confirm("Remove this purchase?")) return;
                             try {
@@ -2320,6 +2379,59 @@
                                 notify(error.message || "Unable to convert purchase", true);
                             }
                         }
+                    });
+                }
+
+                // Purchase receipt upload/view/remove (edit-purchase modal)
+                if ($("#uploadPurchaseReceiptBtn")) {
+                    $("#uploadPurchaseReceiptBtn").addEventListener("click", async () => {
+                        const fileInput = $("#purchaseReceiptFileInput");
+                        if (!fileInput.files.length) {
+                            notify("Choose a file first", true);
+                            return;
+                        }
+                        if (!window.editingPurchaseId) {
+                            notify("Save the purchase before attaching a receipt", true);
+                            return;
+                        }
+                        const formData = new FormData();
+                        formData.append("receipt", fileInput.files[0]);
+                        try {
+                            const res = await receiptFetch(
+                                `/purchases/${window.editingPurchaseId}/receipt`,
+                                { method: "POST", body: formData },
+                            );
+                            const data = await res.json();
+                            if (!res.ok) throw new Error(data.error || "Upload failed");
+                            notify("Receipt uploaded!");
+                            fileInput.value = "";
+                            showPurchaseReceiptState(true);
+                            await loadPurchases();
+                        } catch (error) {
+                            notify(error.message || "Unable to upload receipt", true);
+                        }
+                    });
+                }
+                if ($("#removePurchaseReceiptBtn")) {
+                    $("#removePurchaseReceiptBtn").addEventListener("click", async () => {
+                        if (!window.editingPurchaseId) return;
+                        if (!confirm("Remove this receipt?")) return;
+                        try {
+                            await apiCall(`/purchases/${window.editingPurchaseId}/receipt`, {
+                                method: "DELETE",
+                            });
+                            notify("Receipt removed");
+                            showPurchaseReceiptState(false);
+                            await loadPurchases();
+                        } catch (error) {
+                            notify("Unable to remove receipt", true);
+                        }
+                    });
+                }
+                if ($("#viewPurchaseReceiptLink")) {
+                    $("#viewPurchaseReceiptLink").addEventListener("click", (e) => {
+                        e.preventDefault();
+                        if (window.editingPurchaseId) openReceiptFor("purchases", window.editingPurchaseId);
                     });
                 }
 

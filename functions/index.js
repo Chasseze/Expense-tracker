@@ -940,6 +940,80 @@ app.delete('/api/purchases/:id', verifyToken, async (req, res) => {
 });
 
 // Convert a planned purchase into a real expense record.
+// Upload/replace a receipt for a purchase
+app.post('/api/purchases/:id/receipt', verifyToken, uploadReceiptMiddleware, async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    const purchaseRef = db.collection('users').doc(req.user.uid).collection('purchases').doc(req.params.id);
+    const doc = await purchaseRef.get();
+    if (!doc.exists) {
+      return res.status(404).json({ error: 'Purchase not found' });
+    }
+    const bucket = admin.storage().bucket();
+    const ext = RECEIPT_MIME_EXT[req.file.mimetype] || '';
+    const storagePath = `receipts/${req.user.uid}/purchase-${req.params.id}-${Date.now()}${ext}`;
+
+    const oldPath = doc.data().receipt_path;
+    if (oldPath) {
+      await bucket.file(oldPath).delete().catch(() => {});
+    }
+    await bucket.file(storagePath).save(req.file.buffer, {
+      contentType: req.file.mimetype,
+      metadata: { cacheControl: 'private, max-age=0' },
+    });
+
+    await purchaseRef.update({ receipt_path: storagePath });
+    res.json({ message: 'Receipt uploaded successfully', receipt_path: storagePath });
+  } catch (error) {
+    console.error('Upload purchase receipt error:', error);
+    res.status(500).json({ error: 'Unable to upload receipt. If this persists, confirm Firebase Storage is enabled for this project.' });
+  }
+});
+
+// Stream a purchase receipt back to its owner
+app.get('/api/purchases/:id/receipt', verifyToken, async (req, res) => {
+  try {
+    const doc = await db.collection('users').doc(req.user.uid).collection('purchases').doc(req.params.id).get();
+    const receiptPath = doc.exists ? doc.data().receipt_path : null;
+    if (!receiptPath) {
+      return res.status(404).json({ error: 'No receipt on file' });
+    }
+    const file = admin.storage().bucket().file(receiptPath);
+    const [exists] = await file.exists();
+    if (!exists) {
+      return res.status(404).json({ error: 'Receipt file missing' });
+    }
+    const [metadata] = await file.getMetadata();
+    res.setHeader('Content-Type', metadata.contentType || 'application/octet-stream');
+    file.createReadStream().on('error', () => res.status(500).end()).pipe(res);
+  } catch (error) {
+    console.error('Get purchase receipt error:', error);
+    res.status(500).json({ error: 'Unable to retrieve receipt' });
+  }
+});
+
+// Remove a receipt from a purchase
+app.delete('/api/purchases/:id/receipt', verifyToken, async (req, res) => {
+  try {
+    const purchaseRef = db.collection('users').doc(req.user.uid).collection('purchases').doc(req.params.id);
+    const doc = await purchaseRef.get();
+    if (!doc.exists) {
+      return res.status(404).json({ error: 'Purchase not found' });
+    }
+    const receiptPath = doc.data().receipt_path;
+    if (receiptPath) {
+      await admin.storage().bucket().file(receiptPath).delete().catch(() => {});
+    }
+    await purchaseRef.update({ receipt_path: admin.firestore.FieldValue.delete() });
+    res.json({ message: 'Receipt removed' });
+  } catch (error) {
+    console.error('Delete purchase receipt error:', error);
+    res.status(500).json({ error: 'Unable to remove receipt' });
+  }
+});
+
 app.post('/api/purchases/:id/convert', verifyToken, async (req, res) => {
   try {
     const purchaseRef = db.collection('users').doc(req.user.uid).collection('purchases').doc(req.params.id);
@@ -960,6 +1034,20 @@ app.post('/api/purchases/:id/convert', verifyToken, async (req, res) => {
     const status = balanceDue > 0 ? 'Partial' : 'Paid';
     const dateTime = req.body.date_time || new Date().toISOString().slice(0, 16).replace('T', ' ');
 
+    // Carry the purchase's receipt over to the new expense as its own copy.
+    let expenseReceiptPath = null;
+    if (purchase.receipt_path) {
+      try {
+        const bucket = admin.storage().bucket();
+        const ext = purchase.receipt_path.slice(purchase.receipt_path.lastIndexOf('.'));
+        const destPath = `receipts/${req.user.uid}/conv-${Date.now()}${ext.startsWith('.') ? ext : ''}`;
+        await bucket.file(purchase.receipt_path).copy(bucket.file(destPath));
+        expenseReceiptPath = destPath;
+      } catch (_err) {
+        expenseReceiptPath = null;
+      }
+    }
+
     const expenseRef = await db.collection('users').doc(req.user.uid).collection('expenses').add({
       date_time: dateTime,
       category: purchase.category || 'Uncategorized',
@@ -970,6 +1058,7 @@ app.post('/api/purchases/:id/convert', verifyToken, async (req, res) => {
       balance_due: balanceDue,
       status,
       due_date: null,
+      receipt_path: expenseReceiptPath,
       deleted_at: null,
       created_at: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -1049,7 +1138,7 @@ app.get('/api/reports', verifyToken, async (req, res) => {
     if (endDate) query = query.where('date_time', '<=', endDate + ' 23:59');
 
     const snapshot = await query.get();
-    let expenses = snapshot.docs.map(doc => doc.data()).filter(e => !e.deleted_at);
+    let expenses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(e => !e.deleted_at);
     if (category) expenses = expenses.filter(e => e.category === category);
     if (status) expenses = expenses.filter(e => e.status === status);
 
@@ -1081,7 +1170,23 @@ app.get('/api/reports', verifyToken, async (req, res) => {
       .map(r => ({ month: r.key, count: r.count, total_paid: r.total_paid, total_balance: r.total_balance }))
       .sort((a, b) => a.month.localeCompare(b.month));
 
-    res.json({ statistics, byCategory, byStatus, byMonth });
+    const transactions = expenses
+      .slice()
+      .sort((a, b) => String(b.date_time || '').localeCompare(String(a.date_time || '')))
+      .slice(0, 1000)
+      .map(e => ({
+        id: e.id,
+        date_time: e.date_time,
+        category: e.category,
+        recipient: e.recipient,
+        description: e.description,
+        amount_paid: e.amount_paid,
+        balance_due: e.balance_due,
+        status: e.status,
+        receipt_path: e.receipt_path || null,
+      }));
+
+    res.json({ statistics, byCategory, byStatus, byMonth, transactions });
   } catch (error) {
     console.error('Reports error:', error);
     res.status(500).json({ error: 'Internal server error' });
