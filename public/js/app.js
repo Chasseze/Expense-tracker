@@ -181,6 +181,7 @@
             const $ = (q) => document.querySelector(q);
             const notify = (msg, err = false) => {
                 const box = $("#notification");
+                if (!box) return;
                 box.className = `fixed bottom-4 right-4 ${err ? "bg-red-500" : "bg-green-500"} text-white px-6 py-3 rounded-lg shadow-lg`;
                 $("#notificationText").textContent = msg;
                 box.classList.remove("hidden");
