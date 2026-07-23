@@ -1045,6 +1045,39 @@
                 }
             }
 
+            async function receiptFetch(endpoint, options = {}) {
+                const token = await getSharedIdToken();
+                const headers = { ...(options.headers || {}) };
+                if (!window.appLocalOnly && token) {
+                    headers["Authorization"] = `Bearer ${token}`;
+                }
+                return fetch(`${API_BASE}${endpoint}`, { ...options, headers });
+            }
+
+            function showReceiptState(hasFile) {
+                const noFile = $("#receiptNoFile");
+                const hasFileEl = $("#receiptHasFile");
+                if (!noFile || !hasFileEl) return;
+                noFile.classList.toggle("hidden", hasFile);
+                hasFileEl.classList.toggle("hidden", !hasFile);
+                hasFileEl.classList.toggle("flex", hasFile);
+            }
+
+            async function openReceipt(id) {
+                try {
+                    const res = await receiptFetch(`/expenses/${id}/receipt`);
+                    if (!res.ok) {
+                        notify("Unable to load receipt", true);
+                        return;
+                    }
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    window.open(url, "_blank");
+                } catch (error) {
+                    notify("Unable to load receipt", true);
+                }
+            }
+
             function renderExpenses() {
                 const emptyExp = $("#emptyExpenseState");
                 const tblCont = $("#expenseTableContainer");
@@ -1075,6 +1108,11 @@
                     <td class="p-4 flex gap-2">
                         <button class="text-indigo-600 hover:text-indigo-800 edit-expense" data-id="${escapeHtml(String(expense.id))}"><i class="fas fa-edit"></i></button>
                         <button class="text-red-600 hover:text-red-800 delete-expense" data-id="${escapeHtml(String(expense.id))}"><i class="fas fa-trash"></i></button>
+                        ${
+                            expense.receipt_path
+                                ? `<button class="text-gray-500 hover:text-gray-700 view-receipt" data-id="${escapeHtml(String(expense.id))}" title="View receipt"><i class="fas fa-paperclip"></i></button>`
+                                : ""
+                        }
                     </td>
                 </tr>
             `,
@@ -1498,6 +1536,9 @@
                 $("#expenseBalanceDue").value = expense.balance_due;
                 $("#expenseDueDate").value = expense.due_date || "";
 
+                $("#receiptSection").classList.remove("hidden");
+                showReceiptState(Boolean(expense.receipt_path));
+
                 $("#expenseModalTitle").textContent = "Edit Expense";
                 $("#expenseModal").classList.remove("hidden");
                 window.editingExpenseId = id;
@@ -1766,6 +1807,7 @@
                         .toISOString()
                         .slice(0, 16);
                     $("#expenseModalTitle").textContent = "Add Expense";
+                    $("#receiptSection").classList.add("hidden");
                     $("#expenseModal").classList.remove("hidden");
                 });
 
@@ -1997,7 +2039,7 @@
                 if (expenseTBody) {
                     expenseTBody.addEventListener("click", (e) => {
                         const btn = e.target.closest(
-                            ".edit-expense, .delete-expense",
+                            ".edit-expense, .delete-expense, .view-receipt",
                         );
                         if (!btn) return;
                         const id = btn.dataset.id;
@@ -2006,7 +2048,62 @@
                             window.editExpense(id);
                         } else if (btn.classList.contains("delete-expense")) {
                             window.deleteExpense(id);
+                        } else if (btn.classList.contains("view-receipt")) {
+                            openReceipt(id);
                         }
+                    });
+                }
+
+                // Receipt upload/view/remove (edit-expense modal)
+                if ($("#uploadReceiptBtn")) {
+                    $("#uploadReceiptBtn").addEventListener("click", async () => {
+                        const fileInput = $("#receiptFileInput");
+                        if (!fileInput.files.length) {
+                            notify("Choose a file first", true);
+                            return;
+                        }
+                        if (!window.editingExpenseId) {
+                            notify("Save the expense before attaching a receipt", true);
+                            return;
+                        }
+                        const formData = new FormData();
+                        formData.append("receipt", fileInput.files[0]);
+                        try {
+                            const res = await receiptFetch(
+                                `/expenses/${window.editingExpenseId}/receipt`,
+                                { method: "POST", body: formData },
+                            );
+                            const data = await res.json();
+                            if (!res.ok) throw new Error(data.error || "Upload failed");
+                            notify("Receipt uploaded!");
+                            fileInput.value = "";
+                            showReceiptState(true);
+                            await loadData();
+                        } catch (error) {
+                            notify(error.message || "Unable to upload receipt", true);
+                        }
+                    });
+                }
+                if ($("#removeReceiptBtn")) {
+                    $("#removeReceiptBtn").addEventListener("click", async () => {
+                        if (!window.editingExpenseId) return;
+                        if (!confirm("Remove this receipt?")) return;
+                        try {
+                            await apiCall(`/expenses/${window.editingExpenseId}/receipt`, {
+                                method: "DELETE",
+                            });
+                            notify("Receipt removed");
+                            showReceiptState(false);
+                            await loadData();
+                        } catch (error) {
+                            notify("Unable to remove receipt", true);
+                        }
+                    });
+                }
+                if ($("#viewReceiptLink")) {
+                    $("#viewReceiptLink").addEventListener("click", (e) => {
+                        e.preventDefault();
+                        if (window.editingExpenseId) openReceipt(window.editingExpenseId);
                     });
                 }
 

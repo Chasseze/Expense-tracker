@@ -3,6 +3,7 @@ const { onSchedule } = require('firebase-functions/v2/scheduler');
 const admin = require('firebase-admin');
 const express = require('express');
 const cors = require('cors');
+const multer = require('multer');
 
 admin.initializeApp();
 
@@ -15,6 +16,33 @@ app.use(express.json());
 const db = admin.firestore();
 const auth = admin.auth();
 const FieldPath = admin.firestore.FieldPath;
+
+// Receipts: Cloud Functions have no persistent local filesystem across
+// invocations, so receipts go to Firebase Storage instead of disk (contrast
+// with server.js, the local-dev SQLite backend, which stores them on disk).
+const RECEIPT_MIME_EXT = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'image/gif': '.gif',
+  'application/pdf': '.pdf',
+};
+const receiptUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (!RECEIPT_MIME_EXT[file.mimetype]) {
+      return cb(new Error('Only JPEG, PNG, WEBP, GIF images or PDF files are allowed'));
+    }
+    cb(null, true);
+  },
+});
+function uploadReceiptMiddleware(req, res, next) {
+  receiptUpload.single('receipt')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message || 'Upload failed' });
+    next();
+  });
+}
 
 // Middleware to verify Firebase ID token
 async function verifyToken(req, res, next) {
@@ -432,6 +460,83 @@ app.delete('/api/expenses/:id/permanent', verifyToken, async (req, res) => {
   } catch (error) {
     console.error('Permanent delete error:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Upload/replace a receipt for an expense
+app.post('/api/expenses/:id/receipt', verifyToken, uploadReceiptMiddleware, async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    const expenseRef = db.collection('users').doc(req.user.uid).collection('expenses').doc(req.params.id);
+    const doc = await expenseRef.get();
+    if (!doc.exists) {
+      return res.status(404).json({ error: 'Expense not found' });
+    }
+
+    const bucket = admin.storage().bucket();
+    const ext = RECEIPT_MIME_EXT[req.file.mimetype] || '';
+    const storagePath = `receipts/${req.user.uid}/${req.params.id}-${Date.now()}${ext}`;
+
+    const oldPath = doc.data().receipt_path;
+    if (oldPath) {
+      await bucket.file(oldPath).delete().catch(() => {});
+    }
+
+    await bucket.file(storagePath).save(req.file.buffer, {
+      contentType: req.file.mimetype,
+      metadata: { cacheControl: 'private, max-age=0' },
+    });
+
+    await expenseRef.update({ receipt_path: storagePath });
+    res.json({ message: 'Receipt uploaded successfully', receipt_path: storagePath });
+  } catch (error) {
+    console.error('Upload receipt error:', error);
+    res.status(500).json({ error: 'Unable to upload receipt. If this persists, confirm Firebase Storage is enabled for this project.' });
+  }
+});
+
+// Stream a receipt back to its owner
+app.get('/api/expenses/:id/receipt', verifyToken, async (req, res) => {
+  try {
+    const doc = await db.collection('users').doc(req.user.uid).collection('expenses').doc(req.params.id).get();
+    const receiptPath = doc.exists ? doc.data().receipt_path : null;
+    if (!receiptPath) {
+      return res.status(404).json({ error: 'No receipt on file' });
+    }
+    const bucket = admin.storage().bucket();
+    const file = bucket.file(receiptPath);
+    const [exists] = await file.exists();
+    if (!exists) {
+      return res.status(404).json({ error: 'Receipt file missing' });
+    }
+    const [metadata] = await file.getMetadata();
+    res.setHeader('Content-Type', metadata.contentType || 'application/octet-stream');
+    file.createReadStream().on('error', () => res.status(500).end()).pipe(res);
+  } catch (error) {
+    console.error('Get receipt error:', error);
+    res.status(500).json({ error: 'Unable to retrieve receipt' });
+  }
+});
+
+// Remove a receipt from an expense
+app.delete('/api/expenses/:id/receipt', verifyToken, async (req, res) => {
+  try {
+    const expenseRef = db.collection('users').doc(req.user.uid).collection('expenses').doc(req.params.id);
+    const doc = await expenseRef.get();
+    if (!doc.exists) {
+      return res.status(404).json({ error: 'Expense not found' });
+    }
+    const receiptPath = doc.data().receipt_path;
+    if (receiptPath) {
+      await admin.storage().bucket().file(receiptPath).delete().catch(() => {});
+    }
+    await expenseRef.update({ receipt_path: admin.firestore.FieldValue.delete() });
+    res.json({ message: 'Receipt removed' });
+  } catch (error) {
+    console.error('Delete receipt error:', error);
+    res.status(500).json({ error: 'Unable to remove receipt' });
   }
 });
 

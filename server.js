@@ -5,7 +5,9 @@ const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const path = require("path");
+const fs = require("fs");
 const compression = require("compression");
+const multer = require("multer");
 
 let sqlite3;
 let createClient;
@@ -63,6 +65,48 @@ const dbPath =
     : "./expense_tracker.db";
 let db;
 let ftsHasBm25 = false;
+
+// Receipt storage: local disk next to the database. This server (SQLite/local
+// dev) is not the production backend — see functions/index.js, which stores
+// receipts in Firebase Storage instead since Cloud Functions have no
+// persistent local filesystem across invocations.
+const uploadsDir =
+  process.env.NODE_ENV === "production"
+    ? "/tmp/uploads/receipts"
+    : path.join(__dirname, "uploads", "receipts");
+fs.mkdirSync(uploadsDir, { recursive: true });
+
+const RECEIPT_MIME_EXT = {
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "image/webp": ".webp",
+  "image/gif": ".gif",
+  "application/pdf": ".pdf",
+};
+
+const receiptUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, uploadsDir),
+    filename: (req, file, cb) => {
+      const ext = RECEIPT_MIME_EXT[file.mimetype] || "";
+      cb(null, `${req.user.userId}-${req.params.id}-${Date.now()}${ext}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (!RECEIPT_MIME_EXT[file.mimetype]) {
+      return cb(new Error("Only JPEG, PNG, WEBP, GIF images or PDF files are allowed"));
+    }
+    cb(null, true);
+  },
+});
+
+function uploadReceiptMiddleware(req, res, next) {
+  receiptUpload.single("receipt")(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message || "Upload failed" });
+    next();
+  });
+}
 
 // Development auth toggle: set DISABLE_AUTH=1 to explicitly disable auth checks.
 // Auth is ENABLED by default in all environments; opt-out is explicit.
@@ -1104,6 +1148,81 @@ app.delete("/api/expenses/:id/permanent", authenticateToken, async (req, res) =>
   } catch (error) {
     console.error("Permanent delete error:", error);
     res.status(500).json({ error: "Unable to permanently delete expense. Please try again." });
+  }
+});
+
+app.post(
+  "/api/expenses/:id/receipt",
+  authenticateToken,
+  uploadReceiptMiddleware,
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+      const rows = await dbAll(
+        "SELECT id, receipt_path FROM expenses WHERE id = ? AND user_id = ?",
+        [req.params.id, req.user.userId],
+      );
+      if (!rows.length) {
+        fs.unlink(req.file.path, () => {});
+        return res.status(404).json({ error: "Expense not found" });
+      }
+      if (rows[0].receipt_path) {
+        fs.unlink(path.join(uploadsDir, rows[0].receipt_path), () => {});
+      }
+      await dbRun(
+        "UPDATE expenses SET receipt_path = ? WHERE id = ? AND user_id = ?",
+        [req.file.filename, req.params.id, req.user.userId],
+      );
+      res.json({ message: "Receipt uploaded successfully", receipt_path: req.file.filename });
+    } catch (error) {
+      console.error("Upload receipt error:", error);
+      res.status(500).json({ error: "Unable to upload receipt" });
+    }
+  },
+);
+
+app.get("/api/expenses/:id/receipt", authenticateToken, async (req, res) => {
+  try {
+    const rows = await dbAll(
+      "SELECT receipt_path FROM expenses WHERE id = ? AND user_id = ?",
+      [req.params.id, req.user.userId],
+    );
+    if (!rows.length || !rows[0].receipt_path) {
+      return res.status(404).json({ error: "No receipt on file" });
+    }
+    const filePath = path.join(uploadsDir, rows[0].receipt_path);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: "Receipt file missing" });
+    }
+    res.sendFile(filePath);
+  } catch (error) {
+    console.error("Get receipt error:", error);
+    res.status(500).json({ error: "Unable to retrieve receipt" });
+  }
+});
+
+app.delete("/api/expenses/:id/receipt", authenticateToken, async (req, res) => {
+  try {
+    const rows = await dbAll(
+      "SELECT receipt_path FROM expenses WHERE id = ? AND user_id = ?",
+      [req.params.id, req.user.userId],
+    );
+    if (!rows.length) {
+      return res.status(404).json({ error: "Expense not found" });
+    }
+    if (rows[0].receipt_path) {
+      fs.unlink(path.join(uploadsDir, rows[0].receipt_path), () => {});
+    }
+    await dbRun(
+      "UPDATE expenses SET receipt_path = NULL WHERE id = ? AND user_id = ?",
+      [req.params.id, req.user.userId],
+    );
+    res.json({ message: "Receipt removed" });
+  } catch (error) {
+    console.error("Delete receipt error:", error);
+    res.status(500).json({ error: "Unable to remove receipt" });
   }
 });
 

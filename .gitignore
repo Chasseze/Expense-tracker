@@ -1,5 +1,6 @@
 node_modules/
 backups/
+uploads/
 
 # Firebase service account (NEVER commit!)
 serviceAccountKey.json
