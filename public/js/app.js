@@ -690,6 +690,166 @@
                 }
             }
 
+            function fillReportCategoryOptions() {
+                const select = document.querySelector("#reportCategory");
+                if (!select) return;
+                const categories = getAllCategories();
+                const current = select.value;
+                select.innerHTML =
+                    '<option value="">All categories</option>' +
+                    categories
+                        .map((cat) => `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`)
+                        .join("");
+                if (current) select.value = current;
+            }
+
+            let lastReportData = null;
+
+            async function generateReport() {
+                const qs = new URLSearchParams();
+                const start = $("#reportStartDate").value;
+                const end = $("#reportEndDate").value;
+                const category = $("#reportCategory").value;
+                const status = $("#reportStatus").value;
+                if (start) qs.set("startDate", start);
+                if (end) qs.set("endDate", end);
+                if (category) qs.set("category", category);
+                if (status) qs.set("status", status);
+
+                try {
+                    const data = await apiCall(`/reports?${qs.toString()}`);
+                    lastReportData = data;
+                    renderReport(data);
+                } catch (error) {
+                    notify("Unable to generate report", true);
+                }
+            }
+
+            function renderReport(data) {
+                const stats = data.statistics || {};
+                $("#reportSummaryCards").innerHTML = `
+            <div class="summary-card summary-paid">
+                <div class="meta"><p class="label">Total Paid</p><p class="value">${fmtMoney(stats.total_paid)}</p></div>
+                <i class="fas fa-money-bill-wave"></i>
+            </div>
+            <div class="summary-card summary-balance">
+                <div class="meta"><p class="label">Total Balance Due</p><p class="value">${fmtMoney(stats.total_balance)}</p></div>
+                <i class="fas fa-calendar-minus"></i>
+            </div>
+            <div class="summary-card summary-total">
+                <div class="meta"><p class="label">Total Expenses</p><p class="value">${stats.total_expenses || 0}</p></div>
+                <i class="fas fa-file-invoice-dollar"></i>
+            </div>`;
+
+                const rowHtml = (label, r) => `
+            <tr>
+                <td class="p-2 font-medium">${escapeHtml(String(label))}</td>
+                <td class="p-2">${r.count}</td>
+                <td class="p-2">${fmtMoney(r.total_paid)}</td>
+                <td class="p-2">${fmtMoney(r.total_balance)}</td>
+                <td class="p-2 font-medium">${fmtMoney((Number(r.total_paid) || 0) + (Number(r.total_balance) || 0))}</td>
+            </tr>`;
+
+                $("#reportCategoryTableBody").innerHTML = (data.byCategory || [])
+                    .map((r) => rowHtml(r.category, r))
+                    .join("") || '<tr><td colspan="5" class="p-3 text-center text-gray-500">No data for this filter.</td></tr>';
+
+                $("#reportStatusTableBody").innerHTML = (data.byStatus || [])
+                    .map((r) => rowHtml(r.status, r))
+                    .join("") || '<tr><td colspan="5" class="p-3 text-center text-gray-500">No data for this filter.</td></tr>';
+
+                $("#reportResults").classList.remove("hidden");
+                $("#reportEmptyState").classList.add("hidden");
+            }
+
+            function reportToCsv(data) {
+                const escapeCsv = (val) => {
+                    if (val === null || val === undefined) return "";
+                    const str = String(val);
+                    if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+                        return '"' + str.replace(/"/g, '""') + '"';
+                    }
+                    return str;
+                };
+                const lines = [];
+                const stats = data.statistics || {};
+                lines.push("Summary");
+                lines.push(`Total Paid,${stats.total_paid || 0}`);
+                lines.push(`Total Balance Due,${stats.total_balance || 0}`);
+                lines.push(`Total Expenses,${stats.total_expenses || 0}`);
+                lines.push("");
+                lines.push("By Category");
+                lines.push("Category,Entries,Paid,Balance Due,Total");
+                (data.byCategory || []).forEach((r) => {
+                    lines.push(`${escapeCsv(r.category)},${r.count},${r.total_paid},${r.total_balance},${(Number(r.total_paid) || 0) + (Number(r.total_balance) || 0)}`);
+                });
+                lines.push("");
+                lines.push("By Status");
+                lines.push("Status,Entries,Paid,Balance Due,Total");
+                (data.byStatus || []).forEach((r) => {
+                    lines.push(`${escapeCsv(r.status)},${r.count},${r.total_paid},${r.total_balance},${(Number(r.total_paid) || 0) + (Number(r.total_balance) || 0)}`);
+                });
+                return lines.join("\n");
+            }
+
+            async function ensureJsPDF() {
+                if (window.jspdf && window.jspdf.jsPDF) return true;
+                if (window._jsPdfLoading) return window._jsPdfLoading;
+                window._jsPdfLoading = new Promise((resolve, reject) => {
+                    const s = document.createElement("script");
+                    s.src = "https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js";
+                    s.async = true;
+                    s.onload = () => resolve(true);
+                    s.onerror = () => reject(new Error("Failed to load PDF library"));
+                    document.head.appendChild(s);
+                }).catch((err) => {
+                    console.warn(err);
+                    return false;
+                });
+                return window._jsPdfLoading;
+            }
+
+            async function exportReportPdf(data) {
+                const ready = await ensureJsPDF();
+                if (!ready || !window.jspdf) {
+                    notify("Unable to load PDF library", true);
+                    return;
+                }
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                const stats = data.statistics || {};
+                let y = 15;
+                doc.setFontSize(16);
+                doc.text("Expense Report", 14, y);
+                y += 10;
+                doc.setFontSize(11);
+                doc.text(`Total Paid: ${fmtMoney(stats.total_paid)}`, 14, y); y += 7;
+                doc.text(`Total Balance Due: ${fmtMoney(stats.total_balance)}`, 14, y); y += 7;
+                doc.text(`Total Expenses: ${stats.total_expenses || 0}`, 14, y); y += 12;
+
+                doc.setFontSize(13);
+                doc.text("By Category", 14, y); y += 7;
+                doc.setFontSize(10);
+                (data.byCategory || []).forEach((r) => {
+                    const total = (Number(r.total_paid) || 0) + (Number(r.total_balance) || 0);
+                    doc.text(`${r.category}: ${r.count} entries, ${fmtMoney(total)}`, 16, y);
+                    y += 6;
+                    if (y > 280) { doc.addPage(); y = 15; }
+                });
+                y += 6;
+                doc.setFontSize(13);
+                doc.text("By Status", 14, y); y += 7;
+                doc.setFontSize(10);
+                (data.byStatus || []).forEach((r) => {
+                    const total = (Number(r.total_paid) || 0) + (Number(r.total_balance) || 0);
+                    doc.text(`${r.status}: ${r.count} entries, ${fmtMoney(total)}`, 16, y);
+                    y += 6;
+                    if (y > 280) { doc.addPage(); y = 15; }
+                });
+
+                doc.save(`expense-report-${new Date().toISOString().slice(0, 10)}.pdf`);
+            }
+
             function renderCategoriesList() {
                 const container = document.querySelector("#categoriesList");
                 if (!container) return;
@@ -1937,6 +2097,42 @@
                         }
                     }
                 });
+
+                // Reports tab controls
+                const reportsNavBtn = document.querySelector('.sidebar-nav-btn[data-view="reports"]');
+                if (reportsNavBtn) {
+                    reportsNavBtn.addEventListener("click", () => {
+                        fillReportCategoryOptions();
+                    });
+                }
+                if ($("#generateReportBtn")) {
+                    $("#generateReportBtn").addEventListener("click", generateReport);
+                }
+                if ($("#exportReportCsvBtn")) {
+                    $("#exportReportCsvBtn").addEventListener("click", () => {
+                        if (!lastReportData) {
+                            notify("Generate a report first", true);
+                            return;
+                        }
+                        const csv = reportToCsv(lastReportData);
+                        const blob = new Blob([csv], { type: "text/csv" });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `expense-report-${new Date().toISOString().slice(0, 10)}.csv`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                    });
+                }
+                if ($("#exportReportPdfBtn")) {
+                    $("#exportReportPdfBtn").addEventListener("click", () => {
+                        if (!lastReportData) {
+                            notify("Generate a report first", true);
+                            return;
+                        }
+                        exportReportPdf(lastReportData);
+                    });
+                }
 
                 // Recurring modal controls
                 $("#manageRecurringBtn").addEventListener("click", () => {

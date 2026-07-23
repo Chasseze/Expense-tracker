@@ -900,6 +900,54 @@ app.delete('/api/categories/:name', verifyToken, async (req, res) => {
 });
 
 // Dashboard statistics
+// Reports: filtered totals + breakdowns over a date range
+app.get('/api/reports', verifyToken, async (req, res) => {
+  try {
+    const { startDate, endDate, category, status } = req.query;
+    let query = db.collection('users').doc(req.user.uid).collection('expenses');
+    if (startDate) query = query.where('date_time', '>=', startDate);
+    if (endDate) query = query.where('date_time', '<=', endDate + ' 23:59');
+
+    const snapshot = await query.get();
+    let expenses = snapshot.docs.map(doc => doc.data()).filter(e => !e.deleted_at);
+    if (category) expenses = expenses.filter(e => e.category === category);
+    if (status) expenses = expenses.filter(e => e.status === status);
+
+    const statistics = {
+      total_expenses: expenses.length,
+      total_paid: expenses.reduce((sum, e) => sum + (Number(e.amount_paid) || 0), 0),
+      total_balance: expenses.reduce((sum, e) => sum + (Number(e.balance_due) || 0), 0),
+      total_cost: expenses.reduce((sum, e) => sum + (Number(e.amount_paid) || 0) + (Number(e.balance_due) || 0), 0),
+    };
+
+    const groupBy = (keyFn) => {
+      const map = {};
+      expenses.forEach(e => {
+        const key = keyFn(e);
+        if (!key) return;
+        if (!map[key]) map[key] = { key, count: 0, total_paid: 0, total_balance: 0 };
+        map[key].count++;
+        map[key].total_paid += Number(e.amount_paid) || 0;
+        map[key].total_balance += Number(e.balance_due) || 0;
+      });
+      return Object.values(map);
+    };
+
+    const byCategory = groupBy(e => e.category).map(r => ({ category: r.key, count: r.count, total_paid: r.total_paid, total_balance: r.total_balance }))
+      .sort((a, b) => a.category.localeCompare(b.category));
+    const byStatus = groupBy(e => e.status).map(r => ({ status: r.key, count: r.count, total_paid: r.total_paid, total_balance: r.total_balance }))
+      .sort((a, b) => a.status.localeCompare(b.status));
+    const byMonth = groupBy(e => (e.date_time ? String(e.date_time).slice(0, 7) : null))
+      .map(r => ({ month: r.key, count: r.count, total_paid: r.total_paid, total_balance: r.total_balance }))
+      .sort((a, b) => a.month.localeCompare(b.month));
+
+    res.json({ statistics, byCategory, byStatus, byMonth });
+  } catch (error) {
+    console.error('Reports error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 app.get('/api/dashboard', verifyToken, async (req, res) => {
   try {
     const { startDate, endDate } = req.query;

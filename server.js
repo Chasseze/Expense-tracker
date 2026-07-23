@@ -1339,6 +1339,70 @@ app.delete("/api/blog-posts/:id", authenticateToken, async (req, res) => {
 });
 
 // Dashboard statistics
+app.get("/api/reports", authenticateToken, async (req, res) => {
+  try {
+    const { startDate, endDate, category, status } = req.query;
+    const conditions = ["user_id = ?", "deleted_at IS NULL"];
+    const params = [req.user.userId];
+
+    if (startDate) {
+      conditions.push("date_time >= ?");
+      params.push(formatDateTimeBoundary(startDate, "start"));
+    }
+    if (endDate) {
+      conditions.push("date_time <= ?");
+      params.push(formatDateTimeBoundary(endDate, "end"));
+    }
+    if (category) {
+      conditions.push("category = ?");
+      params.push(category);
+    }
+    if (status) {
+      conditions.push("status = ?");
+      params.push(status);
+    }
+    const where = `WHERE ${conditions.join(" AND ")}`;
+
+    const stats = await dbAll(
+      `SELECT
+                COUNT(*) as total_expenses,
+                SUM(amount_paid) as total_paid,
+                SUM(balance_due) as total_balance,
+                SUM(amount_paid + balance_due) as total_cost
+             FROM expenses ${where}`,
+      params,
+    );
+
+    const byCategory = await dbAll(
+      `SELECT category, COUNT(*) as count, SUM(amount_paid) as total_paid, SUM(balance_due) as total_balance
+             FROM expenses ${where} GROUP BY category ORDER BY category`,
+      params,
+    );
+
+    const byStatus = await dbAll(
+      `SELECT status, COUNT(*) as count, SUM(amount_paid) as total_paid, SUM(balance_due) as total_balance
+             FROM expenses ${where} GROUP BY status ORDER BY status`,
+      params,
+    );
+
+    const byMonth = await dbAll(
+      `SELECT strftime('%Y-%m', date_time) as month, COUNT(*) as count, SUM(amount_paid) as total_paid, SUM(balance_due) as total_balance
+             FROM expenses ${where} GROUP BY strftime('%Y-%m', date_time) ORDER BY month ASC`,
+      params,
+    );
+
+    res.json({
+      statistics: stats[0] || { total_expenses: 0, total_paid: 0, total_balance: 0, total_cost: 0 },
+      byCategory,
+      byStatus,
+      byMonth,
+    });
+  } catch (error) {
+    console.error("Reports error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 app.get("/api/dashboard", authenticateToken, async (req, res) => {
   try {
     const { startDate, endDate } = req.query;

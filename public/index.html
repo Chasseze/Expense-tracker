@@ -178,6 +178,10 @@
                             <i class="fas fa-receipt sb-icon"></i>
                             <span class="sb-label">Expenses</span>
                         </button>
+                        <button class="sidebar-nav-btn" data-view="reports">
+                            <i class="fas fa-chart-bar sb-icon"></i>
+                            <span class="sb-label">Reports</span>
+                        </button>
                         <hr class="sidebar-hr">
                         <div class="sidebar-section-label">Actions</div>
                         <button class="sidebar-nav-btn primary" id="addExpenseBtn" aria-label="Add expense">
@@ -393,6 +397,83 @@
                                 </div>
                             </div>
                         </section>
+                    </div>
+
+                    <!-- VIEW: REPORTS -->
+                    <div id="view-reports" class="app-view">
+                        <div class="view-topbar">
+                            <div>
+                                <h2 class="view-heading"><i class="fas fa-chart-bar"></i> Reports</h2>
+                                <p class="view-sub">Build a filtered summary for any period</p>
+                            </div>
+                        </div>
+                        <section class="card reports-filter-card">
+                            <div class="reports-filter-grid">
+                                <label class="reports-filter-field">From
+                                    <input type="date" id="reportStartDate" />
+                                </label>
+                                <label class="reports-filter-field">To
+                                    <input type="date" id="reportEndDate" />
+                                </label>
+                                <label class="reports-filter-field">Category
+                                    <select id="reportCategory"><option value="">All categories</option></select>
+                                </label>
+                                <label class="reports-filter-field">Status
+                                    <select id="reportStatus">
+                                        <option value="">All statuses</option>
+                                        <option value="Paid">Paid</option>
+                                        <option value="Partial">Partial</option>
+                                    </select>
+                                </label>
+                                <button id="generateReportBtn" type="button" class="btn-accent-sm">Generate</button>
+                            </div>
+                        </section>
+
+                        <div id="reportResults" class="hidden">
+                            <div class="summary-grid" id="reportSummaryCards"></div>
+
+                            <section class="card reports-table-card">
+                                <h3>By Category</h3>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-sm text-gray-700">
+                                        <thead>
+                                            <tr class="text-left border-b">
+                                                <th class="p-2">Category</th>
+                                                <th class="p-2">Entries</th>
+                                                <th class="p-2">Paid</th>
+                                                <th class="p-2">Balance Due</th>
+                                                <th class="p-2">Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="reportCategoryTableBody"></tbody>
+                                    </table>
+                                </div>
+                            </section>
+
+                            <section class="card reports-table-card">
+                                <h3>By Status</h3>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-sm text-gray-700">
+                                        <thead>
+                                            <tr class="text-left border-b">
+                                                <th class="p-2">Status</th>
+                                                <th class="p-2">Entries</th>
+                                                <th class="p-2">Paid</th>
+                                                <th class="p-2">Balance Due</th>
+                                                <th class="p-2">Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="reportStatusTableBody"></tbody>
+                                    </table>
+                                </div>
+                            </section>
+
+                            <div class="reports-export-row">
+                                <button id="exportReportCsvBtn" type="button" class="btn-ghost-sm"><i class="fas fa-file-csv"></i> Export CSV</button>
+                                <button id="exportReportPdfBtn" type="button" class="btn-ghost-sm"><i class="fas fa-file-pdf"></i> Export PDF</button>
+                            </div>
+                        </div>
+                        <p id="reportEmptyState" class="muted">Choose a date range and click Generate to build a report.</p>
                     </div>
 
 </main>
