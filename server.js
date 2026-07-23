@@ -1758,11 +1758,11 @@ app.get("/api/purchases/reports", authenticateToken, async (req, res) => {
     const params = [req.user.userId];
 
     if (startDate) {
-      conditions.push("target_date >= ?");
+      conditions.push("(target_date IS NULL OR target_date >= ?)");
       params.push(startDate);
     }
     if (endDate) {
-      conditions.push("target_date <= ?");
+      conditions.push("(target_date IS NULL OR target_date <= ?)");
       params.push(endDate);
     }
     if (category) {

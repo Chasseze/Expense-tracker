@@ -1637,6 +1637,34 @@ body.theme-dark .cat-summary-total { color: #e2e8f0; }
     margin: 0 0 0.85rem;
 }
 body.theme-dark .report-print-area { background: transparent; }
+.report-mode-toggle {
+    display: inline-flex;
+    gap: 0.25rem;
+    padding: 0.2rem;
+    border-radius: 0.65rem;
+    background: var(--bg-2, #f1f5f9);
+    border: 1px solid var(--border, #e2e8f0);
+}
+.report-mode-btn {
+    border: none;
+    background: transparent;
+    color: var(--text-muted, #64748b);
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 0.45rem 0.85rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+}
+.report-mode-btn.active {
+    background: #fff;
+    color: var(--text, #0f172a);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+body.theme-dark .report-mode-toggle { background: rgba(255,255,255,0.06); }
+body.theme-dark .report-mode-btn.active {
+    background: rgba(255,255,255,0.12);
+    color: #f8fafc;
+}
 body.theme-dark .reports-filter-field select,
 body.theme-dark .reports-filter-field input {
     background: #111827; border-color: #1f2937; color: #e5e7eb;

@@ -870,10 +870,10 @@ app.get('/api/purchases/reports', verifyToken, async (req, res) => {
     let purchases = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
     if (startDate) {
-      purchases = purchases.filter(p => p.target_date && String(p.target_date) >= startDate);
+      purchases = purchases.filter(p => !p.target_date || String(p.target_date) >= startDate);
     }
     if (endDate) {
-      purchases = purchases.filter(p => p.target_date && String(p.target_date) <= endDate);
+      purchases = purchases.filter(p => !p.target_date || String(p.target_date) <= endDate);
     }
     if (category) purchases = purchases.filter(p => p.category === category);
     if (status) purchases = purchases.filter(p => p.status === status);

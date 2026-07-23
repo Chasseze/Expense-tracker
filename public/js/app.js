@@ -828,7 +828,8 @@
                     lastPurchaseReportData = data;
                     renderPurchaseReport(data);
                 } catch (error) {
-                    notify("Unable to generate purchase report", true);
+                    console.error("Purchase report failed:", error);
+                    notify(error.message || "Unable to generate purchase report", true);
                 }
             }
 
@@ -1489,8 +1490,10 @@
             function setPurchaseReceiptAddMode(isAdd) {
                 const btn = $("#uploadPurchaseReceiptBtn");
                 const hint = $("#purchaseReceiptAddHint");
+                // Add: file is staged and uploaded on save — hide the immediate Upload btn.
+                // Edit: Upload applies right away to the existing purchase.
                 if (btn) btn.classList.toggle("hidden", isAdd);
-                if (hint) hint.classList.toggle("hidden", !isAdd);
+                if (hint) hint.classList.toggle("hidden", false);
             }
 
             function showPurchaseReceiptState(hasFile) {
@@ -2380,11 +2383,45 @@
                     }
                 });
 
-                // Reports tab controls
+                // Reports tab controls — Expense and Purchase are separate panels
+                function setReportMode(mode) {
+                    const isPurchase = mode === "purchase";
+                    const expensePanel = $("#expenseReportPanel");
+                    const purchasePanel = $("#purchaseReportPanel");
+                    if (expensePanel) expensePanel.classList.toggle("hidden", isPurchase);
+                    if (purchasePanel) purchasePanel.classList.toggle("hidden", !isPurchase);
+                    const expenseBtn = $("#reportModeExpenseBtn");
+                    const purchaseBtn = $("#reportModePurchaseBtn");
+                    if (expenseBtn) {
+                        expenseBtn.classList.toggle("active", !isPurchase);
+                        expenseBtn.setAttribute("aria-selected", String(!isPurchase));
+                    }
+                    if (purchaseBtn) {
+                        purchaseBtn.classList.toggle("active", isPurchase);
+                        purchaseBtn.setAttribute("aria-selected", String(isPurchase));
+                    }
+                    if (isPurchase) fillPurchaseReportCategoryOptions();
+                    else fillReportCategoryOptions();
+                }
+
                 const reportsNavBtn = document.querySelector('.sidebar-nav-btn[data-view="reports"]');
                 if (reportsNavBtn) {
                     reportsNavBtn.addEventListener("click", () => {
                         fillReportCategoryOptions();
+                        fillPurchaseReportCategoryOptions();
+                    });
+                }
+                if ($("#reportModeExpenseBtn")) {
+                    $("#reportModeExpenseBtn").addEventListener("click", () => setReportMode("expense"));
+                }
+                if ($("#reportModePurchaseBtn")) {
+                    $("#reportModePurchaseBtn").addEventListener("click", () => setReportMode("purchase"));
+                }
+                if ($("#gotoPurchaseReportBtn")) {
+                    $("#gotoPurchaseReportBtn").addEventListener("click", () => {
+                        const sideBtn = document.querySelector('.sidebar-nav-btn[data-view="reports"]');
+                        if (sideBtn) sideBtn.click();
+                        setReportMode("purchase");
                     });
                 }
                 if ($("#generateReportBtn")) {
@@ -2421,7 +2458,6 @@
                 if (purchasesNavBtn) {
                     purchasesNavBtn.addEventListener("click", () => {
                         loadPurchases();
-                        fillPurchaseReportCategoryOptions();
                     });
                 }
 
