@@ -938,6 +938,64 @@ app.put('/api/recurring/:id', verifyToken, async (req, res) => {
   }
 });
 
+// Settle one occurrence of a recurring template: record it as a real expense
+// (fully or partially paid) and advance the template's next run date one cycle.
+app.post('/api/recurring/:id/settle', verifyToken, async (req, res) => {
+  try {
+    const tplRef = db.collection('users').doc(req.user.uid).collection('recurring_templates').doc(req.params.id);
+    const tplDoc = await tplRef.get();
+    if (!tplDoc.exists) {
+      return res.status(404).json({ error: 'Recurring expense not found' });
+    }
+    const tpl = tplDoc.data();
+
+    const total = (Number(tpl.amount_paid) || 0) + (Number(tpl.balance_due) || 0);
+    let paidNow = total;
+    if (req.body && req.body.amount_paid != null) {
+      paidNow = Number(req.body.amount_paid);
+      if (isNaN(paidNow) || paidNow < 0) {
+        return res.status(400).json({ error: 'Invalid amount value' });
+      }
+      if (paidNow > total) {
+        return res.status(400).json({ error: 'Amount exceeds the scheduled total' });
+      }
+    }
+    const balanceLeft = Math.max(total - paidNow, 0);
+    const status = balanceLeft > 0 ? 'Partial' : 'Paid';
+
+    const now = new Date().toISOString().slice(0, 16).replace('T', ' ');
+    await db.collection('users').doc(req.user.uid).collection('expenses').add({
+      date_time: now,
+      category: tpl.category,
+      session_term: tpl.session_term || '',
+      recipient: tpl.recipient,
+      description: tpl.description,
+      amount_paid: paidNow,
+      balance_due: balanceLeft,
+      status,
+      due_date: null,
+      recurring_template_id: tplDoc.id,
+      deleted_at: null,
+      created_at: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    const nextRun = advanceDate(tpl.next_run_date, tpl.frequency);
+    await tplRef.update({
+      next_run_date: nextRun,
+      last_generated_at: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    res.json({
+      message: status === 'Paid' ? 'Marked as paid' : 'Marked as partially paid',
+      status,
+      next_run_date: nextRun,
+    });
+  } catch (error) {
+    console.error('Settle recurring template error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Delete recurring template
 app.delete('/api/recurring/:id', verifyToken, async (req, res) => {
   try {
@@ -1490,46 +1548,9 @@ app.post('/api/auth/refresh', verifyToken, (req, res) => {
 // Export the Express app as a Cloud Function
 exports.api = functions.https.onRequest(app);
 
-// Scheduled job: generate due expenses from active recurring templates across all users.
+// Recurring expenses no longer auto-generate: due templates wait in the UI until
+// the user settles them via POST /api/recurring/:id/settle. The scheduled export is
+// kept as a no-op so deploys don't prompt to delete the existing Cloud Function.
 exports.generateRecurringExpenses = onSchedule('every 24 hours', async () => {
-  const today = new Date().toISOString().slice(0, 10);
-  const dueSnapshot = await db.collectionGroup('recurring_templates')
-    .where('active', '==', true)
-    .where('next_run_date', '<=', today)
-    .get();
-
-  for (const doc of dueSnapshot.docs) {
-    const tpl = doc.data();
-    const expensesRef = doc.ref.parent.parent.collection('expenses');
-    let nextRun = tpl.next_run_date;
-    let iterations = 0;
-    // Catch up if a scheduled run was missed across one or more occurrences, capped to avoid runaway loops.
-    while (nextRun <= today && iterations < 12) {
-      const status = Number(tpl.balance_due) > 0 ? 'Partial' : 'Paid';
-      await expensesRef.add({
-        date_time: `${nextRun} 09:00`,
-        category: tpl.category,
-        session_term: tpl.session_term || '',
-        recipient: tpl.recipient,
-        description: tpl.description,
-        amount_paid: tpl.amount_paid,
-        balance_due: tpl.balance_due,
-        status,
-        due_date: null,
-        recurring_template_id: doc.id,
-        deleted_at: null,
-        created_at: admin.firestore.FieldValue.serverTimestamp(),
-      });
-      nextRun = advanceDate(nextRun, tpl.frequency);
-      iterations += 1;
-    }
-    await doc.ref.update({
-      next_run_date: nextRun,
-      last_generated_at: admin.firestore.FieldValue.serverTimestamp(),
-    });
-  }
-
-  if (dueSnapshot.size) {
-    console.log(`Recurring: generated occurrences for ${dueSnapshot.size} template(s).`);
-  }
+  console.log('Recurring auto-generation disabled; occurrences are settled manually from the app.');
 });

@@ -604,19 +604,31 @@
                         '<tr><td colspan="7" class="p-4 text-center text-gray-500">No recurring expenses yet.</td></tr>';
                     return;
                 }
+                const today = new Date().toISOString().slice(0, 10);
                 tbody.innerHTML = recurringTemplates
                     .map((tpl) => {
                         const total = (Number(tpl.amount_paid) || 0) + (Number(tpl.balance_due) || 0);
                         const isActive = Number(tpl.active) === 1;
+                        const isDue = isActive && tpl.next_run_date <= today;
+                        const statusHtml = !isActive
+                            ? '<span class="text-gray-400 font-medium">Paused</span>'
+                            : isDue
+                              ? '<span class="text-red-600 font-semibold">Due</span>'
+                              : '<span class="text-green-600 font-medium">Active</span>';
+                        const settleButtons = isActive
+                            ? `<button data-id="${tpl.id}" class="text-green-600 hover:text-green-800 font-medium pay-recurring">Mark Paid</button>
+                        <button data-id="${tpl.id}" data-total="${total}" class="text-blue-600 hover:text-blue-800 partial-recurring">Partial</button>`
+                            : "";
                         return `
-                <tr class="border-b last:border-0">
+                <tr class="border-b last:border-0${isDue ? " bg-red-50" : ""}">
                     <td class="p-3 font-medium">${escapeHtml(tpl.recipient)}</td>
                     <td class="p-3">${escapeHtml(tpl.category)}</td>
                     <td class="p-3">${fmtMoney(total)}</td>
                     <td class="p-3">${FREQUENCY_LABELS[tpl.frequency] || tpl.frequency}</td>
                     <td class="p-3">${escapeHtml(tpl.next_run_date)}</td>
-                    <td class="p-3">${isActive ? '<span class="text-green-600 font-medium">Active</span>' : '<span class="text-gray-400 font-medium">Paused</span>'}</td>
-                    <td class="p-3 flex gap-3">
+                    <td class="p-3">${statusHtml}</td>
+                    <td class="p-3 flex gap-3 flex-wrap">
+                        ${settleButtons}
                         <button data-id="${tpl.id}" data-active="${isActive ? 1 : 0}" class="text-amber-600 hover:text-amber-800 toggle-recurring">${isActive ? "Pause" : "Resume"}</button>
                         <button data-id="${tpl.id}" class="text-red-600 hover:text-red-800 delete-recurring">Remove</button>
                     </td>
@@ -2978,8 +2990,52 @@
                     }
                 });
 
+                async function settleRecurring(id, amountPaid) {
+                    const body = amountPaid != null ? { amount_paid: amountPaid } : {};
+                    const result = await apiCall(`/recurring/${id}/settle`, {
+                        method: "POST",
+                        body,
+                    });
+                    notify(
+                        result.status === "Partial"
+                            ? "Recorded as partially paid — added to Expenses with the balance due."
+                            : "Marked as paid — added to Expenses.",
+                    );
+                    await loadRecurring();
+                    loadData();
+                }
+
                 $("#recurringTableBody").addEventListener("click", async (e) => {
-                    if (e.target.matches(".toggle-recurring")) {
+                    if (e.target.matches(".pay-recurring")) {
+                        const id = e.target.dataset.id;
+                        if (!confirm("Mark this occurrence as fully paid? It will be recorded in Expenses.")) return;
+                        try {
+                            await settleRecurring(id, null);
+                        } catch (error) {
+                            notify(error.message || "Error marking as paid", true);
+                        }
+                    } else if (e.target.matches(".partial-recurring")) {
+                        const id = e.target.dataset.id;
+                        const total = Number(e.target.dataset.total) || 0;
+                        const input = prompt(
+                            `How much are you paying now? (Total: ${fmtMoney(total)})`,
+                        );
+                        if (input == null) return;
+                        const amountPaid = Number(input.trim());
+                        if (input.trim() === "" || !Number.isFinite(amountPaid) || amountPaid < 0) {
+                            notify("Enter a valid amount", true);
+                            return;
+                        }
+                        if (amountPaid > total) {
+                            notify("Amount can't exceed the scheduled total", true);
+                            return;
+                        }
+                        try {
+                            await settleRecurring(id, amountPaid);
+                        } catch (error) {
+                            notify(error.message || "Error recording payment", true);
+                        }
+                    } else if (e.target.matches(".toggle-recurring")) {
                         const id = e.target.dataset.id;
                         const isActive = e.target.dataset.active === "1";
                         try {

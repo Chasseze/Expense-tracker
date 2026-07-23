@@ -167,14 +167,9 @@ if (useLibsql) {
       console.error("Error opening database:", err);
     } else {
       console.log("Connected to SQLite database");
-      initializeDatabase()
-        .then(() => {
-          generateDueRecurringExpenses();
-          setInterval(generateDueRecurringExpenses, 24 * 60 * 60 * 1000);
-        })
-        .catch((initErr) => {
-          console.error("Error initializing SQLite database:", initErr);
-        });
+      initializeDatabase().catch((initErr) => {
+        console.error("Error initializing SQLite database:", initErr);
+      });
     }
   });
 }
@@ -1575,52 +1570,67 @@ function advanceDate(dateStr, frequency) {
   return d.toISOString().slice(0, 10);
 }
 
-// Generates due expenses from active recurring templates. Runs at startup and every 24h.
-async function generateDueRecurringExpenses() {
+// Settle one occurrence of a recurring template: record it as a real expense
+// (fully or partially paid) and advance the template's next run date one cycle.
+app.post("/api/recurring/:id/settle", authenticateToken, async (req, res) => {
   try {
-    const today = new Date().toISOString().slice(0, 10);
-    const dueTemplates = await dbAll(
-      `SELECT * FROM recurring_templates WHERE active = 1 AND next_run_date <= ?`,
-      [today],
+    const rows = await dbAll(
+      "SELECT * FROM recurring_templates WHERE id = ? AND user_id = ?",
+      [req.params.id, req.user.userId],
+    );
+    const tpl = rows[0];
+    if (!tpl) {
+      return res.status(404).json({ error: "Recurring expense not found" });
+    }
+
+    const total = (Number(tpl.amount_paid) || 0) + (Number(tpl.balance_due) || 0);
+    let paidNow = total;
+    if (req.body && req.body.amount_paid != null) {
+      paidNow = parseFloat(req.body.amount_paid);
+      if (isNaN(paidNow) || paidNow < 0) {
+        return res.status(400).json({ error: "Invalid amount value" });
+      }
+      if (paidNow > total) {
+        return res.status(400).json({ error: "Amount exceeds the scheduled total" });
+      }
+    }
+    const balanceLeft = Math.max(total - paidNow, 0);
+    const status = balanceLeft > 0 ? "Partial" : "Paid";
+
+    const now = new Date().toISOString().slice(0, 16).replace("T", " ");
+    await dbRun(
+      `INSERT INTO expenses (user_id, date_time, category, session_term, recipient, description, amount_paid, balance_due, status, recurring_template_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        req.user.userId,
+        now,
+        tpl.category,
+        tpl.session_term,
+        tpl.recipient,
+        tpl.description,
+        paidNow,
+        balanceLeft,
+        status,
+        tpl.id,
+      ],
     );
 
-    for (const tpl of dueTemplates) {
-      let nextRun = tpl.next_run_date;
-      let iterations = 0;
-      // Catch up if the server was down across one or more occurrences, capped to avoid runaway loops.
-      while (nextRun <= today && iterations < 12) {
-        const status = Number(tpl.balance_due) > 0 ? "Partial" : "Paid";
-        await dbRun(
-          `INSERT INTO expenses (user_id, date_time, category, session_term, recipient, description, amount_paid, balance_due, status, recurring_template_id)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            tpl.user_id,
-            `${nextRun} 09:00`,
-            tpl.category,
-            tpl.session_term,
-            tpl.recipient,
-            tpl.description,
-            tpl.amount_paid,
-            tpl.balance_due,
-            status,
-            tpl.id,
-          ],
-        );
-        nextRun = advanceDate(nextRun, tpl.frequency);
-        iterations += 1;
-      }
-      await dbRun(
-        `UPDATE recurring_templates SET next_run_date = ?, last_generated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-        [nextRun, tpl.id],
-      );
-    }
-    if (dueTemplates.length) {
-      console.log(`Recurring: generated occurrences for ${dueTemplates.length} template(s).`);
-    }
+    const nextRun = advanceDate(tpl.next_run_date, tpl.frequency);
+    await dbRun(
+      `UPDATE recurring_templates SET next_run_date = ?, last_generated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      [nextRun, tpl.id],
+    );
+
+    res.json({
+      message: status === "Paid" ? "Marked as paid" : "Marked as partially paid",
+      status,
+      next_run_date: nextRun,
+    });
   } catch (error) {
-    console.error("Recurring generation error:", error);
+    console.error("Settle recurring template error:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
-}
+});
 
 app.get("/api/recurring", authenticateToken, async (req, res) => {
   try {
