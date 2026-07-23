@@ -788,11 +788,12 @@
                         />
                     </div>
                     <div id="receiptSection" class="hidden">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Receipt</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Receipt <span class="text-gray-400 font-normal">(optional)</span></label>
                         <div id="receiptNoFile" class="flex items-center gap-3">
                             <input type="file" id="receiptFileInput" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" class="text-sm" />
                             <button type="button" id="uploadReceiptBtn" class="px-3 py-2 border rounded-lg text-sm text-gray-700 hover:bg-gray-50">Upload</button>
                         </div>
+                        <p id="receiptAddHint" class="hidden text-xs text-gray-500 mt-1">Image or PDF, up to 5 MB. It will attach automatically when you save.</p>
                         <div id="receiptHasFile" class="hidden items-center gap-3">
                             <a href="#" id="viewReceiptLink" target="_blank" class="text-primary underline text-sm"><i class="fas fa-paperclip"></i> View receipt</a>
                             <button type="button" id="removeReceiptBtn" class="px-3 py-2 border rounded-lg text-sm text-red-600 hover:bg-red-50">Remove</button>
@@ -1074,11 +1075,12 @@
                         <textarea id="purchaseNotes" rows="2" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary"></textarea>
                     </div>
                     <div id="purchaseReceiptSection" class="hidden">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Receipt / Quote</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Receipt / Quote <span class="text-gray-400 font-normal">(optional)</span></label>
                         <div id="purchaseReceiptNoFile" class="flex items-center gap-3">
                             <input type="file" id="purchaseReceiptFileInput" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" class="text-sm" />
                             <button type="button" id="uploadPurchaseReceiptBtn" class="px-3 py-2 border rounded-lg text-sm text-gray-700 hover:bg-gray-50">Upload</button>
                         </div>
+                        <p id="purchaseReceiptAddHint" class="hidden text-xs text-gray-500 mt-1">Image or PDF, up to 5 MB. It will attach automatically when you save.</p>
                         <div id="purchaseReceiptHasFile" class="hidden items-center gap-3">
                             <a href="#" id="viewPurchaseReceiptLink" class="text-primary underline text-sm"><i class="fas fa-paperclip"></i> View receipt</a>
                             <button type="button" id="removePurchaseReceiptBtn" class="px-3 py-2 border rounded-lg text-sm text-red-600 hover:bg-red-50">Remove</button>

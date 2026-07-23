@@ -1323,6 +1323,21 @@
                 hasFileEl.classList.toggle("flex", hasFile);
             }
 
+            // Add mode: hide the immediate "Upload" button (file uploads on save)
+            // and show the helper hint. Edit mode: the reverse.
+            function setReceiptAddMode(isAdd) {
+                const btn = $("#uploadReceiptBtn");
+                const hint = $("#receiptAddHint");
+                if (btn) btn.classList.toggle("hidden", isAdd);
+                if (hint) hint.classList.toggle("hidden", !isAdd);
+            }
+            function setPurchaseReceiptAddMode(isAdd) {
+                const btn = $("#uploadPurchaseReceiptBtn");
+                const hint = $("#purchaseReceiptAddHint");
+                if (btn) btn.classList.toggle("hidden", isAdd);
+                if (hint) hint.classList.toggle("hidden", !isAdd);
+            }
+
             function showPurchaseReceiptState(hasFile) {
                 const noFile = $("#purchaseReceiptNoFile");
                 const hasFileEl = $("#purchaseReceiptHasFile");
@@ -1348,6 +1363,19 @@
             }
             function openReceipt(id) {
                 return openReceiptFor("expenses", id);
+            }
+
+            // Upload a receipt file for an already-created resource (expense/purchase).
+            async function uploadReceiptFile(resource, id, file) {
+                const formData = new FormData();
+                formData.append("receipt", file);
+                const res = await receiptFetch(`/${resource}/${id}/receipt`, {
+                    method: "POST",
+                    body: formData,
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.error || "Upload failed");
+                return data;
             }
 
             function renderExpenses() {
@@ -1383,7 +1411,7 @@
                         ${
                             expense.receipt_path
                                 ? `<button class="text-gray-500 hover:text-gray-700 view-receipt" data-id="${escapeHtml(String(expense.id))}" title="View receipt"><i class="fas fa-paperclip"></i></button>`
-                                : ""
+                                : `<button class="text-gray-300 hover:text-indigo-600 attach-receipt" data-id="${escapeHtml(String(expense.id))}" title="Attach receipt"><i class="fas fa-paperclip"></i></button>`
                         }
                     </td>
                 </tr>
@@ -1810,6 +1838,8 @@
 
                 $("#receiptSection").classList.remove("hidden");
                 showReceiptState(Boolean(expense.receipt_path));
+                setReceiptAddMode(false);
+                if ($("#receiptFileInput")) $("#receiptFileInput").value = "";
 
                 $("#expenseModalTitle").textContent = "Edit Expense";
                 $("#expenseModal").classList.remove("hidden");
@@ -2050,13 +2080,30 @@
                             );
                             notify("Expense updated successfully!");
                         } else {
-                            await apiCall("/expenses", {
+                            const created = await apiCall("/expenses", {
                                 method: "POST",
                                 body: expenseData,
                             });
-                            notify("Expense added successfully!");
+                            const newId = created && created.expense && created.expense.id;
+                            const stagedFile =
+                                $("#receiptFileInput") &&
+                                $("#receiptFileInput").files[0];
+                            if (newId && stagedFile) {
+                                try {
+                                    await uploadReceiptFile("expenses", newId, stagedFile);
+                                    notify("Expense and receipt added!");
+                                } catch (e) {
+                                    notify(
+                                        `Expense saved, but receipt upload failed: ${e.message}`,
+                                        true,
+                                    );
+                                }
+                            } else {
+                                notify("Expense added successfully!");
+                            }
                         }
 
+                        if ($("#receiptFileInput")) $("#receiptFileInput").value = "";
                         $("#expenseModal").classList.add("hidden");
                         loadData();
                         window.editingExpenseId = null;
@@ -2079,7 +2126,12 @@
                         .toISOString()
                         .slice(0, 16);
                     $("#expenseModalTitle").textContent = "Add Expense";
-                    $("#receiptSection").classList.add("hidden");
+                    // Show the receipt picker on Add too; the chosen file is
+                    // staged and uploaded right after the expense is created.
+                    $("#receiptSection").classList.remove("hidden");
+                    showReceiptState(false);
+                    if ($("#receiptFileInput")) $("#receiptFileInput").value = "";
+                    setReceiptAddMode(true);
                     $("#expenseModal").classList.remove("hidden");
                 });
 
@@ -2273,7 +2325,12 @@
                     $("#addPurchaseBtn").addEventListener("click", () => {
                         window.editingPurchaseId = null;
                         $("#purchaseForm").reset();
-                        $("#purchaseReceiptSection").classList.add("hidden");
+                        // Show the receipt/quote picker on Add too; the chosen
+                        // file is staged and uploaded once the purchase exists.
+                        $("#purchaseReceiptSection").classList.remove("hidden");
+                        showPurchaseReceiptState(false);
+                        if ($("#purchaseReceiptFileInput")) $("#purchaseReceiptFileInput").value = "";
+                        setPurchaseReceiptAddMode(true);
                         openPurchaseModal("Add Purchase");
                     });
                 }
@@ -2298,6 +2355,7 @@
                     $("#purchaseReceiptFileInput").value = "";
                     $("#purchaseReceiptSection").classList.remove("hidden");
                     showPurchaseReceiptState(Boolean(p.receipt_path));
+                    setPurchaseReceiptAddMode(false);
                     openPurchaseModal("Edit Purchase");
                 };
 
@@ -2321,9 +2379,26 @@
                             await apiCall(`/purchases/${window.editingPurchaseId}`, { method: "PUT", body });
                             notify("Purchase updated!");
                         } else {
-                            await apiCall("/purchases", { method: "POST", body });
-                            notify("Purchase added!");
+                            const created = await apiCall("/purchases", { method: "POST", body });
+                            const newId = created && created.purchase && created.purchase.id;
+                            const stagedFile =
+                                $("#purchaseReceiptFileInput") &&
+                                $("#purchaseReceiptFileInput").files[0];
+                            if (newId && stagedFile) {
+                                try {
+                                    await uploadReceiptFile("purchases", newId, stagedFile);
+                                    notify("Purchase and receipt added!");
+                                } catch (e) {
+                                    notify(
+                                        `Purchase saved, but receipt upload failed: ${e.message}`,
+                                        true,
+                                    );
+                                }
+                            } else {
+                                notify("Purchase added!");
+                            }
                         }
+                        if ($("#purchaseReceiptFileInput")) $("#purchaseReceiptFileInput").value = "";
                         $("#purchaseModal").classList.add("hidden");
                         window.editingPurchaseId = null;
                         await loadPurchases();
@@ -2536,7 +2611,7 @@
                 if (expenseTBody) {
                     expenseTBody.addEventListener("click", (e) => {
                         const btn = e.target.closest(
-                            ".edit-expense, .delete-expense, .view-receipt",
+                            ".edit-expense, .delete-expense, .view-receipt, .attach-receipt",
                         );
                         if (!btn) return;
                         const id = btn.dataset.id;
@@ -2547,6 +2622,10 @@
                             window.deleteExpense(id);
                         } else if (btn.classList.contains("view-receipt")) {
                             openReceipt(id);
+                        } else if (btn.classList.contains("attach-receipt")) {
+                            // Open the edit modal, where the receipt uploader lives
+                            window.editExpense(id);
+                            notify("Choose a file and click Upload to attach a receipt");
                         }
                     });
                 }
