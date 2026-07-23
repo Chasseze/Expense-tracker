@@ -53,7 +53,7 @@ const authLimiter = rateLimit({
 app.use(helmet({ contentSecurityPolicy: false })); // CSP disabled so CDN scripts in index.html still load
 app.use(compression());
 app.use(cors(corsOptions));
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "8mb" }));
 app.use(express.static("public", { maxAge: process.env.NODE_ENV === "production" ? "1h" : 0 }));
 
 // Database setup (LibSQL/Turso first, fallback to local SQLite)
@@ -1854,7 +1854,10 @@ app.put("/api/purchases/:id", authenticateToken, async (req, res) => {
     const updates = [];
     const params = [];
     if (item != null) { updates.push("item = ?"); params.push(item); }
-    if (category != null) { updates.push("category = ?"); params.push(category); }
+    if (Object.prototype.hasOwnProperty.call(req.body, "category")) {
+      updates.push("category = ?");
+      params.push(category || null);
+    }
     if (estimated_cost != null) {
       const cost = parseFloat(estimated_cost);
       if (isNaN(cost) || cost < 0) {
@@ -1901,37 +1904,83 @@ app.delete("/api/purchases/:id", authenticateToken, async (req, res) => {
   }
 });
 
-app.post(
-  "/api/purchases/:id/receipt",
-  authenticateToken,
-  uploadPurchaseReceiptMiddleware,
-  async (req, res) => {
-    try {
-      if (!req.file) {
+app.post("/api/purchases/:id/receipt", authenticateToken, async (req, res) => {
+  // Prefer JSON base64 (same path used in production through Hosting rewrites).
+  // Fall back to multipart via multer when Content-Type is multipart/form-data.
+  try {
+    const ct = String(req.headers["content-type"] || "");
+    if (ct.includes("application/json") && req.body && req.body.contentBase64) {
+      const contentType = req.body.contentType;
+      if (!RECEIPT_MIME_EXT[contentType]) {
+        return res.status(400).json({
+          error: "Only JPEG, PNG, WEBP, GIF images or PDF files are allowed",
+        });
+      }
+      const buffer = Buffer.from(String(req.body.contentBase64), "base64");
+      if (!buffer.length) {
         return res.status(400).json({ error: "No file uploaded" });
+      }
+      if (buffer.length > 5 * 1024 * 1024) {
+        return res.status(400).json({ error: "File must be 5 MB or smaller" });
       }
       const rows = await dbAll(
         "SELECT id, receipt_path FROM purchases WHERE id = ? AND user_id = ?",
         [req.params.id, req.user.userId],
       );
       if (!rows.length) {
-        fs.unlink(req.file.path, () => {});
         return res.status(404).json({ error: "Purchase not found" });
       }
       if (rows[0].receipt_path) {
         fs.unlink(path.join(uploadsDir, rows[0].receipt_path), () => {});
       }
+      const ext = RECEIPT_MIME_EXT[contentType] || "";
+      const filename = `purchase-${req.user.userId}-${req.params.id}-${Date.now()}${ext}`;
+      fs.writeFileSync(path.join(uploadsDir, filename), buffer);
       await dbRun(
         "UPDATE purchases SET receipt_path = ? WHERE id = ? AND user_id = ?",
-        [req.file.filename, req.params.id, req.user.userId],
+        [filename, req.params.id, req.user.userId],
       );
-      res.json({ message: "Receipt uploaded successfully", receipt_path: req.file.filename });
-    } catch (error) {
-      console.error("Upload purchase receipt error:", error);
-      res.status(500).json({ error: "Unable to upload receipt" });
+      return res.json({
+        message: "Receipt uploaded successfully",
+        receipt_path: filename,
+      });
     }
-  },
-);
+
+    // Multipart fallback for local tooling / older clients
+    return uploadPurchaseReceiptMiddleware(req, res, async () => {
+      try {
+        if (!req.file) {
+          return res.status(400).json({ error: "No file uploaded" });
+        }
+        const rows = await dbAll(
+          "SELECT id, receipt_path FROM purchases WHERE id = ? AND user_id = ?",
+          [req.params.id, req.user.userId],
+        );
+        if (!rows.length) {
+          fs.unlink(req.file.path, () => {});
+          return res.status(404).json({ error: "Purchase not found" });
+        }
+        if (rows[0].receipt_path) {
+          fs.unlink(path.join(uploadsDir, rows[0].receipt_path), () => {});
+        }
+        await dbRun(
+          "UPDATE purchases SET receipt_path = ? WHERE id = ? AND user_id = ?",
+          [req.file.filename, req.params.id, req.user.userId],
+        );
+        return res.json({
+          message: "Receipt uploaded successfully",
+          receipt_path: req.file.filename,
+        });
+      } catch (error) {
+        console.error("Upload purchase receipt error:", error);
+        res.status(500).json({ error: "Unable to upload receipt" });
+      }
+    });
+  } catch (error) {
+    console.error("Upload purchase receipt error:", error);
+    res.status(500).json({ error: "Unable to upload receipt" });
+  }
+});
 
 app.get("/api/purchases/:id/receipt", authenticateToken, async (req, res) => {
   try {
