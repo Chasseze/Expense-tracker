@@ -1719,6 +1719,102 @@ body.theme-dark .reports-filter-field input {
     color: #475569; font-weight: 600;
 }
 
+/*
+ * App modals sit above the topbar (z-50) and mobile bottom nav (z-40).
+ * Sticky action bars keep Save / Cancel reachable on short mobile viewports
+ * where a single scrolling panel clips the footer under the fold.
+ */
+.app-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem;
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+    background: rgba(0, 0, 0, 0.5);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.app-modal.hidden {
+    display: none !important;
+}
+.app-modal-panel {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 32rem;
+    /* Explicit cap so the sticky footer can stay on-screen. */
+    max-height: calc(100vh - 1.5rem);
+    max-height: calc(100dvh - 1.5rem);
+    background: #fff;
+    border-radius: 1rem;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+}
+.app-modal-panel--lg {
+    max-width: 42rem;
+}
+.app-modal-panel > form,
+.app-modal-form {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+.app-modal-header {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1.25rem 1.5rem 0.75rem;
+}
+.app-modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 0.25rem 1.5rem 1rem;
+    overscroll-behavior: contain;
+}
+.app-modal-actions {
+    flex-shrink: 0;
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.85rem 1.5rem calc(0.85rem + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid #e5e7eb;
+    background: #fff;
+}
+body.modal-open {
+    overflow: hidden;
+}
+body.modal-open .mobile-bottom-nav {
+    pointer-events: none;
+}
+
+/* Keep legacy Tailwind modals above the app chrome (topbar z-50 / nav z-40). */
+#expenseModal,
+#budgetModal,
+#recurringModal,
+#categoriesModal,
+#trashModal,
+#settingsModal {
+    z-index: 200;
+}
+/* Toasts must never steal clicks from modal actions. */
+#notification {
+    z-index: 190;
+    pointer-events: none;
+}
+body.modal-open #notification {
+    bottom: auto;
+    top: 1rem;
+    right: 1rem;
+}
+
 /* Mobile bottom nav + sidebar drawer */
 .mobile-bottom-nav {
     display: none;
