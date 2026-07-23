@@ -1778,9 +1778,9 @@ app.get("/api/purchases/reports", authenticateToken, async (req, res) => {
     const stats = await dbAll(
       `SELECT
                 COUNT(*) as total_purchases,
-                SUM(estimated_cost) as total_estimated,
-                SUM(CASE WHEN status = 'Planned' THEN 1 ELSE 0 END) as planned_count,
-                SUM(CASE WHEN status = 'Purchased' THEN 1 ELSE 0 END) as purchased_count
+                COALESCE(SUM(estimated_cost), 0) as total_estimated,
+                COALESCE(SUM(CASE WHEN status = 'Planned' THEN 1 ELSE 0 END), 0) as planned_count,
+                COALESCE(SUM(CASE WHEN status = 'Purchased' THEN 1 ELSE 0 END), 0) as purchased_count
              FROM purchases ${where}`,
       params,
     );
