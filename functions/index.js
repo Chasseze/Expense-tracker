@@ -5,13 +5,19 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 
-admin.initializeApp();
+admin.initializeApp({
+  // Match the client firebase-config storageBucket so Admin SDK does not
+  // silently target a missing *.appspot.com default bucket.
+  storageBucket:
+    process.env.FIREBASE_STORAGE_BUCKET ||
+    'expense-tracker-prod-df355.firebasestorage.app',
+});
 
 const app = express();
 
 // Middleware
 app.use(cors({ origin: true }));
-app.use(express.json());
+app.use(express.json({ limit: '8mb' }));
 
 const db = admin.firestore();
 const auth = admin.auth();
@@ -38,10 +44,121 @@ const receiptUpload = multer({
   },
 });
 function uploadReceiptMiddleware(req, res, next) {
+  const ct = String(req.headers['content-type'] || '');
+  // JSON base64 uploads skip multer; multipart still uses it.
+  if (ct.includes('application/json')) return next();
   receiptUpload.single('receipt')(req, res, (err) => {
     if (err) return res.status(400).json({ error: err.message || 'Upload failed' });
     next();
   });
+}
+
+function parseReceiptUploadBody(req) {
+  if (req.body && req.body.contentBase64) {
+    const contentType = req.body.contentType;
+    if (!RECEIPT_MIME_EXT[contentType]) {
+      const err = new Error('Only JPEG, PNG, WEBP, GIF images or PDF files are allowed');
+      err.status = 400;
+      throw err;
+    }
+    const buffer = Buffer.from(String(req.body.contentBase64), 'base64');
+    if (!buffer.length) {
+      const err = new Error('No file uploaded');
+      err.status = 400;
+      throw err;
+    }
+    if (buffer.length > 5 * 1024 * 1024) {
+      const err = new Error('File must be 5 MB or smaller');
+      err.status = 400;
+      throw err;
+    }
+    return {
+      buffer,
+      contentType,
+      fileName: req.body.fileName || 'receipt',
+    };
+  }
+  if (req.file && req.file.buffer) {
+    return {
+      buffer: req.file.buffer,
+      contentType: req.file.mimetype,
+      fileName: req.file.originalname || 'receipt',
+    };
+  }
+  const err = new Error('No file uploaded');
+  err.status = 400;
+  throw err;
+}
+
+function getStorageBucket() {
+  // Prefer the configured default; fall back to the legacy appspot name.
+  try {
+    return admin.storage().bucket();
+  } catch (_err) {
+    return admin.storage().bucket('expense-tracker-prod-df355.appspot.com');
+  }
+}
+
+async function persistReceiptBinary(uid, keyPrefix, buffer, contentType) {
+  const ext = RECEIPT_MIME_EXT[contentType] || '';
+  const storagePath = `receipts/${uid}/${keyPrefix}-${Date.now()}${ext}`;
+  try {
+    const bucket = getStorageBucket();
+    await bucket.file(storagePath).save(buffer, {
+      contentType,
+      resumable: false,
+      metadata: { cacheControl: 'private, max-age=0' },
+    });
+    return {
+      receipt_path: storagePath,
+      receipt_inline: admin.firestore.FieldValue.delete(),
+      receipt_mime: admin.firestore.FieldValue.delete(),
+    };
+  } catch (storageErr) {
+    console.error('Firebase Storage save failed; using Firestore inline fallback:', storageErr.message || storageErr);
+    // Firestore docs are capped near 1 MB — keep a safe ceiling for inline receipts.
+    if (buffer.length > 700000) {
+      const err = new Error(
+        'Receipt upload failed (Storage unavailable) and file is too large for inline storage. Enable Firebase Storage or use a file under ~700 KB.',
+      );
+      err.status = 500;
+      throw err;
+    }
+    return {
+      receipt_path: 'inline',
+      receipt_inline: buffer.toString('base64'),
+      receipt_mime: contentType,
+    };
+  }
+}
+
+async function deleteStoredReceipt(receiptPath) {
+  if (!receiptPath || receiptPath === 'inline') return;
+  try {
+    await getStorageBucket().file(receiptPath).delete();
+  } catch (_err) {
+    // ignore missing files
+  }
+}
+
+async function streamStoredReceipt(res, data) {
+  if (data.receipt_path === 'inline' && data.receipt_inline) {
+    const buffer = Buffer.from(String(data.receipt_inline), 'base64');
+    res.setHeader('Content-Type', data.receipt_mime || 'application/octet-stream');
+    res.setHeader('Content-Length', buffer.length);
+    return res.end(buffer);
+  }
+  if (!data.receipt_path) {
+    return res.status(404).json({ error: 'No receipt on file' });
+  }
+  const file = getStorageBucket().file(data.receipt_path);
+  const [exists] = await file.exists();
+  if (!exists) {
+    return res.status(404).json({ error: 'Receipt file missing' });
+  }
+  const [metadata] = await file.getMetadata();
+  res.setHeader('Content-Type', metadata.contentType || 'application/octet-stream');
+  file.createReadStream().on('error', () => res.status(500).end()).pipe(res);
 }
 
 // Middleware to verify Firebase ID token
@@ -466,8 +583,11 @@ app.delete('/api/expenses/:id/permanent', verifyToken, async (req, res) => {
 // Upload/replace a receipt for an expense
 app.post('/api/expenses/:id/receipt', verifyToken, uploadReceiptMiddleware, async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
+    let parsed;
+    try {
+      parsed = parseReceiptUploadBody(req);
+    } catch (parseErr) {
+      return res.status(parseErr.status || 400).json({ error: parseErr.message || 'Upload failed' });
     }
     const expenseRef = db.collection('users').doc(req.user.uid).collection('expenses').doc(req.params.id);
     const doc = await expenseRef.get();
@@ -475,25 +595,20 @@ app.post('/api/expenses/:id/receipt', verifyToken, uploadReceiptMiddleware, asyn
       return res.status(404).json({ error: 'Expense not found' });
     }
 
-    const bucket = admin.storage().bucket();
-    const ext = RECEIPT_MIME_EXT[req.file.mimetype] || '';
-    const storagePath = `receipts/${req.user.uid}/${req.params.id}-${Date.now()}${ext}`;
-
-    const oldPath = doc.data().receipt_path;
-    if (oldPath) {
-      await bucket.file(oldPath).delete().catch(() => {});
-    }
-
-    await bucket.file(storagePath).save(req.file.buffer, {
-      contentType: req.file.mimetype,
-      metadata: { cacheControl: 'private, max-age=0' },
-    });
-
-    await expenseRef.update({ receipt_path: storagePath });
-    res.json({ message: 'Receipt uploaded successfully', receipt_path: storagePath });
+    await deleteStoredReceipt(doc.data().receipt_path);
+    const stored = await persistReceiptBinary(
+      req.user.uid,
+      req.params.id,
+      parsed.buffer,
+      parsed.contentType,
+    );
+    await expenseRef.update(stored);
+    res.json({ message: 'Receipt uploaded successfully', receipt_path: stored.receipt_path });
   } catch (error) {
     console.error('Upload receipt error:', error);
-    res.status(500).json({ error: 'Unable to upload receipt. If this persists, confirm Firebase Storage is enabled for this project.' });
+    res.status(error.status || 500).json({
+      error: error.message || 'Unable to upload receipt. If this persists, confirm Firebase Storage is enabled for this project.',
+    });
   }
 });
 
@@ -501,19 +616,10 @@ app.post('/api/expenses/:id/receipt', verifyToken, uploadReceiptMiddleware, asyn
 app.get('/api/expenses/:id/receipt', verifyToken, async (req, res) => {
   try {
     const doc = await db.collection('users').doc(req.user.uid).collection('expenses').doc(req.params.id).get();
-    const receiptPath = doc.exists ? doc.data().receipt_path : null;
-    if (!receiptPath) {
+    if (!doc.exists) {
       return res.status(404).json({ error: 'No receipt on file' });
     }
-    const bucket = admin.storage().bucket();
-    const file = bucket.file(receiptPath);
-    const [exists] = await file.exists();
-    if (!exists) {
-      return res.status(404).json({ error: 'Receipt file missing' });
-    }
-    const [metadata] = await file.getMetadata();
-    res.setHeader('Content-Type', metadata.contentType || 'application/octet-stream');
-    file.createReadStream().on('error', () => res.status(500).end()).pipe(res);
+    return streamStoredReceipt(res, doc.data() || {});
   } catch (error) {
     console.error('Get receipt error:', error);
     res.status(500).json({ error: 'Unable to retrieve receipt' });
@@ -528,11 +634,12 @@ app.delete('/api/expenses/:id/receipt', verifyToken, async (req, res) => {
     if (!doc.exists) {
       return res.status(404).json({ error: 'Expense not found' });
     }
-    const receiptPath = doc.data().receipt_path;
-    if (receiptPath) {
-      await admin.storage().bucket().file(receiptPath).delete().catch(() => {});
-    }
-    await expenseRef.update({ receipt_path: admin.firestore.FieldValue.delete() });
+    await deleteStoredReceipt(doc.data().receipt_path);
+    await expenseRef.update({
+      receipt_path: admin.firestore.FieldValue.delete(),
+      receipt_inline: admin.firestore.FieldValue.delete(),
+      receipt_mime: admin.firestore.FieldValue.delete(),
+    });
     res.json({ message: 'Receipt removed' });
   } catch (error) {
     console.error('Delete receipt error:', error);
@@ -970,7 +1077,9 @@ app.put('/api/purchases/:id', verifyToken, async (req, res) => {
     const { item, category, estimated_cost, priority, target_date, notes, status } = req.body;
     const updates = {};
     if (item != null) updates.item = item;
-    if (category != null) updates.category = category;
+    if (Object.prototype.hasOwnProperty.call(req.body, 'category')) {
+      updates.category = category || null;
+    }
     if (estimated_cost != null) {
       const cost = Number(estimated_cost);
       if (isNaN(cost) || cost < 0) {
@@ -1010,36 +1119,37 @@ app.delete('/api/purchases/:id', verifyToken, async (req, res) => {
   }
 });
 
-// Convert a planned purchase into a real expense record.
 // Upload/replace a receipt for a purchase
+// Accepts JSON { contentBase64, contentType, fileName } (preferred through
+// Firebase Hosting) or multipart/form-data field "receipt".
 app.post('/api/purchases/:id/receipt', verifyToken, uploadReceiptMiddleware, async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
+    let parsed;
+    try {
+      parsed = parseReceiptUploadBody(req);
+    } catch (parseErr) {
+      return res.status(parseErr.status || 400).json({ error: parseErr.message || 'Upload failed' });
     }
     const purchaseRef = db.collection('users').doc(req.user.uid).collection('purchases').doc(req.params.id);
     const doc = await purchaseRef.get();
     if (!doc.exists) {
       return res.status(404).json({ error: 'Purchase not found' });
     }
-    const bucket = admin.storage().bucket();
-    const ext = RECEIPT_MIME_EXT[req.file.mimetype] || '';
-    const storagePath = `receipts/${req.user.uid}/purchase-${req.params.id}-${Date.now()}${ext}`;
 
-    const oldPath = doc.data().receipt_path;
-    if (oldPath) {
-      await bucket.file(oldPath).delete().catch(() => {});
-    }
-    await bucket.file(storagePath).save(req.file.buffer, {
-      contentType: req.file.mimetype,
-      metadata: { cacheControl: 'private, max-age=0' },
-    });
-
-    await purchaseRef.update({ receipt_path: storagePath });
-    res.json({ message: 'Receipt uploaded successfully', receipt_path: storagePath });
+    await deleteStoredReceipt(doc.data().receipt_path);
+    const stored = await persistReceiptBinary(
+      req.user.uid,
+      `purchase-${req.params.id}`,
+      parsed.buffer,
+      parsed.contentType,
+    );
+    await purchaseRef.update(stored);
+    res.json({ message: 'Receipt uploaded successfully', receipt_path: stored.receipt_path });
   } catch (error) {
     console.error('Upload purchase receipt error:', error);
-    res.status(500).json({ error: 'Unable to upload receipt. If this persists, confirm Firebase Storage is enabled for this project.' });
+    res.status(error.status || 500).json({
+      error: error.message || 'Unable to upload receipt. If this persists, confirm Firebase Storage is enabled for this project.',
+    });
   }
 });
 
@@ -1047,18 +1157,10 @@ app.post('/api/purchases/:id/receipt', verifyToken, uploadReceiptMiddleware, asy
 app.get('/api/purchases/:id/receipt', verifyToken, async (req, res) => {
   try {
     const doc = await db.collection('users').doc(req.user.uid).collection('purchases').doc(req.params.id).get();
-    const receiptPath = doc.exists ? doc.data().receipt_path : null;
-    if (!receiptPath) {
+    if (!doc.exists) {
       return res.status(404).json({ error: 'No receipt on file' });
     }
-    const file = admin.storage().bucket().file(receiptPath);
-    const [exists] = await file.exists();
-    if (!exists) {
-      return res.status(404).json({ error: 'Receipt file missing' });
-    }
-    const [metadata] = await file.getMetadata();
-    res.setHeader('Content-Type', metadata.contentType || 'application/octet-stream');
-    file.createReadStream().on('error', () => res.status(500).end()).pipe(res);
+    return streamStoredReceipt(res, doc.data() || {});
   } catch (error) {
     console.error('Get purchase receipt error:', error);
     res.status(500).json({ error: 'Unable to retrieve receipt' });
@@ -1073,11 +1175,12 @@ app.delete('/api/purchases/:id/receipt', verifyToken, async (req, res) => {
     if (!doc.exists) {
       return res.status(404).json({ error: 'Purchase not found' });
     }
-    const receiptPath = doc.data().receipt_path;
-    if (receiptPath) {
-      await admin.storage().bucket().file(receiptPath).delete().catch(() => {});
-    }
-    await purchaseRef.update({ receipt_path: admin.firestore.FieldValue.delete() });
+    await deleteStoredReceipt(doc.data().receipt_path);
+    await purchaseRef.update({
+      receipt_path: admin.firestore.FieldValue.delete(),
+      receipt_inline: admin.firestore.FieldValue.delete(),
+      receipt_mime: admin.firestore.FieldValue.delete(),
+    });
     res.json({ message: 'Receipt removed' });
   } catch (error) {
     console.error('Delete purchase receipt error:', error);

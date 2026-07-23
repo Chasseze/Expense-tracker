@@ -704,14 +704,12 @@
             }
 
             function fillPurchaseCategoryOptions() {
-                const select = document.querySelector("#purchaseCategory");
-                if (!select) return;
+                const list = document.querySelector("#purchaseCategoryList");
+                if (!list) return;
                 const categories = getAllCategories();
-                const current = select.value;
-                select.innerHTML = categories
-                    .map((cat) => `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`)
+                list.innerHTML = categories
+                    .map((cat) => `<option value="${escapeHtml(cat)}"></option>`)
                     .join("");
-                if (current) select.value = current;
             }
 
             const PRIORITY_BADGE = {
@@ -1490,10 +1488,15 @@
             function setPurchaseReceiptAddMode(isAdd) {
                 const btn = $("#uploadPurchaseReceiptBtn");
                 const hint = $("#purchaseReceiptAddHint");
-                // Add: file is staged and uploaded on save — hide the immediate Upload btn.
-                // Edit: Upload applies right away to the existing purchase.
+                // Keep "Upload now" available when editing an existing purchase.
+                // On add, the chosen file attaches automatically on Save.
                 if (btn) btn.classList.toggle("hidden", isAdd);
-                if (hint) hint.classList.toggle("hidden", false);
+                if (hint) {
+                    hint.textContent = isAdd
+                        ? "Image or PDF, up to 5 MB. Chosen files attach automatically when you save."
+                        : "Image or PDF, up to 5 MB. Click Upload now, or choose a file and Save.";
+                    hint.classList.remove("hidden");
+                }
             }
 
             function showPurchaseReceiptState(hasFile) {
@@ -1503,6 +1506,20 @@
                 noFile.classList.toggle("hidden", hasFile);
                 hasFileEl.classList.toggle("hidden", !hasFile);
                 hasFileEl.classList.toggle("flex", hasFile);
+            }
+
+            function updatePurchaseReceiptFileName() {
+                const input = $("#purchaseReceiptFileInput");
+                const label = $("#purchaseReceiptFileName");
+                if (!input || !label) return;
+                const file = input.files && input.files[0];
+                if (file) {
+                    label.textContent = `Selected: ${file.name} (${Math.round(file.size / 1024)} KB)`;
+                    label.classList.remove("hidden");
+                } else {
+                    label.textContent = "";
+                    label.classList.add("hidden");
+                }
             }
 
             async function openReceiptFor(resource, id) {
@@ -1519,17 +1536,49 @@
                     notify("Unable to load receipt", true);
                 }
             }
-            // Upload a receipt file for an already-created purchase.
+
+            // Convert a File to a JSON-safe payload. Firebase Hosting rewrites to
+            // Cloud Functions are unreliable with multipart/form-data, so we send
+            // receipts as base64 JSON instead.
+            async function fileToReceiptPayload(file) {
+                if (!file) throw new Error("No file selected");
+                if (file.size > 5 * 1024 * 1024) {
+                    throw new Error("File must be 5 MB or smaller");
+                }
+                const allowed = [
+                    "image/jpeg",
+                    "image/png",
+                    "image/webp",
+                    "image/gif",
+                    "application/pdf",
+                ];
+                if (!allowed.includes(file.type)) {
+                    throw new Error("Only JPEG, PNG, WEBP, GIF, or PDF files are allowed");
+                }
+                const buffer = await file.arrayBuffer();
+                const bytes = new Uint8Array(buffer);
+                let binary = "";
+                const chunk = 0x8000;
+                for (let i = 0; i < bytes.length; i += chunk) {
+                    binary += String.fromCharCode.apply(
+                        null,
+                        bytes.subarray(i, i + chunk),
+                    );
+                }
+                return {
+                    contentBase64: btoa(binary),
+                    contentType: file.type,
+                    fileName: file.name || "receipt",
+                };
+            }
+
+            // Upload a receipt file for an already-created purchase (or expense).
             async function uploadReceiptFile(resource, id, file) {
-                const formData = new FormData();
-                formData.append("receipt", file);
-                const res = await receiptFetch(`/${resource}/${id}/receipt`, {
+                const payload = await fileToReceiptPayload(file);
+                return apiCall(`/${resource}/${id}/receipt`, {
                     method: "POST",
-                    body: formData,
-                });
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok) throw new Error(data.error || "Upload failed");
-                return data;
+                    body: payload,
+                }, 60000);
             }
 
             function renderExpenses() {
@@ -2515,6 +2564,7 @@
                         showPurchaseReceiptState(false);
                         if ($("#purchaseReceiptFileInput")) $("#purchaseReceiptFileInput").value = "";
                         setPurchaseReceiptAddMode(true);
+                        updatePurchaseReceiptFileName();
                         openPurchaseModal("Add Purchase");
                     });
                 }
@@ -2540,49 +2590,70 @@
                     $("#purchaseReceiptSection").classList.remove("hidden");
                     showPurchaseReceiptState(Boolean(p.receipt_path));
                     setPurchaseReceiptAddMode(false);
+                    updatePurchaseReceiptFileName();
                     openPurchaseModal("Edit Purchase");
                 };
 
                 $("#purchaseForm").addEventListener("submit", async (e) => {
                     e.preventDefault();
+                    const itemName = ($("#purchaseItem").value || "").trim();
+                    if (!itemName) {
+                        notify("Please type the item name", true);
+                        return;
+                    }
                     const cost = toNumber($("#purchaseEstimatedCost").value);
                     if (isNaN(cost) || cost < 0) {
                         notify("Estimated cost must be a positive number", true);
                         return;
                     }
+                    const categoryVal = ($("#purchaseCategory").value || "").trim();
                     const body = {
-                        item: $("#purchaseItem").value,
-                        category: $("#purchaseCategory").value,
+                        item: itemName,
+                        category: categoryVal || null,
                         estimated_cost: cost,
                         priority: $("#purchasePriority").value,
                         target_date: $("#purchaseTargetDate").value || null,
-                        notes: $("#purchaseNotes").value,
+                        notes: ($("#purchaseNotes").value || "").trim(),
                     };
+                    const stagedFile =
+                        $("#purchaseReceiptFileInput") &&
+                        $("#purchaseReceiptFileInput").files[0];
                     try {
-                        if (window.editingPurchaseId) {
-                            await apiCall(`/purchases/${window.editingPurchaseId}`, { method: "PUT", body });
-                            notify("Purchase updated!");
+                        let purchaseId = window.editingPurchaseId;
+                        if (purchaseId) {
+                            await apiCall(`/purchases/${purchaseId}`, { method: "PUT", body });
                         } else {
                             const created = await apiCall("/purchases", { method: "POST", body });
-                            const newId = created && created.purchase && created.purchase.id;
-                            const stagedFile =
-                                $("#purchaseReceiptFileInput") &&
-                                $("#purchaseReceiptFileInput").files[0];
-                            if (newId && stagedFile) {
-                                try {
-                                    await uploadReceiptFile("purchases", newId, stagedFile);
-                                    notify("Purchase and receipt added!");
-                                } catch (e) {
-                                    notify(
-                                        `Purchase saved, but receipt upload failed: ${e.message}`,
-                                        true,
-                                    );
-                                }
-                            } else {
-                                notify("Purchase added!");
+                            purchaseId = created && created.purchase && created.purchase.id;
+                            if (!purchaseId) {
+                                throw new Error("Purchase saved but no id was returned");
                             }
                         }
+
+                        if (stagedFile && purchaseId) {
+                            try {
+                                await uploadReceiptFile("purchases", purchaseId, stagedFile);
+                                notify(
+                                    window.editingPurchaseId
+                                        ? "Purchase and receipt updated!"
+                                        : "Purchase and receipt added!",
+                                );
+                            } catch (uploadErr) {
+                                notify(
+                                    `Purchase saved, but receipt upload failed: ${uploadErr.message}`,
+                                    true,
+                                );
+                            }
+                        } else {
+                            notify(
+                                window.editingPurchaseId
+                                    ? "Purchase updated!"
+                                    : "Purchase added!",
+                            );
+                        }
+
                         if ($("#purchaseReceiptFileInput")) $("#purchaseReceiptFileInput").value = "";
+                        updatePurchaseReceiptFileName();
                         $("#purchaseModal").classList.add("hidden");
                         window.editingPurchaseId = null;
                         await loadPurchases();
@@ -2642,6 +2713,9 @@
                 }
 
                 // Purchase receipt upload/view/remove (edit-purchase modal)
+                if ($("#purchaseReceiptFileInput")) {
+                    $("#purchaseReceiptFileInput").addEventListener("change", updatePurchaseReceiptFileName);
+                }
                 if ($("#uploadPurchaseReceiptBtn")) {
                     $("#uploadPurchaseReceiptBtn").addEventListener("click", async () => {
                         const fileInput = $("#purchaseReceiptFileInput");
@@ -2653,17 +2727,15 @@
                             notify("Save the purchase before attaching a receipt", true);
                             return;
                         }
-                        const formData = new FormData();
-                        formData.append("receipt", fileInput.files[0]);
                         try {
-                            const res = await receiptFetch(
-                                `/purchases/${window.editingPurchaseId}/receipt`,
-                                { method: "POST", body: formData },
+                            await uploadReceiptFile(
+                                "purchases",
+                                window.editingPurchaseId,
+                                fileInput.files[0],
                             );
-                            const data = await res.json();
-                            if (!res.ok) throw new Error(data.error || "Upload failed");
                             notify("Receipt uploaded!");
                             fileInput.value = "";
+                            updatePurchaseReceiptFileName();
                             showPurchaseReceiptState(true);
                             await loadPurchases();
                         } catch (error) {
