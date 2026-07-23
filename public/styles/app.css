@@ -1719,6 +1719,82 @@ body.theme-dark .reports-filter-field input {
     color: #475569; font-weight: 600;
 }
 
+/*
+ * App modals sit above the topbar (z-50) and mobile bottom nav (z-40).
+ * Sticky action bars keep Save / Cancel reachable on short mobile viewports
+ * where a single scrolling panel clips the footer under the fold.
+ */
+.app-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 0;
+    background: rgba(0, 0, 0, 0.5);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.app-modal.hidden {
+    display: none !important;
+}
+@media (min-width: 640px) {
+    .app-modal {
+        align-items: center;
+        padding: 1rem;
+    }
+}
+.app-modal-panel {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 32rem;
+    max-height: min(92dvh, 100%);
+    background: #fff;
+    border-radius: 1rem 1rem 0 0;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+}
+@media (min-width: 640px) {
+    .app-modal-panel {
+        border-radius: 1rem;
+        max-height: min(90vh, 900px);
+    }
+}
+.app-modal-panel--lg {
+    max-width: 42rem;
+}
+.app-modal-header {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1.25rem 1.5rem 0.75rem;
+}
+.app-modal-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 0.25rem 1.5rem 1rem;
+    overscroll-behavior: contain;
+}
+.app-modal-actions {
+    flex-shrink: 0;
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.85rem 1.5rem calc(0.85rem + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid #e5e7eb;
+    background: #fff;
+}
+body.modal-open {
+    overflow: hidden;
+}
+body.modal-open .mobile-bottom-nav {
+    pointer-events: none;
+}
+
 /* Mobile bottom nav + sidebar drawer */
 .mobile-bottom-nav {
     display: none;

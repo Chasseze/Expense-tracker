@@ -1485,18 +1485,34 @@
                 return fetch(`${API_BASE}${endpoint}`, { ...options, headers });
             }
 
+            function syncModalOpenState() {
+                const open = Array.from(
+                    document.querySelectorAll(".app-modal, [id$='Modal']"),
+                ).some((el) => el && !el.classList.contains("hidden"));
+                document.body.classList.toggle("modal-open", open);
+            }
+
+            function openAppModal(el) {
+                if (!el) return;
+                el.classList.remove("hidden");
+                syncModalOpenState();
+            }
+
+            function closeAppModal(el) {
+                if (!el) return;
+                el.classList.add("hidden");
+                syncModalOpenState();
+            }
+
             function setPurchaseReceiptAddMode(isAdd) {
-                const btn = $("#uploadPurchaseReceiptBtn");
                 const hint = $("#purchaseReceiptAddHint");
-                // Keep "Upload now" available when editing an existing purchase.
-                // On add, the chosen file attaches automatically on Save.
-                if (btn) btn.classList.toggle("hidden", isAdd);
                 if (hint) {
                     hint.textContent = isAdd
-                        ? "Image or PDF, up to 5 MB. Chosen files attach automatically when you save."
-                        : "Image or PDF, up to 5 MB. Click Upload now, or choose a file and Save.";
+                        ? "Image or PDF, up to 5 MB. Choose a file, then tap Upload now (or Save Purchase) to attach it."
+                        : "Image or PDF, up to 5 MB. Choose a file and tap Upload now, or Save to upload with the purchase.";
                     hint.classList.remove("hidden");
                 }
+                updatePurchaseReceiptFileName();
             }
 
             function showPurchaseReceiptState(hasFile) {
@@ -1511,14 +1527,26 @@
             function updatePurchaseReceiptFileName() {
                 const input = $("#purchaseReceiptFileInput");
                 const label = $("#purchaseReceiptFileName");
+                const btn = $("#uploadPurchaseReceiptBtn");
                 if (!input || !label) return;
                 const file = input.files && input.files[0];
                 if (file) {
                     label.textContent = `Selected: ${file.name} (${Math.round(file.size / 1024)} KB)`;
                     label.classList.remove("hidden");
+                    if (btn) {
+                        btn.classList.remove("hidden");
+                        btn.textContent = window.editingPurchaseId
+                            ? "Upload now"
+                            : "Upload now";
+                        btn.disabled = false;
+                    }
                 } else {
                     label.textContent = "";
                     label.classList.add("hidden");
+                    if (btn) {
+                        btn.classList.add("hidden");
+                        btn.disabled = false;
+                    }
                 }
             }
 
@@ -2551,7 +2579,7 @@
                 function openPurchaseModal(title) {
                     fillPurchaseCategoryOptions();
                     $("#purchaseModalTitle").textContent = title;
-                    $("#purchaseModal").classList.remove("hidden");
+                    openAppModal($("#purchaseModal"));
                 }
 
                 if ($("#addPurchaseBtn")) {
@@ -2569,10 +2597,10 @@
                     });
                 }
                 $("#closePurchaseModal").addEventListener("click", () =>
-                    $("#purchaseModal").classList.add("hidden"),
+                    closeAppModal($("#purchaseModal")),
                 );
                 $("#cancelPurchase").addEventListener("click", () =>
-                    $("#purchaseModal").classList.add("hidden"),
+                    closeAppModal($("#purchaseModal")),
                 );
 
                 window.editPurchase = (id) => {
@@ -2654,7 +2682,7 @@
 
                         if ($("#purchaseReceiptFileInput")) $("#purchaseReceiptFileInput").value = "";
                         updatePurchaseReceiptFileName();
-                        $("#purchaseModal").classList.add("hidden");
+                        closeAppModal($("#purchaseModal"));
                         window.editingPurchaseId = null;
                         await loadPurchases();
                     } catch (error) {
@@ -2719,15 +2747,26 @@
                 if ($("#uploadPurchaseReceiptBtn")) {
                     $("#uploadPurchaseReceiptBtn").addEventListener("click", async () => {
                         const fileInput = $("#purchaseReceiptFileInput");
-                        if (!fileInput.files.length) {
+                        const btn = $("#uploadPurchaseReceiptBtn");
+                        if (!fileInput || !fileInput.files.length) {
                             notify("Choose a file first", true);
                             return;
                         }
+                        // On Add: save the purchase first, then upload the receipt
+                        // so "Upload now" actually stores the file in one tap.
                         if (!window.editingPurchaseId) {
-                            notify("Save the purchase before attaching a receipt", true);
+                            const form = $("#purchaseForm");
+                            if (form && typeof form.requestSubmit === "function") {
+                                form.requestSubmit();
+                            } else if (form) {
+                                form.dispatchEvent(
+                                    new Event("submit", { cancelable: true, bubbles: true }),
+                                );
+                            }
                             return;
                         }
                         try {
+                            if (btn) btn.disabled = true;
                             await uploadReceiptFile(
                                 "purchases",
                                 window.editingPurchaseId,
@@ -2740,6 +2779,8 @@
                             await loadPurchases();
                         } catch (error) {
                             notify(error.message || "Unable to upload receipt", true);
+                        } finally {
+                            if (btn) btn.disabled = false;
                         }
                     });
                 }
