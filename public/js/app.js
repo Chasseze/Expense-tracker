@@ -704,6 +704,73 @@
                 renderPurchasesTable();
             }
 
+            // ── Receipts Gallery (purchase receipts) ──
+            let galleryObjectUrls = [];
+
+            async function loadReceiptsGallery() {
+                const grid = $("#receiptsGalleryGrid");
+                const empty = $("#receiptsGalleryEmpty");
+                const loading = $("#receiptsGalleryLoading");
+                if (!grid) return;
+                // Free object URLs from a previous render to avoid leaks.
+                galleryObjectUrls.forEach((u) => URL.revokeObjectURL(u));
+                galleryObjectUrls = [];
+                grid.innerHTML = "";
+                empty.classList.add("hidden");
+                loading.classList.remove("hidden");
+                try {
+                    purchases = await apiCall("/purchases");
+                } catch (error) {
+                    // fall back to whatever is already loaded
+                }
+                const withReceipts = (purchases || []).filter((p) => p.receipt_path);
+                loading.classList.add("hidden");
+                if (!withReceipts.length) {
+                    empty.classList.remove("hidden");
+                    return;
+                }
+                withReceipts.forEach((p) => {
+                    const card = document.createElement("div");
+                    card.className = "receipt-card";
+                    card.innerHTML = `
+                        <div class="receipt-thumb"><div class="receipt-thumb-state"><i class="fas fa-spinner fa-spin"></i></div></div>
+                        <div class="receipt-card-meta">
+                            <div class="receipt-card-title" title="${escapeHtml(p.item)}">${escapeHtml(p.item)}</div>
+                            <div class="receipt-card-sub">${fmtMoney(p.estimated_cost)} · ${escapeHtml(p.status || "")}</div>
+                        </div>`;
+                    card.addEventListener("click", () =>
+                        openReceiptFor("purchases", p.id),
+                    );
+                    grid.appendChild(card);
+                    hydrateReceiptThumb(card, p.id);
+                });
+            }
+
+            async function hydrateReceiptThumb(card, id) {
+                const thumb = card.querySelector(".receipt-thumb");
+                try {
+                    const res = await receiptFetch(`/purchases/${id}/receipt`);
+                    if (!res.ok) throw new Error("load failed");
+                    const blob = await res.blob();
+                    if (blob.type === "application/pdf") {
+                        thumb.innerHTML =
+                            '<div class="receipt-thumb-state receipt-thumb-pdf"><i class="fas fa-file-pdf"></i><span>PDF</span></div>';
+                        return;
+                    }
+                    const url = URL.createObjectURL(blob);
+                    galleryObjectUrls.push(url);
+                    const img = document.createElement("img");
+                    img.src = url;
+                    img.alt = "Receipt";
+                    img.loading = "lazy";
+                    thumb.innerHTML = "";
+                    thumb.appendChild(img);
+                } catch {
+                    thumb.innerHTML =
+                        '<div class="receipt-thumb-state"><i class="fas fa-triangle-exclamation"></i></div>';
+                }
+            }
+
             function fillPurchaseCategoryOptions() {
                 const list = document.querySelector("#purchaseCategoryList");
                 if (!list) return;
@@ -1601,9 +1668,60 @@
                 };
             }
 
+            // Scale down + compress an image before upload. Large phone photos
+            // (several MB) are slow to encode/upload and can exhaust memory or
+            // hit the 5 MB limit; this caps the longest edge and re-encodes as
+            // JPEG. Non-images (PDF) and animated GIFs pass through untouched.
+            async function compressImage(file, maxDim = 1600, quality = 0.8) {
+                if (
+                    !file ||
+                    !file.type ||
+                    !file.type.startsWith("image/") ||
+                    file.type === "image/gif"
+                ) {
+                    return file;
+                }
+                try {
+                    const dataUrl = await new Promise((resolve, reject) => {
+                        const fr = new FileReader();
+                        fr.onload = () => resolve(fr.result);
+                        fr.onerror = () => reject(new Error("read failed"));
+                        fr.readAsDataURL(file);
+                    });
+                    const img = await new Promise((resolve, reject) => {
+                        const im = new Image();
+                        im.onload = () => resolve(im);
+                        im.onerror = () => reject(new Error("decode failed"));
+                        im.src = dataUrl;
+                    });
+                    const longest = Math.max(img.width, img.height);
+                    // Already small enough — skip re-encoding.
+                    if (longest <= maxDim && file.size <= 800 * 1024) return file;
+                    const scale = Math.min(1, maxDim / longest);
+                    const w = Math.round(img.width * scale);
+                    const h = Math.round(img.height * scale);
+                    const canvas = document.createElement("canvas");
+                    canvas.width = w;
+                    canvas.height = h;
+                    const ctx = canvas.getContext("2d");
+                    ctx.drawImage(img, 0, 0, w, h);
+                    const blob = await new Promise((resolve) =>
+                        canvas.toBlob(resolve, "image/jpeg", quality),
+                    );
+                    if (!blob || blob.size >= file.size) return file;
+                    const baseName =
+                        (file.name || "receipt").replace(/\.[^.]+$/, "") || "receipt";
+                    return new File([blob], `${baseName}.jpg`, { type: "image/jpeg" });
+                } catch {
+                    // If anything goes wrong, fall back to the original file.
+                    return file;
+                }
+            }
+
             // Upload a receipt file for an already-created purchase (or expense).
             async function uploadReceiptFile(resource, id, file) {
-                const payload = await fileToReceiptPayload(file);
+                const toSend = await compressImage(file);
+                const payload = await fileToReceiptPayload(toSend);
                 return apiCall(`/${resource}/${id}/receipt`, {
                     method: "POST",
                     body: payload,
@@ -2537,6 +2655,15 @@
                     purchasesNavBtn.addEventListener("click", () => {
                         loadPurchases();
                     });
+                }
+
+                // Receipts Gallery tab
+                const galleryNavBtn = document.querySelector('.sidebar-nav-btn[data-view="receipts-gallery"]');
+                if (galleryNavBtn) {
+                    galleryNavBtn.addEventListener("click", () => loadReceiptsGallery());
+                }
+                if ($("#refreshGalleryBtn")) {
+                    $("#refreshGalleryBtn").addEventListener("click", () => loadReceiptsGallery());
                 }
 
                 if ($("#generatePurchaseReportBtn")) {

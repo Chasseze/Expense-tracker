@@ -186,6 +186,10 @@
                             <i class="fas fa-shopping-cart sb-icon"></i>
                             <span class="sb-label">Purchases</span>
                         </button>
+                        <button class="sidebar-nav-btn" data-view="receipts-gallery">
+                            <i class="fas fa-images sb-icon"></i>
+                            <span class="sb-label">Receipts</span>
+                        </button>
                         <hr class="sidebar-hr">
                         <div class="sidebar-section-label">Actions</div>
                         <button class="sidebar-nav-btn primary" id="addExpenseBtn" aria-label="Add expense">
@@ -628,6 +632,23 @@
                             </div>
                         </section>
                         <p class="muted" style="margin-top:0.75rem">Need a purchase summary with receipts? Open <button type="button" id="gotoPurchaseReportBtn" class="text-primary underline">Reports → Purchase Report</button>.</p>
+                    </div>
+
+                    <!-- VIEW: RECEIPTS GALLERY -->
+                    <div id="view-receipts-gallery" class="app-view">
+                        <div class="view-topbar">
+                            <div>
+                                <h2 class="view-heading"><i class="fas fa-images"></i> Receipts Gallery</h2>
+                                <p class="view-sub">Receipts and quotes attached to your purchases</p>
+                            </div>
+                            <button id="refreshGalleryBtn" type="button" class="btn-ghost-sm"><i class="fas fa-sync"></i> Refresh</button>
+                        </div>
+                        <div id="receiptsGalleryLoading" class="hidden text-sm text-gray-500 p-4">Loading receipts…</div>
+                        <div id="receiptsGalleryEmpty" class="hidden text-center text-gray-500 p-8">
+                            <i class="fas fa-images text-3xl mb-2 block opacity-40"></i>
+                            No purchase receipts yet. Attach a receipt or quote when adding a purchase.
+                        </div>
+                        <div id="receiptsGalleryGrid" class="receipts-gallery-grid"></div>
                     </div>
 
 </main>
