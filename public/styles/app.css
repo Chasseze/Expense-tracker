@@ -1795,6 +1795,19 @@ body.modal-open .mobile-bottom-nav {
     pointer-events: none;
 }
 
+/* Keep legacy Tailwind modals above the app chrome (topbar z-50 / nav z-40). */
+#expenseModal,
+#budgetModal,
+#recurringModal,
+#categoriesModal,
+#trashModal,
+#settingsModal {
+    z-index: 200;
+}
+#notification {
+    z-index: 210;
+}
+
 /* Mobile bottom nav + sidebar drawer */
 .mobile-bottom-nav {
     display: none;
