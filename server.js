@@ -1418,7 +1418,7 @@ app.get("/api/reports", authenticateToken, async (req, res) => {
     );
 
     const transactions = await dbAll(
-      `SELECT id, date_time, category, recipient, description, amount_paid, balance_due, status, receipt_path
+      `SELECT id, date_time, category, recipient, description, amount_paid, balance_due, status
              FROM expenses ${where} ORDER BY date_time DESC LIMIT 1000`,
       params,
     );
@@ -1750,6 +1750,78 @@ app.get("/api/purchases", authenticateToken, async (req, res) => {
   }
 });
 
+// Purchase reports — separate from expense /api/reports
+app.get("/api/purchases/reports", authenticateToken, async (req, res) => {
+  try {
+    const { startDate, endDate, category, status } = req.query;
+    const conditions = ["user_id = ?"];
+    const params = [req.user.userId];
+
+    if (startDate) {
+      conditions.push("target_date >= ?");
+      params.push(startDate);
+    }
+    if (endDate) {
+      conditions.push("target_date <= ?");
+      params.push(endDate);
+    }
+    if (category) {
+      conditions.push("category = ?");
+      params.push(category);
+    }
+    if (status) {
+      conditions.push("status = ?");
+      params.push(status);
+    }
+    const where = `WHERE ${conditions.join(" AND ")}`;
+
+    const stats = await dbAll(
+      `SELECT
+                COUNT(*) as total_purchases,
+                SUM(estimated_cost) as total_estimated,
+                SUM(CASE WHEN status = 'Planned' THEN 1 ELSE 0 END) as planned_count,
+                SUM(CASE WHEN status = 'Purchased' THEN 1 ELSE 0 END) as purchased_count
+             FROM purchases ${where}`,
+      params,
+    );
+
+    const byCategory = await dbAll(
+      `SELECT category, COUNT(*) as count, SUM(estimated_cost) as total_estimated
+             FROM purchases ${where} GROUP BY category ORDER BY category`,
+      params,
+    );
+
+    const byStatus = await dbAll(
+      `SELECT status, COUNT(*) as count, SUM(estimated_cost) as total_estimated
+             FROM purchases ${where} GROUP BY status ORDER BY status`,
+      params,
+    );
+
+    const items = await dbAll(
+      `SELECT id, item, category, estimated_cost, priority, target_date, status, notes, receipt_path
+             FROM purchases ${where}
+             ORDER BY CASE status WHEN 'Planned' THEN 0 ELSE 1 END, target_date IS NULL, target_date ASC
+             LIMIT 1000`,
+      params,
+    );
+
+    res.json({
+      statistics: stats[0] || {
+        total_purchases: 0,
+        total_estimated: 0,
+        planned_count: 0,
+        purchased_count: 0,
+      },
+      byCategory,
+      byStatus,
+      items,
+    });
+  } catch (error) {
+    console.error("Purchase reports error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 app.post("/api/purchases", authenticateToken, async (req, res) => {
   try {
     const { item, category, estimated_cost, priority, target_date, notes } = req.body;
@@ -1927,25 +1999,10 @@ app.post("/api/purchases/:id/convert", authenticateToken, async (req, res) => {
     const status = balanceDue > 0 ? "Partial" : "Paid";
     const dateTime = req.body.date_time || new Date().toISOString().slice(0, 16).replace("T", " ");
 
-    // Carry the purchase's receipt over to the new expense as its own copy,
-    // so deleting one record's receipt never affects the other.
-    let expenseReceiptName = null;
-    if (purchase.receipt_path) {
-      const srcPath = path.join(uploadsDir, purchase.receipt_path);
-      if (fs.existsSync(srcPath)) {
-        const ext = path.extname(purchase.receipt_path);
-        expenseReceiptName = `${req.user.userId}-conv-${Date.now()}${ext}`;
-        try {
-          fs.copyFileSync(srcPath, path.join(uploadsDir, expenseReceiptName));
-        } catch (_err) {
-          expenseReceiptName = null;
-        }
-      }
-    }
-
+    // Receipts stay on the purchase record only — expenses no longer carry receipts.
     const expenseResult = await dbRun(
-      `INSERT INTO expenses (user_id, date_time, category, recipient, description, amount_paid, balance_due, status, receipt_path)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO expenses (user_id, date_time, category, recipient, description, amount_paid, balance_due, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         req.user.userId,
         dateTime,
@@ -1955,7 +2012,6 @@ app.post("/api/purchases/:id/convert", authenticateToken, async (req, res) => {
         amountPaid,
         balanceDue,
         status,
-        expenseReceiptName,
       ],
     );
 

@@ -1629,6 +1629,14 @@ body.theme-dark .cat-summary-total { color: #e2e8f0; }
 .reports-table-card table th { font-weight: 700; color: var(--text-muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; }
 .reports-table-card table td { padding: 0.5rem 0.5rem; border-bottom: 1px solid var(--border); }
 .reports-export-row { display: flex; gap: 0.6rem; }
+.report-print-area { background: #fff; }
+.report-print-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0 0 0.85rem;
+}
+body.theme-dark .report-print-area { background: transparent; }
 body.theme-dark .reports-filter-field select,
 body.theme-dark .reports-filter-field input {
     background: #111827; border-color: #1f2937; color: #e5e7eb;
