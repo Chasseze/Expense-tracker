@@ -862,6 +862,77 @@ app.get('/api/purchases', verifyToken, async (req, res) => {
   }
 });
 
+// Purchase reports — separate from expense /api/reports
+app.get('/api/purchases/reports', verifyToken, async (req, res) => {
+  try {
+    const { startDate, endDate, category, status } = req.query;
+    const snapshot = await db.collection('users').doc(req.user.uid).collection('purchases').get();
+    let purchases = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    if (startDate) {
+      purchases = purchases.filter(p => !p.target_date || String(p.target_date) >= startDate);
+    }
+    if (endDate) {
+      purchases = purchases.filter(p => !p.target_date || String(p.target_date) <= endDate);
+    }
+    if (category) purchases = purchases.filter(p => p.category === category);
+    if (status) purchases = purchases.filter(p => p.status === status);
+
+    const statistics = {
+      total_purchases: purchases.length,
+      total_estimated: purchases.reduce((sum, p) => sum + (Number(p.estimated_cost) || 0), 0),
+      planned_count: purchases.filter(p => p.status === 'Planned').length,
+      purchased_count: purchases.filter(p => p.status === 'Purchased').length,
+    };
+
+    const groupBy = (keyFn) => {
+      const map = {};
+      purchases.forEach(p => {
+        const key = keyFn(p);
+        if (!key) return;
+        if (!map[key]) map[key] = { key, count: 0, total_estimated: 0 };
+        map[key].count++;
+        map[key].total_estimated += Number(p.estimated_cost) || 0;
+      });
+      return Object.values(map);
+    };
+
+    const byCategory = groupBy(p => p.category || 'Uncategorized')
+      .map(r => ({ category: r.key, count: r.count, total_estimated: r.total_estimated }))
+      .sort((a, b) => a.category.localeCompare(b.category));
+    const byStatus = groupBy(p => p.status)
+      .map(r => ({ status: r.key, count: r.count, total_estimated: r.total_estimated }))
+      .sort((a, b) => a.status.localeCompare(b.status));
+
+    const items = purchases
+      .slice()
+      .sort((a, b) => {
+        const statusRank = (s) => (s === 'Planned' ? 0 : 1);
+        if (statusRank(a.status) !== statusRank(b.status)) return statusRank(a.status) - statusRank(b.status);
+        if (!a.target_date) return 1;
+        if (!b.target_date) return -1;
+        return String(a.target_date).localeCompare(String(b.target_date));
+      })
+      .slice(0, 1000)
+      .map(p => ({
+        id: p.id,
+        item: p.item,
+        category: p.category,
+        estimated_cost: p.estimated_cost,
+        priority: p.priority,
+        target_date: p.target_date,
+        status: p.status,
+        notes: p.notes,
+        receipt_path: p.receipt_path || null,
+      }));
+
+    res.json({ statistics, byCategory, byStatus, items });
+  } catch (error) {
+    console.error('Purchase reports error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 app.post('/api/purchases', verifyToken, async (req, res) => {
   try {
     const { item, category, estimated_cost, priority, target_date, notes } = req.body;
@@ -1034,20 +1105,7 @@ app.post('/api/purchases/:id/convert', verifyToken, async (req, res) => {
     const status = balanceDue > 0 ? 'Partial' : 'Paid';
     const dateTime = req.body.date_time || new Date().toISOString().slice(0, 16).replace('T', ' ');
 
-    // Carry the purchase's receipt over to the new expense as its own copy.
-    let expenseReceiptPath = null;
-    if (purchase.receipt_path) {
-      try {
-        const bucket = admin.storage().bucket();
-        const ext = purchase.receipt_path.slice(purchase.receipt_path.lastIndexOf('.'));
-        const destPath = `receipts/${req.user.uid}/conv-${Date.now()}${ext.startsWith('.') ? ext : ''}`;
-        await bucket.file(purchase.receipt_path).copy(bucket.file(destPath));
-        expenseReceiptPath = destPath;
-      } catch (_err) {
-        expenseReceiptPath = null;
-      }
-    }
-
+    // Receipts stay on the purchase record only — expenses no longer carry receipts.
     const expenseRef = await db.collection('users').doc(req.user.uid).collection('expenses').add({
       date_time: dateTime,
       category: purchase.category || 'Uncategorized',
@@ -1058,7 +1116,6 @@ app.post('/api/purchases/:id/convert', verifyToken, async (req, res) => {
       balance_due: balanceDue,
       status,
       due_date: null,
-      receipt_path: expenseReceiptPath,
       deleted_at: null,
       created_at: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -1183,7 +1240,6 @@ app.get('/api/reports', verifyToken, async (req, res) => {
         amount_paid: e.amount_paid,
         balance_due: e.balance_due,
         status: e.status,
-        receipt_path: e.receipt_path || null,
       }));
 
     res.json({ statistics, byCategory, byStatus, byMonth, transactions });

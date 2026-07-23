@@ -763,6 +763,19 @@
                     .join("");
             }
 
+            function fillPurchaseReportCategoryOptions() {
+                const select = document.querySelector("#purchaseReportCategory");
+                if (!select) return;
+                const categories = getAllCategories();
+                const current = select.value;
+                select.innerHTML =
+                    '<option value="">All categories</option>' +
+                    categories
+                        .map((cat) => `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`)
+                        .join("");
+                if (current) select.value = current;
+            }
+
             function fillReportCategoryOptions() {
                 const select = document.querySelector("#reportCategory");
                 if (!select) return;
@@ -777,6 +790,7 @@
             }
 
             let lastReportData = null;
+            let lastPurchaseReportData = null;
 
             async function generateReport() {
                 const qs = new URLSearchParams();
@@ -795,6 +809,27 @@
                     renderReport(data);
                 } catch (error) {
                     notify("Unable to generate report", true);
+                }
+            }
+
+            async function generatePurchaseReport() {
+                const qs = new URLSearchParams();
+                const start = $("#purchaseReportStartDate") && $("#purchaseReportStartDate").value;
+                const end = $("#purchaseReportEndDate") && $("#purchaseReportEndDate").value;
+                const category = $("#purchaseReportCategory") && $("#purchaseReportCategory").value;
+                const status = $("#purchaseReportStatus") && $("#purchaseReportStatus").value;
+                if (start) qs.set("startDate", start);
+                if (end) qs.set("endDate", end);
+                if (category) qs.set("category", category);
+                if (status) qs.set("status", status);
+
+                try {
+                    const data = await apiCall(`/purchases/reports?${qs.toString()}`);
+                    lastPurchaseReportData = data;
+                    renderPurchaseReport(data);
+                } catch (error) {
+                    console.error("Purchase report failed:", error);
+                    notify(error.message || "Unable to generate purchase report", true);
                 }
             }
 
@@ -848,29 +883,87 @@
                 <td class="p-2">${fmtMoney(t.amount_paid)}</td>
                 <td class="p-2">${fmtMoney(t.balance_due)}</td>
                 <td class="p-2">${statusBadge}</td>
-                <td class="p-2">${
-                    t.receipt_path
-                        ? `<a href="#" class="report-receipt-link text-primary" data-id="${escapeHtml(String(t.id))}" title="View receipt"><i class="fas fa-paperclip"></i></a>`
-                        : '<span class="text-gray-300">—</span>'
-                }</td>
             </tr>`;
                           })
                           .join("")
-                    : '<tr><td colspan="7" class="p-3 text-center text-gray-500">No transactions for this filter.</td></tr>';
+                    : '<tr><td colspan="6" class="p-3 text-center text-gray-500">No transactions for this filter.</td></tr>';
 
                 $("#reportResults").classList.remove("hidden");
                 $("#reportEmptyState").classList.add("hidden");
             }
 
+            function renderPurchaseReport(data) {
+                const stats = data.statistics || {};
+                const summaryEl = $("#purchaseReportSummaryCards");
+                if (!summaryEl) return;
+                summaryEl.innerHTML = `
+            <div class="summary-card summary-paid">
+                <div class="meta"><p class="label">Total Est. Cost</p><p class="value">${fmtMoney(stats.total_estimated)}</p></div>
+                <i class="fas fa-shopping-cart"></i>
+            </div>
+            <div class="summary-card summary-balance">
+                <div class="meta"><p class="label">Planned</p><p class="value">${stats.planned_count || 0}</p></div>
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="summary-card summary-total">
+                <div class="meta"><p class="label">Total Purchases</p><p class="value">${stats.total_purchases || 0}</p></div>
+                <i class="fas fa-list"></i>
+            </div>`;
+
+                const rowHtml = (label, r) => `
+            <tr>
+                <td class="p-2 font-medium">${escapeHtml(String(label))}</td>
+                <td class="p-2">${r.count}</td>
+                <td class="p-2 font-medium">${fmtMoney(r.total_estimated)}</td>
+            </tr>`;
+
+                $("#purchaseReportCategoryTableBody").innerHTML = (data.byCategory || [])
+                    .map((r) => rowHtml(r.category, r))
+                    .join("") || '<tr><td colspan="3" class="p-3 text-center text-gray-500">No data for this filter.</td></tr>';
+
+                $("#purchaseReportStatusTableBody").innerHTML = (data.byStatus || [])
+                    .map((r) => rowHtml(r.status, r))
+                    .join("") || '<tr><td colspan="3" class="p-3 text-center text-gray-500">No data for this filter.</td></tr>';
+
+                const items = data.items || [];
+                $("#purchaseReportItemsTableBody").innerHTML = items.length
+                    ? items
+                          .map((p) => {
+                              const target = p.target_date
+                                  ? new Date(p.target_date).toLocaleDateString()
+                                  : "-";
+                              return `
+            <tr class="border-b border-gray-100">
+                <td class="p-2">${escapeHtml(p.item || "-")}</td>
+                <td class="p-2">${escapeHtml(p.category || "-")}</td>
+                <td class="p-2">${fmtMoney(p.estimated_cost)}</td>
+                <td class="p-2">${PRIORITY_BADGE[p.priority] || escapeHtml(p.priority || "-")}</td>
+                <td class="p-2">${escapeHtml(target)}</td>
+                <td class="p-2">${PURCHASE_STATUS_BADGE[p.status] || escapeHtml(p.status || "-")}</td>
+                <td class="p-2">${
+                    p.receipt_path
+                        ? `<a href="#" class="purchase-report-receipt-link text-primary" data-id="${escapeHtml(String(p.id))}" title="View receipt"><i class="fas fa-paperclip"></i></a>`
+                        : '<span class="text-gray-300">—</span>'
+                }</td>
+            </tr>`;
+                          })
+                          .join("")
+                    : '<tr><td colspan="7" class="p-3 text-center text-gray-500">No purchases for this filter.</td></tr>';
+
+                $("#purchaseReportResults").classList.remove("hidden");
+                $("#purchaseReportEmptyState").classList.add("hidden");
+            }
+
+            function escapeCsvValue(val) {
+                if (val === null || val === undefined) return "";
+                const str = String(val);
+                if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+                    return '"' + str.replace(/"/g, '""') + '"';
+                }
+                return str;
+            }
+
             function reportToCsv(data) {
-                const escapeCsv = (val) => {
-                    if (val === null || val === undefined) return "";
-                    const str = String(val);
-                    if (str.includes(",") || str.includes('"') || str.includes("\n")) {
-                        return '"' + str.replace(/"/g, '""') + '"';
-                    }
-                    return str;
-                };
                 const lines = [];
                 const stats = data.statistics || {};
                 lines.push("Summary");
@@ -881,73 +974,153 @@
                 lines.push("By Category");
                 lines.push("Category,Entries,Paid,Balance Due,Total");
                 (data.byCategory || []).forEach((r) => {
-                    lines.push(`${escapeCsv(r.category)},${r.count},${r.total_paid},${r.total_balance},${(Number(r.total_paid) || 0) + (Number(r.total_balance) || 0)}`);
+                    lines.push(`${escapeCsvValue(r.category)},${r.count},${r.total_paid},${r.total_balance},${(Number(r.total_paid) || 0) + (Number(r.total_balance) || 0)}`);
                 });
                 lines.push("");
                 lines.push("By Status");
                 lines.push("Status,Entries,Paid,Balance Due,Total");
                 (data.byStatus || []).forEach((r) => {
-                    lines.push(`${escapeCsv(r.status)},${r.count},${r.total_paid},${r.total_balance},${(Number(r.total_paid) || 0) + (Number(r.total_balance) || 0)}`);
+                    lines.push(`${escapeCsvValue(r.status)},${r.count},${r.total_paid},${r.total_balance},${(Number(r.total_paid) || 0) + (Number(r.total_balance) || 0)}`);
                 });
                 return lines.join("\n");
             }
 
-            async function ensureJsPDF() {
-                if (window.jspdf && window.jspdf.jsPDF) return true;
-                if (window._jsPdfLoading) return window._jsPdfLoading;
-                window._jsPdfLoading = new Promise((resolve, reject) => {
-                    const s = document.createElement("script");
-                    s.src = "https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js";
-                    s.async = true;
-                    s.onload = () => resolve(true);
-                    s.onerror = () => reject(new Error("Failed to load PDF library"));
-                    document.head.appendChild(s);
-                }).catch((err) => {
-                    console.warn(err);
-                    return false;
+            function purchaseReportToCsv(data) {
+                const lines = [];
+                const stats = data.statistics || {};
+                lines.push("Summary");
+                lines.push(`Total Estimated Cost,${stats.total_estimated || 0}`);
+                lines.push(`Planned,${stats.planned_count || 0}`);
+                lines.push(`Purchased,${stats.purchased_count || 0}`);
+                lines.push(`Total Purchases,${stats.total_purchases || 0}`);
+                lines.push("");
+                lines.push("By Category");
+                lines.push("Category,Entries,Est. Cost");
+                (data.byCategory || []).forEach((r) => {
+                    lines.push(`${escapeCsvValue(r.category)},${r.count},${r.total_estimated}`);
                 });
-                return window._jsPdfLoading;
+                lines.push("");
+                lines.push("By Status");
+                lines.push("Status,Entries,Est. Cost");
+                (data.byStatus || []).forEach((r) => {
+                    lines.push(`${escapeCsvValue(r.status)},${r.count},${r.total_estimated}`);
+                });
+                lines.push("");
+                lines.push("Purchases");
+                lines.push("Item,Category,Est. Cost,Priority,Target Date,Status,Has Receipt");
+                (data.items || []).forEach((p) => {
+                    lines.push([
+                        escapeCsvValue(p.item),
+                        escapeCsvValue(p.category),
+                        p.estimated_cost,
+                        escapeCsvValue(p.priority),
+                        escapeCsvValue(p.target_date || ""),
+                        escapeCsvValue(p.status),
+                        p.receipt_path ? "Yes" : "No",
+                    ].join(","));
+                });
+                return lines.join("\n");
             }
 
-            async function exportReportPdf(data) {
-                const ready = await ensureJsPDF();
-                if (!ready || !window.jspdf) {
-                    notify("Unable to load PDF library", true);
+            function loadScriptOnce(src, flagKey) {
+                if (window[flagKey] === true) return Promise.resolve(true);
+                if (window[flagKey]) return window[flagKey];
+                window[flagKey] = new Promise((resolve) => {
+                    const s = document.createElement("script");
+                    s.src = src;
+                    s.async = true;
+                    s.onload = () => {
+                        window[flagKey] = true;
+                        resolve(true);
+                    };
+                    s.onerror = () => {
+                        window[flagKey] = null;
+                        resolve(false);
+                    };
+                    document.head.appendChild(s);
+                });
+                return window[flagKey];
+            }
+
+            async function ensureJsPDF() {
+                if (window.jspdf && window.jspdf.jsPDF) return true;
+                return loadScriptOnce(
+                    "https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js",
+                    "_jsPdfLoading",
+                );
+            }
+
+            async function ensureHtml2Canvas() {
+                if (typeof window.html2canvas === "function") return true;
+                return loadScriptOnce(
+                    "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js",
+                    "_html2canvasLoading",
+                );
+            }
+
+            // WYSIWYG PDF: capture the on-screen report DOM so the PDF matches
+            // what the user sees (summary cards, tables, badges).
+            async function exportWysiwygPdf(printAreaEl, filename) {
+                if (!printAreaEl) {
+                    notify("Nothing to export", true);
                     return;
                 }
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF();
-                const stats = data.statistics || {};
-                let y = 15;
-                doc.setFontSize(16);
-                doc.text("Expense Report", 14, y);
-                y += 10;
-                doc.setFontSize(11);
-                doc.text(`Total Paid: ${fmtMoney(stats.total_paid)}`, 14, y); y += 7;
-                doc.text(`Total Balance Due: ${fmtMoney(stats.total_balance)}`, 14, y); y += 7;
-                doc.text(`Total Expenses: ${stats.total_expenses || 0}`, 14, y); y += 12;
+                const pdfReady = await ensureJsPDF();
+                const canvasReady = await ensureHtml2Canvas();
+                if (!pdfReady || !canvasReady || !window.jspdf || typeof window.html2canvas !== "function") {
+                    notify("Unable to load PDF libraries", true);
+                    return;
+                }
 
-                doc.setFontSize(13);
-                doc.text("By Category", 14, y); y += 7;
-                doc.setFontSize(10);
-                (data.byCategory || []).forEach((r) => {
-                    const total = (Number(r.total_paid) || 0) + (Number(r.total_balance) || 0);
-                    doc.text(`${r.category}: ${r.count} entries, ${fmtMoney(total)}`, 16, y);
-                    y += 6;
-                    if (y > 280) { doc.addPage(); y = 15; }
-                });
-                y += 6;
-                doc.setFontSize(13);
-                doc.text("By Status", 14, y); y += 7;
-                doc.setFontSize(10);
-                (data.byStatus || []).forEach((r) => {
-                    const total = (Number(r.total_paid) || 0) + (Number(r.total_balance) || 0);
-                    doc.text(`${r.status}: ${r.count} entries, ${fmtMoney(total)}`, 16, y);
-                    y += 6;
-                    if (y > 280) { doc.addPage(); y = 15; }
-                });
+                try {
+                    notify("Preparing PDF…");
+                    const canvas = await window.html2canvas(printAreaEl, {
+                        scale: 2,
+                        useCORS: true,
+                        backgroundColor: "#ffffff",
+                        logging: false,
+                    });
+                    const imgData = canvas.toDataURL("image/png");
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF("p", "mm", "a4");
+                    const pageWidth = doc.internal.pageSize.getWidth();
+                    const pageHeight = doc.internal.pageSize.getHeight();
+                    const margin = 8;
+                    const usableWidth = pageWidth - margin * 2;
+                    const imgHeight = (canvas.height * usableWidth) / canvas.width;
+                    let heightLeft = imgHeight;
+                    let position = margin;
 
-                doc.save(`expense-report-${new Date().toISOString().slice(0, 10)}.pdf`);
+                    doc.addImage(imgData, "PNG", margin, position, usableWidth, imgHeight);
+                    heightLeft -= pageHeight - margin * 2;
+
+                    while (heightLeft > 0) {
+                        position = margin - (imgHeight - heightLeft);
+                        doc.addPage();
+                        doc.addImage(imgData, "PNG", margin, position, usableWidth, imgHeight);
+                        heightLeft -= pageHeight - margin * 2;
+                    }
+
+                    doc.save(filename);
+                    notify("PDF downloaded");
+                } catch (error) {
+                    console.error("PDF export failed:", error);
+                    notify("Unable to export PDF", true);
+                }
+            }
+
+            async function exportReportPdf() {
+                await exportWysiwygPdf(
+                    $("#reportPrintArea"),
+                    `expense-report-${new Date().toISOString().slice(0, 10)}.pdf`,
+                );
+            }
+
+            async function exportPurchaseReportPdf() {
+                await exportWysiwygPdf(
+                    $("#purchaseReportPrintArea"),
+                    `purchase-report-${new Date().toISOString().slice(0, 10)}.pdf`,
+                );
             }
 
             function renderCategoriesList() {
@@ -1314,28 +1487,13 @@
                 return fetch(`${API_BASE}${endpoint}`, { ...options, headers });
             }
 
-            function showReceiptState(hasFile) {
-                const noFile = $("#receiptNoFile");
-                const hasFileEl = $("#receiptHasFile");
-                if (!noFile || !hasFileEl) return;
-                noFile.classList.toggle("hidden", hasFile);
-                hasFileEl.classList.toggle("hidden", !hasFile);
-                hasFileEl.classList.toggle("flex", hasFile);
-            }
-
-            // Add mode: hide the immediate "Upload" button (file uploads on save)
-            // and show the helper hint. Edit mode: the reverse.
-            function setReceiptAddMode(isAdd) {
-                const btn = $("#uploadReceiptBtn");
-                const hint = $("#receiptAddHint");
-                if (btn) btn.classList.toggle("hidden", isAdd);
-                if (hint) hint.classList.toggle("hidden", !isAdd);
-            }
             function setPurchaseReceiptAddMode(isAdd) {
                 const btn = $("#uploadPurchaseReceiptBtn");
                 const hint = $("#purchaseReceiptAddHint");
+                // Add: file is staged and uploaded on save — hide the immediate Upload btn.
+                // Edit: Upload applies right away to the existing purchase.
                 if (btn) btn.classList.toggle("hidden", isAdd);
-                if (hint) hint.classList.toggle("hidden", !isAdd);
+                if (hint) hint.classList.toggle("hidden", false);
             }
 
             function showPurchaseReceiptState(hasFile) {
@@ -1361,11 +1519,7 @@
                     notify("Unable to load receipt", true);
                 }
             }
-            function openReceipt(id) {
-                return openReceiptFor("expenses", id);
-            }
-
-            // Upload a receipt file for an already-created resource (expense/purchase).
+            // Upload a receipt file for an already-created purchase.
             async function uploadReceiptFile(resource, id, file) {
                 const formData = new FormData();
                 formData.append("receipt", file);
@@ -1408,11 +1562,6 @@
                     <td class="p-4 flex gap-2">
                         <button class="text-indigo-600 hover:text-indigo-800 edit-expense" data-id="${escapeHtml(String(expense.id))}"><i class="fas fa-edit"></i></button>
                         <button class="text-red-600 hover:text-red-800 delete-expense" data-id="${escapeHtml(String(expense.id))}"><i class="fas fa-trash"></i></button>
-                        ${
-                            expense.receipt_path
-                                ? `<button class="text-gray-500 hover:text-gray-700 view-receipt" data-id="${escapeHtml(String(expense.id))}" title="View receipt"><i class="fas fa-paperclip"></i></button>`
-                                : `<button class="text-gray-300 hover:text-indigo-600 attach-receipt" data-id="${escapeHtml(String(expense.id))}" title="Attach receipt"><i class="fas fa-paperclip"></i></button>`
-                        }
                     </td>
                 </tr>
             `,
@@ -1836,11 +1985,6 @@
                 $("#expenseBalanceDue").value = expense.balance_due;
                 $("#expenseDueDate").value = expense.due_date || "";
 
-                $("#receiptSection").classList.remove("hidden");
-                showReceiptState(Boolean(expense.receipt_path));
-                setReceiptAddMode(false);
-                if ($("#receiptFileInput")) $("#receiptFileInput").value = "";
-
                 $("#expenseModalTitle").textContent = "Edit Expense";
                 $("#expenseModal").classList.remove("hidden");
                 window.editingExpenseId = id;
@@ -2080,30 +2224,13 @@
                             );
                             notify("Expense updated successfully!");
                         } else {
-                            const created = await apiCall("/expenses", {
+                            await apiCall("/expenses", {
                                 method: "POST",
                                 body: expenseData,
                             });
-                            const newId = created && created.expense && created.expense.id;
-                            const stagedFile =
-                                $("#receiptFileInput") &&
-                                $("#receiptFileInput").files[0];
-                            if (newId && stagedFile) {
-                                try {
-                                    await uploadReceiptFile("expenses", newId, stagedFile);
-                                    notify("Expense and receipt added!");
-                                } catch (e) {
-                                    notify(
-                                        `Expense saved, but receipt upload failed: ${e.message}`,
-                                        true,
-                                    );
-                                }
-                            } else {
-                                notify("Expense added successfully!");
-                            }
+                            notify("Expense added successfully!");
                         }
 
-                        if ($("#receiptFileInput")) $("#receiptFileInput").value = "";
                         $("#expenseModal").classList.add("hidden");
                         loadData();
                         window.editingExpenseId = null;
@@ -2126,12 +2253,6 @@
                         .toISOString()
                         .slice(0, 16);
                     $("#expenseModalTitle").textContent = "Add Expense";
-                    // Show the receipt picker on Add too; the chosen file is
-                    // staged and uploaded right after the expense is created.
-                    $("#receiptSection").classList.remove("hidden");
-                    showReceiptState(false);
-                    if ($("#receiptFileInput")) $("#receiptFileInput").value = "";
-                    setReceiptAddMode(true);
                     $("#expenseModal").classList.remove("hidden");
                 });
 
@@ -2262,24 +2383,49 @@
                     }
                 });
 
-                // Reports tab controls
+                // Reports tab controls — Expense and Purchase are separate panels
+                function setReportMode(mode) {
+                    const isPurchase = mode === "purchase";
+                    const expensePanel = $("#expenseReportPanel");
+                    const purchasePanel = $("#purchaseReportPanel");
+                    if (expensePanel) expensePanel.classList.toggle("hidden", isPurchase);
+                    if (purchasePanel) purchasePanel.classList.toggle("hidden", !isPurchase);
+                    const expenseBtn = $("#reportModeExpenseBtn");
+                    const purchaseBtn = $("#reportModePurchaseBtn");
+                    if (expenseBtn) {
+                        expenseBtn.classList.toggle("active", !isPurchase);
+                        expenseBtn.setAttribute("aria-selected", String(!isPurchase));
+                    }
+                    if (purchaseBtn) {
+                        purchaseBtn.classList.toggle("active", isPurchase);
+                        purchaseBtn.setAttribute("aria-selected", String(isPurchase));
+                    }
+                    if (isPurchase) fillPurchaseReportCategoryOptions();
+                    else fillReportCategoryOptions();
+                }
+
                 const reportsNavBtn = document.querySelector('.sidebar-nav-btn[data-view="reports"]');
                 if (reportsNavBtn) {
                     reportsNavBtn.addEventListener("click", () => {
                         fillReportCategoryOptions();
+                        fillPurchaseReportCategoryOptions();
+                    });
+                }
+                if ($("#reportModeExpenseBtn")) {
+                    $("#reportModeExpenseBtn").addEventListener("click", () => setReportMode("expense"));
+                }
+                if ($("#reportModePurchaseBtn")) {
+                    $("#reportModePurchaseBtn").addEventListener("click", () => setReportMode("purchase"));
+                }
+                if ($("#gotoPurchaseReportBtn")) {
+                    $("#gotoPurchaseReportBtn").addEventListener("click", () => {
+                        const sideBtn = document.querySelector('.sidebar-nav-btn[data-view="reports"]');
+                        if (sideBtn) sideBtn.click();
+                        setReportMode("purchase");
                     });
                 }
                 if ($("#generateReportBtn")) {
                     $("#generateReportBtn").addEventListener("click", generateReport);
-                }
-                if ($("#reportTransactionsTableBody")) {
-                    $("#reportTransactionsTableBody").addEventListener("click", (e) => {
-                        const link = e.target.closest(".report-receipt-link");
-                        if (!link) return;
-                        e.preventDefault();
-                        const id = link.dataset.id;
-                        if (id) openReceiptFor("expenses", id);
-                    });
                 }
                 if ($("#exportReportCsvBtn")) {
                     $("#exportReportCsvBtn").addEventListener("click", () => {
@@ -2303,7 +2449,7 @@
                             notify("Generate a report first", true);
                             return;
                         }
-                        exportReportPdf(lastReportData);
+                        exportReportPdf();
                     });
                 }
 
@@ -2312,6 +2458,44 @@
                 if (purchasesNavBtn) {
                     purchasesNavBtn.addEventListener("click", () => {
                         loadPurchases();
+                    });
+                }
+
+                if ($("#generatePurchaseReportBtn")) {
+                    $("#generatePurchaseReportBtn").addEventListener("click", generatePurchaseReport);
+                }
+                if ($("#purchaseReportItemsTableBody")) {
+                    $("#purchaseReportItemsTableBody").addEventListener("click", (e) => {
+                        const link = e.target.closest(".purchase-report-receipt-link");
+                        if (!link) return;
+                        e.preventDefault();
+                        const id = link.dataset.id;
+                        if (id) openReceiptFor("purchases", id);
+                    });
+                }
+                if ($("#exportPurchaseReportCsvBtn")) {
+                    $("#exportPurchaseReportCsvBtn").addEventListener("click", () => {
+                        if (!lastPurchaseReportData) {
+                            notify("Generate a purchase report first", true);
+                            return;
+                        }
+                        const csv = purchaseReportToCsv(lastPurchaseReportData);
+                        const blob = new Blob([csv], { type: "text/csv" });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `purchase-report-${new Date().toISOString().slice(0, 10)}.csv`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                    });
+                }
+                if ($("#exportPurchaseReportPdfBtn")) {
+                    $("#exportPurchaseReportPdfBtn").addEventListener("click", () => {
+                        if (!lastPurchaseReportData) {
+                            notify("Generate a purchase report first", true);
+                            return;
+                        }
+                        exportPurchaseReportPdf();
                     });
                 }
 
@@ -2611,7 +2795,7 @@
                 if (expenseTBody) {
                     expenseTBody.addEventListener("click", (e) => {
                         const btn = e.target.closest(
-                            ".edit-expense, .delete-expense, .view-receipt, .attach-receipt",
+                            ".edit-expense, .delete-expense",
                         );
                         if (!btn) return;
                         const id = btn.dataset.id;
@@ -2620,66 +2804,7 @@
                             window.editExpense(id);
                         } else if (btn.classList.contains("delete-expense")) {
                             window.deleteExpense(id);
-                        } else if (btn.classList.contains("view-receipt")) {
-                            openReceipt(id);
-                        } else if (btn.classList.contains("attach-receipt")) {
-                            // Open the edit modal, where the receipt uploader lives
-                            window.editExpense(id);
-                            notify("Choose a file and click Upload to attach a receipt");
                         }
-                    });
-                }
-
-                // Receipt upload/view/remove (edit-expense modal)
-                if ($("#uploadReceiptBtn")) {
-                    $("#uploadReceiptBtn").addEventListener("click", async () => {
-                        const fileInput = $("#receiptFileInput");
-                        if (!fileInput.files.length) {
-                            notify("Choose a file first", true);
-                            return;
-                        }
-                        if (!window.editingExpenseId) {
-                            notify("Save the expense before attaching a receipt", true);
-                            return;
-                        }
-                        const formData = new FormData();
-                        formData.append("receipt", fileInput.files[0]);
-                        try {
-                            const res = await receiptFetch(
-                                `/expenses/${window.editingExpenseId}/receipt`,
-                                { method: "POST", body: formData },
-                            );
-                            const data = await res.json();
-                            if (!res.ok) throw new Error(data.error || "Upload failed");
-                            notify("Receipt uploaded!");
-                            fileInput.value = "";
-                            showReceiptState(true);
-                            await loadData();
-                        } catch (error) {
-                            notify(error.message || "Unable to upload receipt", true);
-                        }
-                    });
-                }
-                if ($("#removeReceiptBtn")) {
-                    $("#removeReceiptBtn").addEventListener("click", async () => {
-                        if (!window.editingExpenseId) return;
-                        if (!confirm("Remove this receipt?")) return;
-                        try {
-                            await apiCall(`/expenses/${window.editingExpenseId}/receipt`, {
-                                method: "DELETE",
-                            });
-                            notify("Receipt removed");
-                            showReceiptState(false);
-                            await loadData();
-                        } catch (error) {
-                            notify("Unable to remove receipt", true);
-                        }
-                    });
-                }
-                if ($("#viewReceiptLink")) {
-                    $("#viewReceiptLink").addEventListener("click", (e) => {
-                        e.preventDefault();
-                        if (window.editingExpenseId) openReceipt(window.editingExpenseId);
                     });
                 }
 
