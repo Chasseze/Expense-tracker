@@ -842,6 +842,146 @@ app.delete('/api/recurring/:id', verifyToken, async (req, res) => {
   }
 });
 
+const PURCHASE_PRIORITIES = ['Low', 'Medium', 'High'];
+
+app.get('/api/purchases', verifyToken, async (req, res) => {
+  try {
+    const snapshot = await db.collection('users').doc(req.user.uid).collection('purchases').get();
+    const rows = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    rows.sort((a, b) => {
+      const statusRank = (s) => (s === 'Planned' ? 0 : 1);
+      if (statusRank(a.status) !== statusRank(b.status)) return statusRank(a.status) - statusRank(b.status);
+      if (!a.target_date) return 1;
+      if (!b.target_date) return -1;
+      return a.target_date.localeCompare(b.target_date);
+    });
+    res.json(rows);
+  } catch (error) {
+    console.error('Get purchases error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/purchases', verifyToken, async (req, res) => {
+  try {
+    const { item, category, estimated_cost, priority, target_date, notes } = req.body;
+    if (!item || estimated_cost == null) {
+      return res.status(400).json({ error: 'Item and estimated cost are required' });
+    }
+    const cost = Number(estimated_cost);
+    if (isNaN(cost) || cost < 0) {
+      return res.status(400).json({ error: 'Estimated cost must be a positive number' });
+    }
+    const finalPriority = PURCHASE_PRIORITIES.includes(priority) ? priority : 'Medium';
+
+    const docRef = await db.collection('users').doc(req.user.uid).collection('purchases').add({
+      item,
+      category: category || null,
+      estimated_cost: cost,
+      priority: finalPriority,
+      target_date: target_date || null,
+      status: 'Planned',
+      notes: notes || null,
+      linked_expense_id: null,
+      created_at: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    const doc = await docRef.get();
+    res.json({ message: 'Purchase added', purchase: { id: docRef.id, ...doc.data() } });
+  } catch (error) {
+    console.error('Create purchase error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.put('/api/purchases/:id', verifyToken, async (req, res) => {
+  try {
+    const { item, category, estimated_cost, priority, target_date, notes, status } = req.body;
+    const updates = {};
+    if (item != null) updates.item = item;
+    if (category != null) updates.category = category;
+    if (estimated_cost != null) {
+      const cost = Number(estimated_cost);
+      if (isNaN(cost) || cost < 0) {
+        return res.status(400).json({ error: 'Estimated cost must be a positive number' });
+      }
+      updates.estimated_cost = cost;
+    }
+    if (priority != null) {
+      if (!PURCHASE_PRIORITIES.includes(priority)) {
+        return res.status(400).json({ error: 'Invalid priority' });
+      }
+      updates.priority = priority;
+    }
+    if (target_date != null) updates.target_date = target_date;
+    if (notes != null) updates.notes = notes;
+    if (status != null) updates.status = status;
+
+    if (!Object.keys(updates).length) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    await db.collection('users').doc(req.user.uid).collection('purchases').doc(req.params.id).update(updates);
+    res.json({ message: 'Purchase updated' });
+  } catch (error) {
+    console.error('Update purchase error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.delete('/api/purchases/:id', verifyToken, async (req, res) => {
+  try {
+    await db.collection('users').doc(req.user.uid).collection('purchases').doc(req.params.id).delete();
+    res.json({ message: 'Purchase deleted' });
+  } catch (error) {
+    console.error('Delete purchase error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Convert a planned purchase into a real expense record.
+app.post('/api/purchases/:id/convert', verifyToken, async (req, res) => {
+  try {
+    const purchaseRef = db.collection('users').doc(req.user.uid).collection('purchases').doc(req.params.id);
+    const doc = await purchaseRef.get();
+    if (!doc.exists) {
+      return res.status(404).json({ error: 'Purchase not found' });
+    }
+    const purchase = doc.data();
+    if (purchase.status === 'Purchased') {
+      return res.status(400).json({ error: 'Purchase has already been converted' });
+    }
+
+    const amountPaid = Number(req.body.amount_paid);
+    const balanceDue = Number(req.body.balance_due) || 0;
+    if (isNaN(amountPaid) || amountPaid < 0 || balanceDue < 0) {
+      return res.status(400).json({ error: 'Invalid amount values' });
+    }
+    const status = balanceDue > 0 ? 'Partial' : 'Paid';
+    const dateTime = req.body.date_time || new Date().toISOString().slice(0, 16).replace('T', ' ');
+
+    const expenseRef = await db.collection('users').doc(req.user.uid).collection('expenses').add({
+      date_time: dateTime,
+      category: purchase.category || 'Uncategorized',
+      session_term: '',
+      recipient: purchase.item,
+      description: `Purchased: ${purchase.item}`,
+      amount_paid: amountPaid,
+      balance_due: balanceDue,
+      status,
+      due_date: null,
+      deleted_at: null,
+      created_at: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await purchaseRef.update({ status: 'Purchased', linked_expense_id: expenseRef.id });
+    res.json({ message: 'Purchase converted to expense', expense_id: expenseRef.id });
+  } catch (error) {
+    console.error('Convert purchase error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Get custom categories
 app.get('/api/categories', verifyToken, async (req, res) => {
   try {

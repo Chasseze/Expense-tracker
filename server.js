@@ -229,6 +229,21 @@ async function initializeDatabase() {
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (id)
         )`,
+    `CREATE TABLE IF NOT EXISTS purchases (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            item TEXT NOT NULL,
+            category TEXT,
+            estimated_cost REAL NOT NULL,
+            priority TEXT DEFAULT 'Medium',
+            target_date TEXT,
+            status TEXT DEFAULT 'Planned',
+            notes TEXT,
+            linked_expense_id INTEGER,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id),
+            FOREIGN KEY (linked_expense_id) REFERENCES expenses (id)
+        )`,
     // Performance indexes
     `CREATE INDEX IF NOT EXISTS idx_expenses_user_date ON expenses(user_id, date_time DESC)`,
     `CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(user_id, category)`,
@@ -1698,6 +1713,150 @@ app.delete("/api/recurring/:id", authenticateToken, async (req, res) => {
     res.json({ message: "Recurring expense deleted" });
   } catch (error) {
     console.error("Delete recurring template error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+const PURCHASE_PRIORITIES = ["Low", "Medium", "High"];
+
+app.get("/api/purchases", authenticateToken, async (req, res) => {
+  try {
+    const rows = await dbAll(
+      "SELECT * FROM purchases WHERE user_id = ? ORDER BY CASE status WHEN 'Planned' THEN 0 ELSE 1 END, target_date IS NULL, target_date ASC",
+      [req.user.userId],
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error("Get purchases error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.post("/api/purchases", authenticateToken, async (req, res) => {
+  try {
+    const { item, category, estimated_cost, priority, target_date, notes } = req.body;
+    if (!item || estimated_cost == null) {
+      return res.status(400).json({ error: "Item and estimated cost are required" });
+    }
+    const cost = parseFloat(estimated_cost);
+    if (isNaN(cost) || cost < 0) {
+      return res.status(400).json({ error: "Estimated cost must be a positive number" });
+    }
+    const finalPriority = PURCHASE_PRIORITIES.includes(priority) ? priority : "Medium";
+
+    const result = await dbRun(
+      `INSERT INTO purchases (user_id, item, category, estimated_cost, priority, target_date, notes)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [req.user.userId, item, category || null, cost, finalPriority, target_date || null, notes || null],
+    );
+
+    const newRow = await dbAll("SELECT * FROM purchases WHERE id = ?", [result.id]);
+    res.json({ message: "Purchase added", purchase: newRow[0] });
+  } catch (error) {
+    console.error("Create purchase error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.put("/api/purchases/:id", authenticateToken, async (req, res) => {
+  try {
+    const { item, category, estimated_cost, priority, target_date, notes, status } = req.body;
+    const updates = [];
+    const params = [];
+    if (item != null) { updates.push("item = ?"); params.push(item); }
+    if (category != null) { updates.push("category = ?"); params.push(category); }
+    if (estimated_cost != null) {
+      const cost = parseFloat(estimated_cost);
+      if (isNaN(cost) || cost < 0) {
+        return res.status(400).json({ error: "Estimated cost must be a positive number" });
+      }
+      updates.push("estimated_cost = ?"); params.push(cost);
+    }
+    if (priority != null) {
+      if (!PURCHASE_PRIORITIES.includes(priority)) {
+        return res.status(400).json({ error: "Invalid priority" });
+      }
+      updates.push("priority = ?"); params.push(priority);
+    }
+    if (target_date != null) { updates.push("target_date = ?"); params.push(target_date); }
+    if (notes != null) { updates.push("notes = ?"); params.push(notes); }
+    if (status != null) { updates.push("status = ?"); params.push(status); }
+
+    if (!updates.length) {
+      return res.status(400).json({ error: "No fields to update" });
+    }
+
+    params.push(req.params.id, req.user.userId);
+    await dbRun(
+      `UPDATE purchases SET ${updates.join(", ")} WHERE id = ? AND user_id = ?`,
+      params,
+    );
+    res.json({ message: "Purchase updated" });
+  } catch (error) {
+    console.error("Update purchase error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.delete("/api/purchases/:id", authenticateToken, async (req, res) => {
+  try {
+    await dbRun(
+      "DELETE FROM purchases WHERE id = ? AND user_id = ?",
+      [req.params.id, req.user.userId],
+    );
+    res.json({ message: "Purchase deleted" });
+  } catch (error) {
+    console.error("Delete purchase error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Convert a planned purchase into a real expense record.
+app.post("/api/purchases/:id/convert", authenticateToken, async (req, res) => {
+  try {
+    const rows = await dbAll(
+      "SELECT * FROM purchases WHERE id = ? AND user_id = ?",
+      [req.params.id, req.user.userId],
+    );
+    if (!rows.length) {
+      return res.status(404).json({ error: "Purchase not found" });
+    }
+    const purchase = rows[0];
+    if (purchase.status === "Purchased") {
+      return res.status(400).json({ error: "Purchase has already been converted" });
+    }
+
+    const amountPaid = parseFloat(req.body.amount_paid);
+    const balanceDue = parseFloat(req.body.balance_due) || 0;
+    if (isNaN(amountPaid) || amountPaid < 0 || balanceDue < 0) {
+      return res.status(400).json({ error: "Invalid amount values" });
+    }
+    const status = balanceDue > 0 ? "Partial" : "Paid";
+    const dateTime = req.body.date_time || new Date().toISOString().slice(0, 16).replace("T", " ");
+
+    const expenseResult = await dbRun(
+      `INSERT INTO expenses (user_id, date_time, category, recipient, description, amount_paid, balance_due, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        req.user.userId,
+        dateTime,
+        purchase.category || "Uncategorized",
+        purchase.item,
+        `Purchased: ${purchase.item}`,
+        amountPaid,
+        balanceDue,
+        status,
+      ],
+    );
+
+    await dbRun(
+      "UPDATE purchases SET status = 'Purchased', linked_expense_id = ? WHERE id = ? AND user_id = ?",
+      [expenseResult.id, req.params.id, req.user.userId],
+    );
+
+    res.json({ message: "Purchase converted to expense", expense_id: expenseResult.id });
+  } catch (error) {
+    console.error("Convert purchase error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 });

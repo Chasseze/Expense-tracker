@@ -690,6 +690,74 @@
                 }
             }
 
+            let purchases = [];
+            window.editingPurchaseId = null;
+
+            async function loadPurchases() {
+                try {
+                    purchases = await apiCall("/purchases");
+                } catch (error) {
+                    purchases = [];
+                    notify("Unable to load purchases", true);
+                }
+                renderPurchasesTable();
+            }
+
+            function fillPurchaseCategoryOptions() {
+                const select = document.querySelector("#purchaseCategory");
+                if (!select) return;
+                const categories = getAllCategories();
+                const current = select.value;
+                select.innerHTML = categories
+                    .map((cat) => `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`)
+                    .join("");
+                if (current) select.value = current;
+            }
+
+            const PRIORITY_BADGE = {
+                Low: '<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">Low</span>',
+                Medium: '<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Medium</span>',
+                High: '<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">High</span>',
+            };
+            const PURCHASE_STATUS_BADGE = {
+                Planned: '<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Planned</span>',
+                Purchased: '<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Purchased</span>',
+                Cancelled: '<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Cancelled</span>',
+            };
+
+            function renderPurchasesTable() {
+                const tbody = document.querySelector("#purchasesTableBody");
+                if (!tbody) return;
+                if (!purchases.length) {
+                    tbody.innerHTML =
+                        '<tr><td colspan="7" class="p-4 text-center text-gray-500">No planned purchases yet.</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = purchases
+                    .map((p) => {
+                        const isPlanned = p.status === "Planned";
+                        return `
+                <tr class="border-b border-gray-100 hover:bg-gray-50">
+                    <td class="p-3 font-medium">${escapeHtml(p.item)}</td>
+                    <td class="p-3">${escapeHtml(p.category || "-")}</td>
+                    <td class="p-3">${fmtMoney(p.estimated_cost)}</td>
+                    <td class="p-3">${PRIORITY_BADGE[p.priority] || escapeHtml(p.priority)}</td>
+                    <td class="p-3">${escapeHtml(p.target_date) || "-"}</td>
+                    <td class="p-3">${PURCHASE_STATUS_BADGE[p.status] || escapeHtml(p.status)}</td>
+                    <td class="p-3 flex gap-2">
+                        ${
+                            isPlanned
+                                ? `<button class="text-indigo-600 hover:text-indigo-800 edit-purchase" data-id="${p.id}" title="Edit"><i class="fas fa-edit"></i></button>
+                           <button class="text-green-600 hover:text-green-800 convert-purchase" data-id="${p.id}" title="Mark purchased"><i class="fas fa-check-circle"></i></button>`
+                                : ""
+                        }
+                        <button class="text-red-600 hover:text-red-800 delete-purchase" data-id="${p.id}" title="Remove"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>`;
+                    })
+                    .join("");
+            }
+
             function fillReportCategoryOptions() {
                 const select = document.querySelector("#reportCategory");
                 if (!select) return;
@@ -2131,6 +2199,127 @@
                             return;
                         }
                         exportReportPdf(lastReportData);
+                    });
+                }
+
+                // Purchases tab controls
+                const purchasesNavBtn = document.querySelector('.sidebar-nav-btn[data-view="purchases"]');
+                if (purchasesNavBtn) {
+                    purchasesNavBtn.addEventListener("click", () => {
+                        loadPurchases();
+                    });
+                }
+
+                function openPurchaseModal(title) {
+                    fillPurchaseCategoryOptions();
+                    $("#purchaseModalTitle").textContent = title;
+                    $("#purchaseModal").classList.remove("hidden");
+                }
+
+                if ($("#addPurchaseBtn")) {
+                    $("#addPurchaseBtn").addEventListener("click", () => {
+                        window.editingPurchaseId = null;
+                        $("#purchaseForm").reset();
+                        openPurchaseModal("Add Purchase");
+                    });
+                }
+                $("#closePurchaseModal").addEventListener("click", () =>
+                    $("#purchaseModal").classList.add("hidden"),
+                );
+                $("#cancelPurchase").addEventListener("click", () =>
+                    $("#purchaseModal").classList.add("hidden"),
+                );
+
+                window.editPurchase = (id) => {
+                    const p = purchases.find((x) => String(x.id) === String(id));
+                    if (!p) return;
+                    window.editingPurchaseId = id;
+                    fillPurchaseCategoryOptions();
+                    $("#purchaseItem").value = p.item;
+                    $("#purchaseCategory").value = p.category || "";
+                    $("#purchaseEstimatedCost").value = p.estimated_cost;
+                    $("#purchasePriority").value = p.priority || "Medium";
+                    $("#purchaseTargetDate").value = p.target_date || "";
+                    $("#purchaseNotes").value = p.notes || "";
+                    openPurchaseModal("Edit Purchase");
+                };
+
+                $("#purchaseForm").addEventListener("submit", async (e) => {
+                    e.preventDefault();
+                    const cost = toNumber($("#purchaseEstimatedCost").value);
+                    if (isNaN(cost) || cost < 0) {
+                        notify("Estimated cost must be a positive number", true);
+                        return;
+                    }
+                    const body = {
+                        item: $("#purchaseItem").value,
+                        category: $("#purchaseCategory").value,
+                        estimated_cost: cost,
+                        priority: $("#purchasePriority").value,
+                        target_date: $("#purchaseTargetDate").value || null,
+                        notes: $("#purchaseNotes").value,
+                    };
+                    try {
+                        if (window.editingPurchaseId) {
+                            await apiCall(`/purchases/${window.editingPurchaseId}`, { method: "PUT", body });
+                            notify("Purchase updated!");
+                        } else {
+                            await apiCall("/purchases", { method: "POST", body });
+                            notify("Purchase added!");
+                        }
+                        $("#purchaseModal").classList.add("hidden");
+                        window.editingPurchaseId = null;
+                        await loadPurchases();
+                    } catch (error) {
+                        notify(error.message || "Unable to save purchase", true);
+                    }
+                });
+
+                if ($("#purchasesTableBody")) {
+                    $("#purchasesTableBody").addEventListener("click", async (e) => {
+                        const btn = e.target.closest(".edit-purchase, .delete-purchase, .convert-purchase");
+                        if (!btn) return;
+                        const id = btn.dataset.id;
+                        if (!id) return;
+
+                        if (btn.classList.contains("edit-purchase")) {
+                            window.editPurchase(id);
+                        } else if (btn.classList.contains("delete-purchase")) {
+                            if (!confirm("Remove this purchase?")) return;
+                            try {
+                                await apiCall(`/purchases/${id}`, { method: "DELETE" });
+                                notify("Purchase removed");
+                                await loadPurchases();
+                            } catch (error) {
+                                notify("Unable to remove purchase", true);
+                            }
+                        } else if (btn.classList.contains("convert-purchase")) {
+                            const p = purchases.find((x) => String(x.id) === String(id));
+                            if (!p) return;
+                            const amountStr = prompt(
+                                `Mark "${p.item}" as purchased.\nAmount paid now (₦):`,
+                                p.estimated_cost,
+                            );
+                            if (amountStr === null) return;
+                            const amountPaid = toNumber(amountStr);
+                            if (isNaN(amountPaid) || amountPaid < 0) {
+                                notify("Amount paid must be a positive number", true);
+                                return;
+                            }
+                            const balanceStr = prompt("Balance due, if any (₦):", "0");
+                            const balanceDue = toNumber(balanceStr) || 0;
+                            try {
+                                await apiCall(`/purchases/${id}/convert`, {
+                                    method: "POST",
+                                    body: { amount_paid: amountPaid, balance_due: balanceDue },
+                                });
+                                notify("Purchase converted to an expense!");
+                                await loadPurchases();
+                                await loadData();
+                            } catch (error) {
+                                notify(error.message || "Unable to convert purchase", true);
+                            }
+                        }
                     });
                 }
 
