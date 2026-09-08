@@ -13,9 +13,11 @@ assert.match(css, /body\.theme-dark \.auth-form-panel h2/, "Authentication text 
 assert.match(html, /data-range="this-month"/, "Dashboard needs a this-month shortcut.");
 assert.match(html, /id="budgetProgressList"/, "Dashboard needs budget guidance.");
 assert.match(html, /id="recurringOverview"/, "Dashboard needs recurring-payment guidance.");
+assert.match(html, /id="dashboardOnboarding"/, "New users need a clear onboarding path.");
 assert.match(html, /id="expensePaymentPlan"/, "Expense payment-plan fields should be progressively disclosed.");
 assert.match(html, /<details class="sidebar-more">/, "Secondary tools should be grouped in the sidebar.");
 assert.match(app, /recurringResp/, "Dashboard hydration should include recurring expenses.");
 assert.match(app, /\.dash-preset/, "Date-range shortcut interactions must be wired up.");
+assert.match(app, /Import preview:/, "Imports should be confirmed from a preview.");
 
 console.log("UI contract checks passed.");

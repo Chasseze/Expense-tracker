@@ -1431,6 +1431,30 @@
             const expenseDedupKey = (e) =>
                 `${(e.date_time || e.dateTime || "").slice(0, 16)}|${(e.recipient || "").toLowerCase().trim()}|${(e.description || "").toLowerCase().trim()}|${e.amount_paid ?? e.amountPaid ?? 0}`;
 
+            function previewImport(payload) {
+                const incomingExpenses = Array.isArray(payload.expenses) ? payload.expenses : [];
+                const incomingPosts = Array.isArray(payload.blogPosts) ? payload.blogPosts : [];
+                const existingKeys = new Set(expenses.map(expenseDedupKey));
+                let duplicates = 0;
+                let invalid = 0;
+
+                incomingExpenses.forEach((entry) => {
+                    const amount = Number(entry.amount_paid ?? entry.amountPaid ?? 0);
+                    if (!Number.isFinite(amount) || amount < 0) {
+                        invalid += 1;
+                        return;
+                    }
+                    if (existingKeys.has(expenseDedupKey(entry))) duplicates += 1;
+                });
+
+                return {
+                    expenses: incomingExpenses.length,
+                    posts: incomingPosts.length,
+                    duplicates,
+                    invalid,
+                };
+            }
+
             async function processImportedData(data) {
                 const result = { expenses: 0, blogPosts: 0, skipped: 0 };
 
@@ -1543,6 +1567,21 @@
                         );
                     }
 
+                    const preview = previewImport(payload);
+                    const details = [
+                        `${preview.expenses} expense${preview.expenses === 1 ? "" : "s"}`,
+                        `${preview.posts} journal post${preview.posts === 1 ? "" : "s"}`,
+                        preview.duplicates ? `${preview.duplicates} possible duplicate${preview.duplicates === 1 ? "" : "s"} (skipped)` : "",
+                        preview.invalid ? `${preview.invalid} invalid amount${preview.invalid === 1 ? "" : "s"} (not imported)` : "",
+                    ].filter(Boolean).join("\n• ");
+                    if (!confirm(`Import preview:\n• ${details}\n\nContinue?`)) return;
+
+                    if (preview.invalid) {
+                        payload.expenses = (payload.expenses || []).filter((entry) => {
+                            const amount = Number(entry.amount_paid ?? entry.amountPaid ?? 0);
+                            return Number.isFinite(amount) && amount >= 0;
+                        });
+                    }
                     const summary = await processImportedData(payload);
                     const skippedMsg = summary.skipped > 0 ? ` (${summary.skipped} duplicate${summary.skipped > 1 ? "s" : ""} skipped)` : "";
                     notify(
@@ -1931,6 +1970,13 @@
                 const alertSet = new Set(
                     (dashboard.alerts || []).map((alert) => alert.category),
                 );
+                const onboarding = $("#dashboardOnboarding");
+                if (onboarding) {
+                    onboarding.classList.toggle(
+                        "hidden",
+                        Number(statistics.total_expenses) > 0,
+                    );
+                }
 
                 $("#summaryCards").innerHTML = `
             <div class="summary-card summary-paid">
@@ -2556,6 +2602,16 @@
 
                 $("#addFirstExpenseBtn").addEventListener("click", () => {
                     $("#addExpenseBtn").click();
+                });
+
+                $("#onboardingAddExpense")?.addEventListener("click", () => {
+                    $("#addExpenseBtn").click();
+                });
+                $("#onboardingSetBudget")?.addEventListener("click", () => {
+                    $("#manageBudgetsBtn").click();
+                });
+                $("#onboardingImportData")?.addEventListener("click", () => {
+                    $("#importBtn").click();
                 });
 
                 // Hook up pagination controls
