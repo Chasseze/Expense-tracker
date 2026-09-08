@@ -471,11 +471,12 @@
                     if (dashEnd) dashQs.set("endDate", dashEnd);
                     const dashUrl = `/dashboard${dashQs.toString() ? "?" + dashQs.toString() : ""}`;
 
-                    const [customCatsResp, expResp, dashboard] =
+                    const [customCatsResp, expResp, dashboard, recurringResp] =
                         await Promise.all([
                             apiCall("/categories").catch(() => []),
                             apiCall(`/expenses?${qs.toString()}`).catch(() => []),
                             apiCall(dashUrl).catch(() => ({})),
+                            apiCall("/recurring").catch(() => []),
                         ]);
 
                     customCategories = Array.isArray(customCatsResp) ? customCatsResp : [];
@@ -508,6 +509,7 @@
                     // Blog posts are loaded on blog.html only
                     blogPosts = Array.isArray(blogPosts) ? blogPosts : [];
                     budgets = dashboard.budgets || [];
+                    recurringTemplates = Array.isArray(recurringResp) ? recurringResp : [];
                     budgetAlerts = dashboard.alerts || [];
                     overdueAlerts = dashboard.overdue || [];
                     dueSoonAlerts = dashboard.dueSoon || [];
@@ -1954,6 +1956,51 @@
             </div>
         `;
 
+                const categoryByName = new Map(
+                    categories.map((category) => [category.category, category]),
+                );
+                const budgetProgressList = $("#budgetProgressList");
+                if (budgetProgressList) {
+                    if (!budgets.length) {
+                        budgetProgressList.innerHTML =
+                            '<p class="dashboard-empty">No budgets yet. Add one to see how your spending is tracking.</p>';
+                    } else {
+                        budgetProgressList.innerHTML = budgets
+                            .slice()
+                            .sort((a, b) => a.category.localeCompare(b.category))
+                            .map((budget) => {
+                                const category = categoryByName.get(budget.category) || {};
+                                const spent = (Number(category.total_paid) || 0) + (Number(category.total_balance) || 0);
+                                const limit = Number(budget.threshold) || 0;
+                                const percent = limit > 0 ? Math.round((spent / limit) * 100) : 0;
+                                const tone = percent >= 100 ? "is-danger" : percent >= 80 ? "is-warning" : "";
+                                return `
+                                    <div class="budget-progress-item">
+                                        <div class="budget-progress-label"><strong>${escapeHtml(budget.category)}</strong><span>${fmtMoney(spent)} of ${fmtMoney(limit)}</span></div>
+                                        <div class="budget-progress-track"><span class="budget-progress-fill ${tone}" style="width:${Math.min(percent, 100)}%"></span></div>
+                                    </div>`;
+                            })
+                            .join("");
+                    }
+                }
+
+                const recurringOverview = $("#recurringOverview");
+                if (recurringOverview) {
+                    const today = new Date().toISOString().slice(0, 10);
+                    const upcoming = recurringTemplates
+                        .filter((template) => Number(template.active) === 1)
+                        .slice()
+                        .sort((a, b) => String(a.next_run_date).localeCompare(String(b.next_run_date)))
+                        .slice(0, 3);
+                    recurringOverview.innerHTML = upcoming.length
+                        ? upcoming.map((template) => {
+                            const due = String(template.next_run_date) <= today;
+                            const total = (Number(template.amount_paid) || 0) + (Number(template.balance_due) || 0);
+                            return `<div class="recurring-overview-item"><div><strong>${escapeHtml(template.recipient)}</strong><span>${fmtMoney(total)} · ${FREQUENCY_LABELS[template.frequency] || template.frequency}</span></div><span class="${due ? "recurring-due" : ""}">${due ? "Due now" : escapeHtml(template.next_run_date)}</span></div>`;
+                        }).join("")
+                        : '<p class="dashboard-empty">No scheduled payments. Add recurring costs to keep due dates in view.</p>';
+                }
+
                 // Written-out category totals (name, total, number of entries)
                 const summaryGrid = $("#categorySummaryGrid");
                 if (summaryGrid) {
@@ -2192,6 +2239,9 @@
                 $("#expenseAmountPaid").value = expense.amount_paid;
                 $("#expenseBalanceDue").value = expense.balance_due;
                 $("#expenseDueDate").value = expense.due_date || "";
+                $("#expensePaymentPlan").open = Boolean(
+                    Number(expense.balance_due) || expense.due_date,
+                );
 
                 $("#expenseModalTitle").textContent = "Edit Expense";
                 $("#expenseModal").classList.remove("hidden");
@@ -2362,18 +2412,57 @@
                 });
 
                 // Dashboard date range filter
+                document.querySelectorAll(".dash-preset").forEach((button) => {
+                    button.addEventListener("click", () => {
+                        const now = new Date();
+                        const pad = (value) => String(value).padStart(2, "0");
+                        const format = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+                        let start;
+                        let end;
+                        if (button.dataset.range === "last-month") {
+                            start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                            end = new Date(now.getFullYear(), now.getMonth(), 0);
+                        } else if (button.dataset.range === "this-year") {
+                            start = new Date(now.getFullYear(), 0, 1);
+                            end = new Date(now.getFullYear(), 11, 31);
+                        } else {
+                            start = new Date(now.getFullYear(), now.getMonth(), 1);
+                            end = now;
+                        }
+                        if ($("#dashStartDate")) $("#dashStartDate").value = format(start);
+                        if ($("#dashEndDate")) $("#dashEndDate").value = format(end);
+                        document.querySelectorAll(".dash-preset").forEach((item) => item.classList.toggle("is-active", item === button));
+                        loadData();
+                    });
+                });
                 if ($("#applyDashDateBtn")) {
                     $("#applyDashDateBtn").addEventListener("click", () => {
                         loadData();
                     });
                 }
                 if ($("#clearDashDateBtn")) {
-                    $("#clearDashDateBtn").addEventListener("click", () => {
+                $("#clearDashDateBtn").addEventListener("click", () => {
                         if ($("#dashStartDate")) $("#dashStartDate").value = "";
                         if ($("#dashEndDate")) $("#dashEndDate").value = "";
+                        document.querySelectorAll(".dash-preset").forEach((item) => item.classList.remove("is-active"));
                         loadData();
                     });
                 }
+
+                document.querySelectorAll("[data-open-modal]").forEach((button) => {
+                    button.addEventListener("click", () => {
+                        if (button.dataset.openModal === "budgetModal") {
+                            renderBudgetsTable();
+                            fillBudgetCategoryOptions();
+                        }
+                        if (button.dataset.openModal === "recurringModal") {
+                            fillRecurringCategoryOptions();
+                            $("#recurringStartDate").value = new Date().toISOString().slice(0, 10);
+                            loadRecurring();
+                        }
+                        document.getElementById(button.dataset.openModal)?.classList.remove("hidden");
+                    });
+                });
 
                 // Import/Export
                 $("#importBtn").addEventListener("click", () => {
@@ -2457,6 +2546,7 @@
                 $("#addExpenseBtn").addEventListener("click", () => {
                     window.editingExpenseId = null;
                     $("#expenseForm").reset();
+                    $("#expensePaymentPlan").open = false;
                     $("#expenseDateTime").value = new Date()
                         .toISOString()
                         .slice(0, 16);

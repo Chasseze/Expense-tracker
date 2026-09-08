@@ -1963,3 +1963,83 @@ body.theme-dark .btn-ghost-sm:hover { background: #1f2937; }
 body.theme-dark .summary-card p.label,
 body.theme-dark .summary-card p.value { color: #f8fafc; }
 body.theme-dark .empty-state { color: #cbd5e1; }
+
+/* ── Product polish: auth, navigation, and guided actions ── */
+/* app-shell is declared after Tailwind's .hidden utility, so make the
+   authenticated-state contract explicit instead of relying on CSS order. */
+.app-shell.hidden { display: none !important; }
+
+body.theme-dark .auth-form-panel h2,
+body.theme-dark .auth-form-panel h3,
+body.theme-dark .auth-form-panel label,
+body.theme-dark .auth-form-panel p { color: #e5e7eb !important; }
+body.theme-dark .auth-form-panel input {
+    background: #0b1220;
+    border-color: #334155;
+    color: #f8fafc;
+}
+body.theme-dark .auth-form-panel input::placeholder { color: #94a3b8; }
+body.theme-dark .auth-form-panel .text-primary { color: #93c5fd !important; }
+
+.sidebar-more { margin: 0.2rem 0.5rem 0.45rem; }
+.sidebar-more > summary {
+    list-style: none;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.32rem 0.25rem;
+    color: rgba(255,255,255,0.72);
+    cursor: pointer;
+    border-radius: 11px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+.sidebar-more > summary::-webkit-details-marker { display: none; }
+.sidebar-more > summary:hover { background: rgba(255,255,255,0.08); color: #fff; }
+.sidebar-more-chevron { margin-left: auto; font-size: 0.65rem; transition: transform 0.18s ease; }
+.sidebar-more[open] .sidebar-more-chevron { transform: rotate(180deg); }
+.sidebar-more-content { display: grid; gap: 1px; padding-top: 0.2rem; }
+.sidebar-more .sidebar-nav-btn { margin-left: 0; margin-right: 0; width: 100%; }
+
+.dash-date-presets { display: flex; flex-wrap: wrap; gap: 0.4rem; padding: 0.6rem 0.75rem 0 0.75rem; }
+.dash-preset {
+    border: 1px solid var(--border); border-radius: 999px; padding: 0.28rem 0.6rem;
+    background: var(--surface); color: var(--text-muted); font-size: 0.74rem; font-weight: 700; cursor: pointer;
+}
+.dash-preset:hover, .dash-preset.is-active { background: #dbeafe; border-color: #93c5fd; color: #1e40af; }
+body.theme-dark .dash-preset { background: #0b1220; border-color: #334155; color: #cbd5e1; }
+body.theme-dark .dash-preset:hover, body.theme-dark .dash-preset.is-active { background: #1e3a5f; color: #dbeafe; }
+
+.dashboard-action-grid { display: grid; gap: 1rem; margin: 1rem 0 0.8rem; }
+@media (min-width: 900px) { .dashboard-action-grid { grid-template-columns: 1fr 1fr; } }
+.dashboard-action-card { background: var(--surface); padding: 1rem; border: 1px solid var(--border); }
+.dashboard-action-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 0.8rem; }
+.dashboard-action-heading h3 { margin: 0.1rem 0 0; color: var(--text); font-size: 1rem; }
+.eyebrow { margin: 0; color: var(--text-muted); font-size: 0.7rem; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase; }
+.budget-progress-list, .recurring-overview { display: grid; gap: 0.65rem; }
+.budget-progress-item { display: grid; gap: 0.3rem; }
+.budget-progress-label { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 0.8rem; color: var(--text-muted); }
+.budget-progress-label strong { color: var(--text); font-weight: 700; }
+.budget-progress-track { height: 0.5rem; background: #e2e8f0; border-radius: 999px; overflow: hidden; }
+.budget-progress-fill { display: block; height: 100%; background: #2563eb; border-radius: inherit; }
+.budget-progress-fill.is-warning { background: #d97706; }
+.budget-progress-fill.is-danger { background: #dc2626; }
+.dashboard-empty { margin: 0; color: var(--text-muted); font-size: 0.85rem; }
+.recurring-overview-item { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.55rem 0.65rem; border-radius: 0.6rem; background: var(--surface-muted); }
+.recurring-overview-item strong { display: block; font-size: 0.85rem; color: var(--text); }
+.recurring-overview-item span { color: var(--text-muted); font-size: 0.76rem; }
+.recurring-due { color: #b91c1c !important; font-weight: 700; }
+body.theme-dark .dashboard-action-card { background: #111827; border-color: #1f2937; }
+body.theme-dark .dashboard-action-heading h3, body.theme-dark .budget-progress-label strong, body.theme-dark .recurring-overview-item strong { color: #e5e7eb; }
+body.theme-dark .budget-progress-track { background: #334155; }
+body.theme-dark .recurring-overview-item { background: #0b1220; }
+
+.expense-form-intro { margin: 0; padding: 0.7rem 0.8rem; border-radius: 0.65rem; background: #eff6ff; color: #1e40af; font-size: 0.84rem; }
+.expense-form-intro i { margin-right: 0.35rem; }
+.expense-payment-plan { border: 1px solid #dbeafe; border-radius: 0.7rem; padding: 0.75rem; background: #f8fbff; }
+.expense-payment-plan summary { cursor: pointer; color: #1d4ed8; font-size: 0.88rem; font-weight: 700; }
+.expense-payment-plan summary i { margin-right: 0.4rem; }
+body.theme-dark .expense-form-intro { background: #172554; color: #dbeafe; }
+body.theme-dark .expense-payment-plan { background: #0b1220; border-color: #334155; }
+body.theme-dark .expense-payment-plan summary { color: #bfdbfe; }

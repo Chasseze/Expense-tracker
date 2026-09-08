@@ -1,6 +1,8 @@
 node_modules/
 backups/
 uploads/
+.vs/
+.vscode/
 
 # Firebase service account (NEVER commit!)
 serviceAccountKey.json
@@ -18,3 +20,5 @@ firebase-debug.log
 playwright-smoke-*.png
 playwright-smoke-artifacts.zip
 playwright-smoke-report.json
+deploy_output.txt
+public/*.backup_*

@@ -182,57 +182,32 @@
                             <i class="fas fa-chart-bar sb-icon"></i>
                             <span class="sb-label">Reports</span>
                         </button>
-                        <button class="sidebar-nav-btn" data-view="purchases">
-                            <i class="fas fa-shopping-cart sb-icon"></i>
-                            <span class="sb-label">Purchases</span>
-                        </button>
-                        <button class="sidebar-nav-btn" data-view="receipts-gallery">
-                            <i class="fas fa-images sb-icon"></i>
-                            <span class="sb-label">Receipts</span>
-                        </button>
                         <hr class="sidebar-hr">
                         <div class="sidebar-section-label">Actions</div>
                         <button class="sidebar-nav-btn primary" id="addExpenseBtn" aria-label="Add expense">
                             <i class="fas fa-plus-circle sb-icon"></i>
                             <span class="sb-label">Add Expense</span>
                         </button>
-                        <div class="export-dropdown-container" style="position:relative">
-                            <button class="sidebar-nav-btn" id="exportBtn" aria-label="Export data">
-                                <i class="fas fa-download sb-icon"></i>
-                                <span class="sb-label">Export Data <i class="fas fa-caret-down" style="font-size:0.7rem"></i></span>
-                            </button>
-                            <div id="exportDropdown" class="export-dropdown hidden">
-                                <button id="exportJsonBtn" class="export-dropdown-item"><i class="fas fa-file-code"></i> Export as JSON</button>
-                                <button id="exportCsvBtn" class="export-dropdown-item"><i class="fas fa-file-csv"></i> Export as CSV</button>
+                        <details class="sidebar-more">
+                            <summary><i class="fas fa-ellipsis-h sb-icon"></i><span class="sb-label">More tools</span><i class="fas fa-chevron-down sidebar-more-chevron"></i></summary>
+                            <div class="sidebar-more-content">
+                                <button class="sidebar-nav-btn" data-view="purchases"><i class="fas fa-shopping-cart sb-icon"></i><span class="sb-label">Purchase plans</span></button>
+                                <button class="sidebar-nav-btn" data-view="receipts-gallery"><i class="fas fa-images sb-icon"></i><span class="sb-label">Receipts</span></button>
+                                <div class="export-dropdown-container" style="position:relative">
+                                    <button class="sidebar-nav-btn" id="exportBtn" aria-label="Export data"><i class="fas fa-download sb-icon"></i><span class="sb-label">Export data <i class="fas fa-caret-down" style="font-size:0.7rem"></i></span></button>
+                                    <div id="exportDropdown" class="export-dropdown hidden">
+                                        <button id="exportJsonBtn" class="export-dropdown-item"><i class="fas fa-file-code"></i> Export as JSON</button>
+                                        <button id="exportCsvBtn" class="export-dropdown-item"><i class="fas fa-file-csv"></i> Export as CSV</button>
+                                    </div>
+                                </div>
+                                <button class="sidebar-nav-btn" id="importBtn" aria-label="Import data"><i class="fas fa-upload sb-icon"></i><span class="sb-label">Import data</span></button>
+                                <button class="sidebar-nav-btn" id="manageBudgetsBtn" aria-label="Manage budgets"><i class="fas fa-bullseye sb-icon"></i><span class="sb-label">Budgets</span></button>
+                                <button class="sidebar-nav-btn" id="manageCategoriesBtn" aria-label="Manage categories"><i class="fas fa-tags sb-icon"></i><span class="sb-label">Categories</span></button>
+                                <button class="sidebar-nav-btn" id="manageRecurringBtn" aria-label="Manage recurring expenses"><i class="fas fa-sync-alt sb-icon"></i><span class="sb-label">Recurring</span></button>
+                                <button class="sidebar-nav-btn" id="addBlogPostBtn" aria-label="Blog"><i class="fas fa-pen-fancy sb-icon"></i><span class="sb-label">Financial journal</span></button>
+                                <button class="sidebar-nav-btn danger" id="trashBtn" aria-label="Deleted expenses"><i class="fas fa-trash-restore sb-icon"></i><span class="sb-label">Trash</span></button>
                             </div>
-                        </div>
-                        <button class="sidebar-nav-btn" id="importBtn" aria-label="Import data">
-                            <i class="fas fa-upload sb-icon"></i>
-                            <span class="sb-label">Import Data</span>
-                        </button>
-                        <hr class="sidebar-hr">
-                        <div class="sidebar-section-label">Manage</div>
-                        <button class="sidebar-nav-btn" id="manageBudgetsBtn" aria-label="Manage budgets">
-                            <i class="fas fa-bullseye sb-icon"></i>
-                            <span class="sb-label">Budgets</span>
-                        </button>
-                        <button class="sidebar-nav-btn" id="manageCategoriesBtn" aria-label="Manage categories">
-                            <i class="fas fa-tags sb-icon"></i>
-                            <span class="sb-label">Categories</span>
-                        </button>
-                        <button class="sidebar-nav-btn" id="manageRecurringBtn" aria-label="Manage recurring expenses">
-                            <i class="fas fa-sync-alt sb-icon"></i>
-                            <span class="sb-label">Recurring</span>
-                        </button>
-                        <button class="sidebar-nav-btn" id="addBlogPostBtn" aria-label="Blog">
-                            <i class="fas fa-pen-fancy sb-icon"></i>
-                            <span class="sb-label">Blog</span>
-                        </button>
-                        <hr class="sidebar-hr">
-                        <button class="sidebar-nav-btn danger" id="trashBtn" aria-label="Deleted expenses">
-                            <i class="fas fa-trash-restore sb-icon"></i>
-                            <span class="sb-label">Trash</span>
-                        </button>
+                        </details>
                     </div>
                 </aside>
 
@@ -248,6 +223,11 @@
                             </div>
                             <details class="dash-date-panel">
                                 <summary class="dash-date-summary"><i class="fas fa-calendar-alt"></i> Date range</summary>
+                                <div class="dash-date-presets" aria-label="Date range shortcuts">
+                                    <button type="button" class="dash-preset" data-range="this-month">This month</button>
+                                    <button type="button" class="dash-preset" data-range="last-month">Last month</button>
+                                    <button type="button" class="dash-preset" data-range="this-year">This year</button>
+                                </div>
                                 <div class="dash-date-controls">
                                     <label class="dash-date-field">From <input type="date" id="dashStartDate" /></label>
                                     <label class="dash-date-field">To <input type="date" id="dashEndDate" /></label>
@@ -258,6 +238,16 @@
                         </div>
                         <div id="summarySection">
                             <div class="summary-grid" id="summaryCards"></div>
+                            <section class="dashboard-action-grid" aria-label="Budget and recurring overview">
+                                <article class="card dashboard-action-card">
+                                    <div class="dashboard-action-heading"><div><p class="eyebrow">Budget health</p><h3>Stay on plan</h3></div><button type="button" class="btn-ghost-sm" data-open-modal="budgetModal">Manage</button></div>
+                                    <div id="budgetProgressList" class="budget-progress-list"></div>
+                                </article>
+                                <article class="card dashboard-action-card">
+                                    <div class="dashboard-action-heading"><div><p class="eyebrow">Upcoming</p><h3>Recurring payments</h3></div><button type="button" class="btn-ghost-sm" data-open-modal="recurringModal">Manage</button></div>
+                                    <div id="recurringOverview" class="recurring-overview"></div>
+                                </article>
+                            </section>
                             <section class="insights-section" aria-label="Insights">
                                 <div class="insights-heading">
                                     <h3>Insights</h3>
@@ -787,6 +777,7 @@
                     </button>
                 </div>
                 <form id="expenseForm" class="space-y-4">
+                    <p class="expense-form-intro"><i class="fas fa-bolt"></i> Start with the essentials. Payment plans and due dates are available below when you need them.</p>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label
@@ -822,7 +813,7 @@
                         <div>
                             <label
                                 class="block text-sm font-medium text-gray-700 mb-1"
-                                >Session/Term</label
+                                >Session/Term <span class="muted">(optional)</span></label
                             >
                             <select
                                 id="expenseSession"
@@ -871,7 +862,7 @@
                         <div>
                             <label
                                 class="block text-sm font-medium text-gray-700 mb-1"
-                                >Amount Paid (₦)</label
+                                >Amount (₦)</label
                             >
                             <input
                                 type="number"
@@ -883,32 +874,20 @@
                                 class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary"
                             />
                         </div>
-                        <div>
-                            <label
-                                class="block text-sm font-medium text-gray-700 mb-1"
-                                >Balance Due (₦)</label
-                            >
-                            <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                id="expenseBalanceDue"
-                                placeholder="0.00"
-                                class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary"
-                            />
+                    </div>
+                    <details id="expensePaymentPlan" class="expense-payment-plan">
+                        <summary><i class="fas fa-calendar-alt"></i> Add a balance or due date</summary>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Balance Due (₦)</label>
+                                <input type="number" step="0.01" min="0" id="expenseBalanceDue" placeholder="0.00" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary" />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                                <input type="date" id="expenseDueDate" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary" />
+                            </div>
                         </div>
-                    </div>
-                    <div>
-                        <label
-                            class="block text-sm font-medium text-gray-700 mb-1"
-                            >Due Date <span class="muted">(optional — for balance reminders)</span></label
-                        >
-                        <input
-                            type="date"
-                            id="expenseDueDate"
-                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary"
-                        />
-                    </div>
+                    </details>
                     <div class="flex gap-3 pt-4">
                         <button
                             type="submit"
