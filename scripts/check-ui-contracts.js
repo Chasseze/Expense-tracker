@@ -14,6 +14,7 @@ assert.match(html, /data-range="this-month"/, "Dashboard needs a this-month shor
 assert.match(html, /id="budgetProgressList"/, "Dashboard needs budget guidance.");
 assert.match(html, /id="recurringOverview"/, "Dashboard needs recurring-payment guidance.");
 assert.match(html, /id="dashboardOnboarding"/, "New users need a clear onboarding path.");
+assert.match(css, /\.onboarding-actions\s*\{[^}]*flex-wrap:\s*nowrap/s, "Mobile onboarding actions must remain on one line.");
 assert.match(html, /id="expensePaymentPlan"/, "Expense payment-plan fields should be progressively disclosed.");
 assert.match(html, /<details class="sidebar-more">/, "Secondary tools should be grouped in the sidebar.");
 assert.match(app, /recurringResp/, "Dashboard hydration should include recurring expenses.");

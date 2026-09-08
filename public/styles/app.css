@@ -2017,7 +2017,13 @@ body.theme-dark .dash-preset:hover, body.theme-dark .dash-preset.is-active { bac
 .onboarding-card h3 { margin: 0.15rem 0 0.25rem; color: #1e3a8a; font-size: 1.05rem; }
 .onboarding-card > div > p:last-child { margin: 0; color: var(--text-muted); font-size: 0.86rem; }
 .onboarding-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-end; }
-@media (max-width: 720px) { .onboarding-card { align-items: flex-start; flex-direction: column; } .onboarding-actions { justify-content: flex-start; } }
+@media (max-width: 720px) {
+    .onboarding-card { align-items: flex-start; flex-direction: column; gap: 0.7rem; padding: 0.85rem; }
+    .onboarding-actions { width: 100%; flex-wrap: nowrap; gap: 0.3rem; justify-content: flex-start; }
+    .onboarding-actions .btn-accent-sm,
+    .onboarding-actions .btn-ghost-sm { flex: 1 1 0; min-width: 0; padding: 0.55rem 0.25rem; font-size: 0.7rem; white-space: nowrap; }
+    .onboarding-actions i { display: none; }
+}
 .dashboard-action-card { background: var(--surface); padding: 1rem; border: 1px solid var(--border); }
 .dashboard-action-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 0.8rem; }
 .dashboard-action-heading h3 { margin: 0.1rem 0 0; color: var(--text); font-size: 1rem; }
