@@ -1,6 +1,7 @@
 node_modules/
 backups/
 uploads/
+*.db
 .vs/
 .vscode/
 
