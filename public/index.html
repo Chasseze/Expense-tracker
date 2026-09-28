@@ -11,7 +11,7 @@
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'" />
         <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" /></noscript>
         <link rel="stylesheet" href="/styles/tailwind.css?v=3" />
-        <link rel="stylesheet" href="/styles/app.css?v=8" />
+        <link rel="stylesheet" href="/styles/app.css?v=9" />
         <script>const APP_VERSION = "2";</script>
         <script src="/firebase-config.js?v=2" defer></script>
         <script src="/js/filter-enhancements.js?v=2" defer></script>
@@ -205,6 +205,7 @@
                                 <button class="sidebar-nav-btn" id="manageCategoriesBtn" aria-label="Manage categories"><i class="fas fa-tags sb-icon"></i><span class="sb-label">Categories</span></button>
                                 <button class="sidebar-nav-btn" id="manageRecurringBtn" aria-label="Manage recurring expenses"><i class="fas fa-sync-alt sb-icon"></i><span class="sb-label">Recurring</span></button>
                                 <button class="sidebar-nav-btn" id="addBlogPostBtn" aria-label="Blog"><i class="fas fa-pen-fancy sb-icon"></i><span class="sb-label">Financial journal</span></button>
+                                <button class="sidebar-nav-btn" type="button" data-view="biz-strategy"><i class="fas fa-chess-board sb-icon"></i><span class="sb-label">Biz Strategy</span></button>
                                 <button class="sidebar-nav-btn danger" id="trashBtn" aria-label="Deleted expenses"><i class="fas fa-trash-restore sb-icon"></i><span class="sb-label">Trash</span></button>
                             </div>
                         </details>
@@ -651,6 +652,598 @@
                             No purchase receipts yet. Attach a receipt or quote when adding a purchase.
                         </div>
                         <div id="receiptsGalleryGrid" class="receipts-gallery-grid"></div>
+                    </div>
+
+                    <!-- VIEW: BIZ STRATEGY -->
+                    <div id="view-biz-strategy" class="app-view" aria-labelledby="bizStrategyTitle">
+                        <article class="biz-strategy-document">
+                            <div class="eyebrow">ChassEZE Group · Strategy and execution</div>
+                            <h1 id="bizStrategyTitle">ChassEZE Group Business Strategy</h1>
+                            <p>
+                            <strong>Planning horizon:</strong> 12 months from [approved start date]<br>
+                            <strong>Accountable executive:</strong> [Group CEO or Managing Director]<br>
+                            <strong>Strategy owner:</strong> [Name and role]<br>
+                            <strong>Version:</strong> 1.0<br>
+                            <strong>Review cycle:</strong> Monthly performance review and quarterly strategy review </p>
+                            <blockquote>
+                            <strong>Strategic focus</strong>
+                            <br>Build a profitable core, deliver reliably, and expand when customer demand and cash support it.</blockquote>
+                            <h2>1. Executive Direction</h2>
+                            <p>ChassEZE Group should build its next year around a focused set of commercially viable offers, reliable delivery, and disciplined cash management. The recommended sequence is to establish a clear operating baseline, prove demand and delivery economics, and then expand the offers and channels that produce repeatable results. </p>
+                            <p>This strategy sets out the company overview, strategic goals, operating model, growth priorities, and execution responsibilities. Its central decision is to concentrate resources on one primary customer segment and no more than two priority offers during the first quarter. Leadership should approve further expansion only when customer demand, delivery capacity, and cash forecasts support it. </p>
+                            <h3>Planning Basis</h3>
+                            <blockquote>
+                            <strong>Planning note</strong>
+                            <br>Company-specific details appear in brackets for completion. The operating model and numerical targets below are proposals for leadership approval, rather than statements of current company performance. Month 1 begins when this strategy is approved; all financial amounts should use [reporting currency].</blockquote>
+                            <h2>2. Company Overview</h2>
+                            <h3>Company Profile</h3>
+                            <div class="table-wrap">
+                            <table>
+                            <thead>
+                            <tr>
+                            <th>Area</th>
+                            <th>Company detail to confirm</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr>
+                            <td>Legal entity and structure</td>
+                            <td>[Registered name, jurisdiction, ownership, and subsidiaries or business units]</td>
+                            </tr>
+                            <tr>
+                            <td>Core activities</td>
+                            <td>[Products, services, and current business lines]</td>
+                            </tr>
+                            <tr>
+                            <td>Headquarters and markets</td>
+                            <td>[Location and geographic markets served]</td>
+                            </tr>
+                            <tr>
+                            <td>Priority customers</td>
+                            <td>[Primary customer segment, buyer role, and recurring need]</td>
+                            </tr>
+                            <tr>
+                            <td>Current scale</td>
+                            <td>[Team size, active customers, trailing 12-month revenue, and gross margin]</td>
+                            </tr>
+                            <tr>
+                            <td>Revenue model</td>
+                            <td>[Project fees, recurring contracts, product sales, or other sources]</td>
+                            </tr>
+                            <tr>
+                            <td>Distinctive capabilities</td>
+                            <td>[Verified expertise, assets, relationships, or delivery strengths]</td>
+                            </tr>
+                            <tr>
+                            <td>Current constraints</td>
+                            <td>[Cash, staffing, systems, customer concentration, or capacity limits]</td>
+                            </tr>
+                            </tbody>
+                            </table>
+                            </div>
+                            <h3>Proposed Mission and Vision</h3>
+                            <p>
+                            <strong>Mission:</strong> Help [priority customers] achieve [specific business or personal outcome] through [core products or services], with dependable delivery and measurable value. </p>
+                            <p>
+                            <strong>Vision:</strong> Become a trusted provider in [chosen market], supported by a profitable core business and a portfolio of complementary offers. </p>
+                            <h3>Customer Value Proposition</h3>
+                            <p>ChassEZE Group helps <strong>[customer segment]</strong> solve <strong>[priority problem]</strong> by providing <strong>[offer]</strong>, producing <strong>[measurable outcome]</strong> through <strong>[verified capability or differentiator]</strong>. </p>
+                            <p>Before using this statement externally, validate it through customer interviews and evidence from completed engagements. Document the customer&#x27;s alternatives, buying criteria, willingness to pay, and reasons for choosing ChassEZE Group. </p>
+                            <h2>3. Strategic Goals</h2>
+                            <p>Approve targets by the end of Month 1 after reviewing the baseline, budget, and available capacity. If the proposed targets are unrealistic, replace them with approved values and record the rationale. </p>
+                            <div class="table-wrap">
+                            <table>
+                            <thead>
+                            <tr>
+                            <th>Goal</th>
+                            <th>Proposed 12-month outcome</th>
+                            <th>Accountable role</th>
+                            <th>Key milestone</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr>
+                            <td>Focus the portfolio</td>
+                            <td>Select one primary segment and up to two priority offers; give each active business line a clear role</td>
+                            <td>[CEO]</td>
+                            <td>Portfolio and positioning approved in Month 2</td>
+                            </tr>
+                            <tr>
+                            <td>Grow revenue sustainably</td>
+                            <td>Increase revenue by 20% against the preceding comparable 12-month period, subject to approved capacity and margin thresholds</td>
+                            <td>[Commercial Lead]</td>
+                            <td>Repeatable acquisition channel demonstrated by Month 6</td>
+                            </tr>
+                            <tr>
+                            <td>Improve profitability</td>
+                            <td>Increase gross margin by 3 percentage points from baseline</td>
+                            <td>[Finance Lead]</td>
+                            <td>Offer economics and pricing reviewed in Month 3</td>
+                            </tr>
+                            <tr>
+                            <td>Strengthen customer relationships</td>
+                            <td>Achieve at least 85% retention among customers eligible to renew or repurchase</td>
+                            <td>[Customer Success Lead]</td>
+                            <td>Renewal and feedback process operating by Month 4</td>
+                            </tr>
+                            <tr>
+                            <td>Make delivery dependable</td>
+                            <td>Complete at least 95% of commitments by the agreed date</td>
+                            <td>[Operations Lead]</td>
+                            <td>Core delivery procedures adopted in Month 3</td>
+                            </tr>
+                            <tr>
+                            <td>Protect cash</td>
+                            <td>Build toward unrestricted cash covering at least three months of essential operating outflows</td>
+                            <td>[Finance Lead]</td>
+                            <td>Rolling 13-week cash forecast operating in Month 1</td>
+                            </tr>
+                            </tbody>
+                            </table>
+                            </div>
+                            <p>For a new business without a meaningful revenue baseline, replace the percentage growth target with [approved annual revenue target] derived from expected customer volume, pricing, and delivery capacity. Define retention periods around the actual buying cycle before adopting the retention target. </p>
+                            <h2>4. Operating Model and Operations</h2>
+                            <h3>Group Structure and Accountability</h3>
+                            <p>The proposed structure combines shared leadership, finance, and operating standards with clear accountability for each business line. If ChassEZE Group currently operates as a single business, one person may hold multiple roles; record a named owner for every responsibility. </p>
+                            <div class="table-wrap">
+                            <table>
+                            <thead>
+                            <tr>
+                            <th>Role</th>
+                            <th>Core responsibility</th>
+                            <th>Decision authority</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr>
+                            <td>[CEO or Managing Director]</td>
+                            <td>Strategy, portfolio choices, major partnerships, and resource allocation</td>
+                            <td>Approves annual plan, material commitments, and expansion</td>
+                            </tr>
+                            <tr>
+                            <td>[Business Unit or Offer Lead]</td>
+                            <td>Customer outcomes, offer economics, and delivery performance</td>
+                            <td>Manages approved offer scope and budget</td>
+                            </tr>
+                            <tr>
+                            <td>[Commercial Lead]</td>
+                            <td>Positioning, prospecting, proposals, pricing execution, and pipeline</td>
+                            <td>Approves standard commercial terms within delegated limits</td>
+                            </tr>
+                            <tr>
+                            <td>[Operations Lead]</td>
+                            <td>Capacity, scheduling, quality, suppliers, and process improvement</td>
+                            <td>Assigns delivery resources and resolves delivery issues</td>
+                            </tr>
+                            <tr>
+                            <td>[Finance Lead]</td>
+                            <td>Budgets, collections, cash forecasts, reporting, and financial controls</td>
+                            <td>Enforces spending limits and escalates forecast shortfalls</td>
+                            </tr>
+                            <tr>
+                            <td>[Customer Success Lead]</td>
+                            <td>Onboarding, feedback, service recovery, renewals, and referrals</td>
+                            <td>Coordinates customer follow-up and retention actions</td>
+                            </tr>
+                            </tbody>
+                            </table>
+                            </div>
+                            <p>Leadership should publish spending and discount limits in Month 1. Purchases outside budget, contracts above [approval threshold], and exceptions below [minimum gross margin] require approval from [authorized role]. </p>
+                            <h3>Customer and Delivery Workflow</h3>
+                            <ol>
+                            <li>
+                            <strong>Qualify demand:</strong> Record the customer&#x27;s need, budget, decision maker, and timing in a shared customer relationship management system or tracker.</li>
+                            <li>
+                            <strong>Scope and price:</strong> Confirm deliverables, exclusions, estimated effort, direct costs, payment terms, and acceptance criteria.</li>
+                            <li>
+                            <strong>Approve the commitment:</strong> Check capacity and margin before issuing the final proposal or accepting the order.</li>
+                            <li>
+                            <strong>Onboard the customer:</strong> Assign an owner, agree milestones, and collect any contracted deposit.</li>
+                            <li>
+                            <strong>Deliver and review:</strong> Track progress weekly, check quality, and document changes to scope, dates, or fees.</li>
+                            <li>
+                            <strong>Close and collect:</strong> Confirm acceptance, invoice promptly, and resolve overdue balances.</li>
+                            <li>
+                            <strong>Retain and learn:</strong> Capture feedback, identify the next relevant need, and request a referral when appropriate.</li>
+                            </ol>
+                            <p>Maintain concise procedures for these activities, with a checklist, owner, and escalation point for each. Use one shared record for customer commitments and one action register for execution. </p>
+                            <h3>Management Rhythm</h3>
+                            <div class="table-wrap">
+                            <table>
+                            <thead>
+                            <tr>
+                            <th>Cadence</th>
+                            <th>Discussion and required output</th>
+                            <th>Owner</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr>
+                            <td>Weekly</td>
+                            <td>Pipeline, delivery risks, collections, capacity, and next actions; update owners and due dates</td>
+                            <td>[Operations Lead]</td>
+                            </tr>
+                            <tr>
+                            <td>Monthly</td>
+                            <td>Financial results, KPI trends, budget variances, and corrective actions; refresh cash forecast</td>
+                            <td>[CEO and Finance Lead]</td>
+                            </tr>
+                            <tr>
+                            <td>Quarterly</td>
+                            <td>Offer performance, customer evidence, and resource allocation; continue, revise, or stop initiatives</td>
+                            <td>[Leadership Team]</td>
+                            </tr>
+                            </tbody>
+                            </table>
+                            </div>
+                            <h2>5. Growth Priorities</h2>
+                            <h3>Priority 1 Strengthen the Core Offer</h3>
+                            <ul>
+                            <li>Interview at least 10 current or prospective customers by Month 2.</li>
+                            <li>Define up to two offers with clear outcomes, scope, pricing, and delivery standards.</li>
+                            <li>Build proof from customer-approved results and relevant examples.</li>
+                            <li>Review direct costs and margins before changing pricing or adding features.</li>
+                            </ul>
+                            <blockquote>
+                            <strong>Success gate</strong>
+                            <br>Customers understand the offer, demand is evidenced, and delivery can meet the approved minimum margin.</blockquote>
+                            <h3>Priority 2 Build Repeatable Customer Acquisition</h3>
+                            <ul>
+                            <li>Test no more than two channels initially, selected for the chosen segment: referrals, direct outreach, partnerships, or targeted content.</li>
+                            <li>Track qualified opportunities, proposals, wins, channel costs, and time to close.</li>
+                            <li>Document the sales process and follow-up schedule.</li>
+                            <li>Increase spending only after a channel produces acceptable economics across multiple completed sales.</li>
+                            </ul>
+                            <blockquote>
+                            <strong>Success gate</strong>
+                            <br>At least one channel delivers qualified customers consistently over three consecutive months within [approved acquisition cost or payback limit].</blockquote>
+                            <h3>Priority 3 Increase Repeat Business</h3>
+                            <ul>
+                            <li>Schedule customer reviews at relevant delivery milestones.</li>
+                            <li>Introduce renewal reminders or repurchase follow-up aligned with the buying cycle.</li>
+                            <li>Offer complementary services only when they solve a validated need.</li>
+                            <li>Close feedback issues with a named owner and response date.</li>
+                            </ul>
+                            <blockquote>
+                            <strong>Success gate</strong>
+                            <br>Retention meets the approved target, and repeat business maintains the minimum margin.</blockquote>
+                            <h3>Priority 4 Expand Selectively</h3>
+                            <ul>
+                            <li>Assess adjacent customer segments, geographies, or partnerships after the core offer performs reliably.</li>
+                            <li>Use a limited pilot with a defined budget, duration, and success criteria.</li>
+                            <li>Prefer partners where they improve access or capacity without creating unsustainable commitments.</li>
+                            <li>Approve permanent hiring or broader expansion only after reviewing demand, utilization, and cash.</li>
+                            </ul>
+                            <blockquote>
+                            <strong>Success gate</strong>
+                            <br>A pilot produces paid demand, acceptable delivery quality, and positive contribution after incremental costs, within the approved budget.</blockquote>
+                            <h2>6. Performance Dashboard</h2>
+                            <p>Every monthly review should show baseline, target, actual result, trend, accountable owner, and corrective action. Finance should define consistent cost classifications and reconcile financial measures to the accounting records. </p>
+                            <div class="table-wrap">
+                            <table>
+                            <thead>
+                            <tr>
+                            <th>KPI</th>
+                            <th>Definition</th>
+                            <th>Proposed target</th>
+                            <th>Owner</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr>
+                            <td>Revenue growth</td>
+                            <td>(Current 12-month revenue − preceding comparable 12-month revenue) ÷ preceding revenue</td>
+                            <td>20%; use an absolute target if baseline is zero</td>
+                            <td>[Commercial Lead]</td>
+                            </tr>
+                            <tr>
+                            <td>Gross margin</td>
+                            <td>(Revenue − direct delivery or product costs) ÷ revenue</td>
+                            <td>Baseline + 3 percentage points</td>
+                            <td>[Finance Lead]</td>
+                            </tr>
+                            <tr>
+                            <td>Customer retention</td>
+                            <td>Customers who renew or repurchase ÷ customers eligible in the defined period</td>
+                            <td>At least 85%</td>
+                            <td>[Customer Success Lead]</td>
+                            </tr>
+                            <tr>
+                            <td>On-time delivery</td>
+                            <td>Commitments completed by agreed date ÷ commitments due</td>
+                            <td>At least 95%</td>
+                            <td>[Operations Lead]</td>
+                            </tr>
+                            <tr>
+                            <td>Proposal win rate</td>
+                            <td>Won proposals ÷ proposals decided in the period</td>
+                            <td>[Month 1 approved target]</td>
+                            <td>[Commercial Lead]</td>
+                            </tr>
+                            <tr>
+                            <td>Channel acquisition cost</td>
+                            <td>Attributable channel sales and marketing costs ÷ new customers won through that channel</td>
+                            <td>[Approved limit]</td>
+                            <td>[Commercial Lead]</td>
+                            </tr>
+                            <tr>
+                            <td>Overdue receivables</td>
+                            <td>Unpaid invoice value past contracted due date</td>
+                            <td>[Approved amount or percentage ceiling]</td>
+                            <td>[Finance Lead]</td>
+                            </tr>
+                            <tr>
+                            <td>Cash coverage</td>
+                            <td>Unrestricted cash ÷ average monthly essential operating cash outflows</td>
+                            <td>At least 3 months</td>
+                            <td>[Finance Lead]</td>
+                            </tr>
+                            <tr>
+                            <td>Action completion</td>
+                            <td>Actions completed by due date ÷ actions due</td>
+                            <td>At least 90%</td>
+                            <td>[Strategy Owner]</td>
+                            </tr>
+                            </tbody>
+                            </table>
+                            </div>
+                            <p>Report numerator and denominator alongside percentage metrics when volumes are small. Mark metrics with no eligible observations as not applicable. Investigate missed targets during the monthly review and assign a recovery action with a deadline. </p>
+                            <h2>7. Practical Execution Plan</h2>
+                            <h3>🟢 First 30 Days</h3>
+                            <ul>
+                            <li>
+                            <strong>Week 1:</strong> Appoint the strategy owner, confirm business lines and customer segments, and gather available financial and operating records.</li>
+                            <li>
+                            <strong>Week 2:</strong> Establish KPI baselines, list active commitments, and prepare the first 13-week cash forecast.</li>
+                            <li>
+                            <strong>Week 3:</strong> Review customer evidence, rank offers, and estimate the resources needed for the priority initiatives.</li>
+                            <li>
+                            <strong>Week 4:</strong> Approve targets, named owners, budget limits, and the first-quarter action register.</li>
+                            </ul>
+                            <h3>🔵 12 Month Action Roadmap</h3>
+                            <div class="table-wrap">
+                            <table>
+                            <thead>
+                            <tr>
+                            <th>Month</th>
+                            <th>Main actions</th>
+                            <th>Milestone and evidence</th>
+                            <th>Accountable role</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr>
+                            <td>1</td>
+                            <td>Confirm company profile, baseline KPIs, cash forecast, owners, and budget</td>
+                            <td>Approved strategy, dashboard, and funded first-quarter plan</td>
+                            <td>[CEO and Finance Lead]</td>
+                            </tr>
+                            <tr>
+                            <td>2</td>
+                            <td>Complete customer interviews; choose primary segment and up to two offers</td>
+                            <td>Written positioning and offer scope supported by interview findings</td>
+                            <td>[Commercial Lead]</td>
+                            </tr>
+                            <tr>
+                            <td>3</td>
+                            <td>Review pricing; implement sales and delivery procedures; launch channel tests</td>
+                            <td>Offer cost model, delivery checklist, and first test results</td>
+                            <td>[Commercial and Operations Leads]</td>
+                            </tr>
+                            <tr>
+                            <td>4</td>
+                            <td>Start systematic customer reviews and renewal follow-up</td>
+                            <td>Feedback log and renewal or repurchase schedule in use</td>
+                            <td>[Customer Success Lead]</td>
+                            </tr>
+                            <tr>
+                            <td>5</td>
+                            <td>Improve conversion and delivery bottlenecks; stop weak experiments</td>
+                            <td>Documented improvements and decision on each tested channel</td>
+                            <td>[Commercial and Operations Leads]</td>
+                            </tr>
+                            <tr>
+                            <td>6</td>
+                            <td>Review first-half performance; assess acquisition repeatability</td>
+                            <td>Midyear review and decision to continue, revise, or stop growth spending</td>
+                            <td>[Leadership Team]</td>
+                            </tr>
+                            <tr>
+                            <td>7</td>
+                            <td>Increase activity in proven channels within capacity and cash limits</td>
+                            <td>Approved channel plan and capacity forecast</td>
+                            <td>[Commercial Lead]</td>
+                            </tr>
+                            <tr>
+                            <td>8</td>
+                            <td>Assess complementary offers or partnerships; select one bounded pilot</td>
+                            <td>Pilot brief with owner, budget, customer evidence, and success criteria</td>
+                            <td>[Business Unit Lead]</td>
+                            </tr>
+                            <tr>
+                            <td>9</td>
+                            <td>Run the pilot and assess incremental economics and quality</td>
+                            <td>Quarterly review with evidence-based expansion decision</td>
+                            <td>[CEO and Business Unit Lead]</td>
+                            </tr>
+                            <tr>
+                            <td>10</td>
+                            <td>Standardize successful practices; review staffing and supplier needs</td>
+                            <td>Updated procedures and resource plan tied to forecast demand</td>
+                            <td>[Operations Lead]</td>
+                            </tr>
+                            <tr>
+                            <td>11</td>
+                            <td>Prepare next-year budget, renewals, and portfolio recommendations</td>
+                            <td>Draft annual plan with forecasts and initiative priorities</td>
+                            <td>[Finance and Commercial Leads]</td>
+                            </tr>
+                            <tr>
+                            <td>12</td>
+                            <td>Review annual KPIs, customer outcomes, and lessons; approve next-year plan</td>
+                            <td>Annual strategy review and approved next-year operating plan</td>
+                            <td>[Leadership Team]</td>
+                            </tr>
+                            </tbody>
+                            </table>
+                            </div>
+                            <h3>🟠 Milestone Gates</h3>
+                            <ul>
+                            <li>
+                            <strong>End of Month 3:</strong> Proceed with broader sales activity only after offer scope, cost estimates, and delivery responsibilities are clear.</li>
+                            <li>
+                            <strong>End of Month 6:</strong> Increase acquisition spending only when the channel gate in Section 5 is met and the cash forecast supports it.</li>
+                            <li>
+                            <strong>End of Month 9:</strong> Expand a pilot only if paid demand, contribution, delivery quality, and capacity satisfy its pre-agreed criteria.</li>
+                            <li>
+                            <strong>End of Month 12:</strong> Allocate next-year resources according to demonstrated offer performance and strategic fit.</li>
+                            </ul>
+                            <p>If a gate is missed, record the cause, a corrective action, and a new decision date. Avoid treating calendar progress as evidence that an initiative is ready to scale. </p>
+                            <h3>Action Register</h3>
+                            <div class="table-wrap">
+                            <table>
+                            <thead>
+                            <tr>
+                            <th>Action</th>
+                            <th>Named owner</th>
+                            <th>Due date</th>
+                            <th>Evidence of completion</th>
+                            <th>Status</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr>
+                            <td>Confirm company profile and priority customer</td>
+                            <td>[Name]</td>
+                            <td>[Month 1 date]</td>
+                            <td>Completed profile and approved segment</td>
+                            <td>[Not started]</td>
+                            </tr>
+                            <tr>
+                            <td>Establish KPI baseline and approved targets</td>
+                            <td>[Name]</td>
+                            <td>[Month 1 date]</td>
+                            <td>Reconciled dashboard</td>
+                            <td>[Not started]</td>
+                            </tr>
+                            <tr>
+                            <td>Approve initiative budgets and cash limits</td>
+                            <td>[Name]</td>
+                            <td>[Month 1 date]</td>
+                            <td>Signed budget and cash forecast</td>
+                            <td>[Not started]</td>
+                            </tr>
+                            <tr>
+                            <td>Complete customer interviews and offer selection</td>
+                            <td>[Name]</td>
+                            <td>[Month 2 date]</td>
+                            <td>Interview findings and approved offer briefs</td>
+                            <td>[Not started]</td>
+                            </tr>
+                            <tr>
+                            <td>Adopt core operating procedures</td>
+                            <td>[Name]</td>
+                            <td>[Month 3 date]</td>
+                            <td>Procedures used on active work</td>
+                            <td>[Not started]</td>
+                            </tr>
+                            </tbody>
+                            </table>
+                            </div>
+                            <p>Use the same register for all roadmap actions. Record dependencies and blockers in the working tracker; escalate any blocker that threatens a customer commitment or approved milestone. </p>
+                            <h2>8. Resources and Risk Management</h2>
+                            <h3>Resource Allocation</h3>
+                            <p>Fund essential operations first, then core-offer improvements and small growth tests. Release expansion funds in stages after milestone reviews. Every initiative should specify [budget], [required team hours], [expected result], [cash impact], and [stop criteria]. Finance should reconcile the initiative plan to the operating budget each month. </p>
+                            <div class="table-wrap">
+                            <table>
+                            <thead>
+                            <tr>
+                            <th>Risk</th>
+                            <th>Early indicator</th>
+                            <th>Response</th>
+                            <th>Owner</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr>
+                            <td>Cash pressure</td>
+                            <td>Cash forecast falls below [minimum balance]</td>
+                            <td>Accelerate collections, review payment terms, and defer discretionary spending</td>
+                            <td>[Finance Lead]</td>
+                            </tr>
+                            <tr>
+                            <td>Unfocused expansion</td>
+                            <td>Multiple pilots compete for the same people or budget</td>
+                            <td>Pause lower-priority initiatives and enforce portfolio limits</td>
+                            <td>[CEO]</td>
+                            </tr>
+                            <tr>
+                            <td>Customer concentration</td>
+                            <td>One customer exceeds [approved revenue share]</td>
+                            <td>Diversify pipeline and plan for loss of the largest account</td>
+                            <td>[Commercial Lead]</td>
+                            </tr>
+                            <tr>
+                            <td>Delivery overload</td>
+                            <td>Missed dates, rework, or backlog exceeds [threshold]</td>
+                            <td>Adjust capacity, scope, or scheduling before accepting more work</td>
+                            <td>[Operations Lead]</td>
+                            </tr>
+                            <tr>
+                            <td>Weak offer economics</td>
+                            <td>Realized margin falls below [minimum]</td>
+                            <td>Reassess price, scope, supplier costs, and delivery effort</td>
+                            <td>[Business Unit Lead]</td>
+                            </tr>
+                            <tr>
+                            <td>Key-person dependency</td>
+                            <td>Critical tasks lack trained backup</td>
+                            <td>Document procedures and assign backup responsibility</td>
+                            <td>[Operations Lead]</td>
+                            </tr>
+                            </tbody>
+                            </table>
+                            </div>
+                            <h2>9. Leadership Approval and Ownership</h2>
+                            <p>Approval activates Month 1 and confirms responsibility for the plan. Complete the placeholders, approve or revise proposed targets, and record any changes in the monthly review log. </p>
+                            <div class="table-wrap">
+                            <table>
+                            <thead>
+                            <tr>
+                            <th>Approval item</th>
+                            <th>Required decision</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr>
+                            <td>Strategic focus</td>
+                            <td>[Primary segment and priority offers]</td>
+                            </tr>
+                            <tr>
+                            <td>Financial commitments</td>
+                            <td>[Annual budget, minimum cash balance, and margin floor]</td>
+                            </tr>
+                            <tr>
+                            <td>Performance targets</td>
+                            <td>[Approved dashboard and baseline period]</td>
+                            </tr>
+                            <tr>
+                            <td>Execution ownership</td>
+                            <td>[Named executive sponsor and strategy owner]</td>
+                            </tr>
+                            <tr>
+                            <td>Start and review dates</td>
+                            <td>[Start date, monthly review dates, and quarterly review dates]</td>
+                            </tr>
+                            </tbody>
+                            </table>
+                            </div>
+                            <p>
+                            <strong>Approved by:</strong> [Name and role]<br>
+                            <strong>Approval date:</strong> [Date]<br>
+                            <strong>Next review:</strong> [Date] </p>
+                            <footer>ChassEZE Group Business Strategy · 12 month planning horizon</footer>
+                        </article>
                     </div>
 
 </main>
@@ -1264,7 +1857,7 @@
             ><span id="notificationText"></span>
         </div>
 
-        <script src="/js/app.js?v=4" defer></script>
+        <script src="/js/app.js?v=5" defer></script>
 
     </body>
 </html>

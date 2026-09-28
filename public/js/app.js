@@ -2668,6 +2668,10 @@
                         const target = document.getElementById("view-" + viewId);
                         if (target) target.classList.add("active");
                         navBtns.forEach(b => b.classList.toggle("active", b.dataset.view === viewId));
+                        document.querySelectorAll(".mobile-nav-btn[data-view]").forEach(b =>
+                            b.classList.toggle("active", b.dataset.view === viewId),
+                        );
+                        if (viewId === "biz-strategy") document.querySelector(".app-main")?.scrollTo(0, 0);
                     }
                     navBtns.forEach(btn => btn.addEventListener("click", () => switchView(btn.dataset.view)));
                 })();
@@ -3506,6 +3510,9 @@
                     backdrop.classList.add("open");
                 };
                 backdrop.addEventListener("click", closeSidebar);
+                sidebar?.querySelectorAll(".sidebar-nav-btn[data-view]").forEach((btn) => {
+                    btn.addEventListener("click", closeSidebar);
+                });
 
                 document.querySelectorAll(".mobile-nav-btn[data-view]").forEach((btn) => {
                     btn.addEventListener("click", () => {
